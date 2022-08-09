@@ -96,6 +96,16 @@ private:
   /*! @brief Index of the next source to add (if output is enabled). */
   uint_fast32_t _next_index;
 
+  std::vector< CoordinateVector<> > _to_do_feedback;
+
+  std::vector< double > _r_inj;
+  std::vector< double > _r_st;
+  std::vector< double > _num_cells_injected;
+  std::vector< double > _nbar;
+
+
+  double _energy = 1e44;
+
   /**
    * @brief Generate a new source position.
    *
@@ -116,6 +126,34 @@ private:
         _origin_z;
 
     return CoordinateVector<>(x, y, z);
+  }
+
+  double get_r_inj(HydroDensitySubGrid::hydroiterator cell) {
+    double rho = cell.get_hydro_variables().get_primitives_density();
+
+    double r_inj = std::pow(0.23873241*1.e3*2.e30/rho,1./3.);
+
+    double dx = std::pow(cell.get_volume(),1./3.);
+
+    if (r_inj < 4.*dx) {
+      r_inj = 4.*dx;
+    }
+
+    return r_inj;
+
+  }
+
+
+  double get_r_st(HydroDensitySubGrid::hydroiterator cell) {
+
+    double rho = cell.get_hydro_variables().get_primitives_density();
+
+    double nbar = 1.e-6*rho/1.67262192e-27;
+
+    double r_st = 3.086e+16 * 19.1 * std::pow(_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
+
+    return r_st;
+
   }
 
 public:
@@ -306,6 +344,137 @@ public:
     return _source_positions.size();
   }
 
+
+  /**
+   * @brief Will the distribution do stellar feedback at the given time?
+   *
+   * @param current_time Current simulation time (in s).
+   * @return True if the star has not exploded yet and its lifetime has been
+   * exceeded.
+   */
+  virtual bool do_stellar_feedback(const double current_time) const {
+    return (_to_do_feedback.size() > 0);
+  }
+
+
+  virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {
+
+    for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
+
+      if (subgrid.is_in_box(_to_do_feedback[i])) {
+
+        HydroDensitySubGrid::hydroiterator cell =
+           subgrid.get_hydro_cell(_to_do_feedback[i]);
+
+        double r_inj = get_r_inj(cell);
+        double r_st = get_r_st(cell);
+
+        _r_inj.push_back(r_inj);
+        _r_st.push_back(r_st);
+
+
+        double dx = std::pow(cell.get_volume(),1./3.);
+
+        double r_inj_cells= r_inj/dx;
+
+        _num_cells_injected.push_back(std::pow(r_inj_cells,3) * 4.18879020479);
+
+        double rho = cell.get_hydro_variables().get_primitives_density();
+        _nbar.push_back(1.e-6*rho/1.67262192e-27);
+      }
+    }
+
+  }
+
+  virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid) {
+
+
+
+    for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
+
+      for (auto cellit = subgrid.hydro_begin();
+           cellit != subgrid.hydro_end(); ++cellit) {
+           CoordinateVector<> cellpos = cellit.get_cell_midpoint();
+
+           if ((cellpos - _to_do_feedback[i]).norm() < _r_inj[i]) {
+
+
+             double dx = std::pow(cellit.get_volume(),1./3.);
+             if (_r_st[i] < 4.*dx || 1 == 1) {
+
+
+
+            //   CoordinateVector<> vel_prior =
+              //         cellit.get_hydro_variables().get_primitives_velocity();
+
+               CoordinateVector<> mom_prior =
+                      cellit.get_hydro_variables().get_conserved_momentum();
+
+            //   double kinetic_energy_prior =
+              //     0.5 * CoordinateVector<>::dot_product(vel_prior,mom_prior);
+
+
+               //double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
+
+              // double init_tot_en = cellit.get_hydro_variables().get_conserved_total_energy();
+
+               double mom_to_inj = 2.6e5*std::pow(_nbar[i],-2./17) * std::pow(_energy*1.e-44,16./17.);
+               // Msol km/s to kg m/s
+               mom_to_inj = mom_to_inj * 2.e30 * 1.e3;
+
+               mom_to_inj = mom_to_inj/_num_cells_injected[i];
+
+               CoordinateVector<> direction = (cellpos-_to_do_feedback[i])/((cellpos-_to_do_feedback[i]).norm());
+
+               //CoordinateVector<> vel_new = vel_prior + mom_to_inj*direction/cell_mass;
+
+               CoordinateVector<> mom_new = mom_prior + mom_to_inj*direction;
+
+               cellit.get_hydro_variables().set_conserved_momentum(mom_new);
+
+
+              // double kinetic_energy_new =
+                //   0.5 * CoordinateVector<>::dot_product(vel_new,mom_new);
+
+              //double energy_change = kinetic_energy_new - kinetic_energy_prior;
+
+
+
+              //cellit.get_hydro_variables().set_conserved_total_energy(init_tot_en + energy_change);
+
+
+
+               //cellit.get_hydro_variables().set_primitives_velocity(vel_new);
+
+
+               //cellit.get_hydro_variables().set_energy_term(0.01*_energy/_num_cells_injected[i]);
+
+
+
+
+
+             }
+             else {
+
+               cellit.get_hydro_variables().set_energy_term(_energy/_num_cells_injected[i]);
+             }
+           }
+        }
+    }
+  }
+
+  virtual void done_stellar_feedback() {
+
+    _to_do_feedback.clear();
+    _r_inj.clear();
+    _r_st.clear();
+    _num_cells_injected.clear();
+    _nbar.clear();
+
+  }
+
+
+
   /**
    * @brief Get a valid position from the distribution.
    *
@@ -362,8 +531,11 @@ public:
             _source_indices.erase(_source_indices.begin() + i);
           }
 
+          _to_do_feedback.push_back(_source_positions[i]);
           _source_positions.erase(_source_positions.begin() + i);
           _source_lifetimes.erase(_source_lifetimes.begin() + i);
+
+
           changed = true;
         } else {
           // check the next element

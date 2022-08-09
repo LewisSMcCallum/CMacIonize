@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cmath>
+#include <iostream>
 
 /*! @brief Number of temperature bins. */
 #define DERIJCKERADIATIVECOOLING_NUMTEMPERATURE 351
@@ -68,6 +69,9 @@ public:
    */
   inline double get_cooling_rate(const double temperature) const {
 
+
+
+
     // we need to find the index of the lower limit and the upper limit of
     // the temperature interval that contains the given temperature
     uint_fast32_t ilow, ihigh;
@@ -97,7 +101,12 @@ public:
 
       // now search for the actual indices using bisection
       while ((ihigh - ilow) != 1) {
-        const uint_fast32_t imid = (ilow + ihigh) >> 1;
+        uint_fast32_t imid = (ilow + ihigh) >> 1;
+        if (imid > 350 || imid<0) {
+          ilow = 0;
+          ihigh = 350;
+          imid = 175;
+        }
         if (temperature >= _temperatures[imid]) {
           ilow = imid;
         } else {
@@ -116,9 +125,16 @@ public:
     const double cooling_rate =
         (1. - fac) * _cooling_rates[ilow] + fac * _cooling_rates[ihigh];
 
+
+
     cmac_assert(cooling_rate == cooling_rate);
 
+
+
     return std::max(cooling_rate, 0.);
+
+
+
   }
 
   /**
@@ -127,6 +143,8 @@ public:
    * @return Lowest tabulated temperature value (in K).
    */
   double get_minimum_temperature() const { return _temperatures[0]; }
+
+  double get_maximum_temperature() const { return _temperatures[DERIJCKERADIATIVECOOLING_NUMTEMPERATURE - 1]; }
 };
 
 #endif // DERIJCKERADIATIVECOOLING_HPP

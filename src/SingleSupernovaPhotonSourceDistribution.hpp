@@ -55,8 +55,44 @@ private:
   /*! @brief Energy of the supernova exposion (in J). */
   const double _energy;
 
+
   /*! @brief Flag signalling if the supernova already exploded. */
   bool _has_exploded;
+  bool _inform_dist;
+
+  double _r_inj;
+  double _r_st;
+
+  double _nbar;
+
+  double _num_cells_injected;
+
+  double get_r_inj(HydroDensitySubGrid::hydroiterator cell) {
+    double rho = cell.get_hydro_variables().get_primitives_density();
+
+    _nbar = 1.e-6*rho/1.67262192e-27;
+
+    double r_inj = std::pow(0.23873241*1.e3*2.e30/rho,1./3.);
+
+    double dx = std::pow(cell.get_volume(),1./3.);
+
+    if (r_inj < 4.*dx) {
+      r_inj = 4.*dx;
+    }
+
+    return r_inj;
+
+  }
+
+
+  double get_r_st(HydroDensitySubGrid::hydroiterator cell) {
+
+
+    double r_st = 3.086e+16 * 19.1 * std::pow(_energy*1.e-44,5./17.) * std::pow(_nbar,-7./17);
+
+    return r_st;
+
+  }
 
 public:
   /**
@@ -73,7 +109,10 @@ public:
       const CoordinateVector<> position, const double lifetime,
       const double luminosity, const double energy, Log *log = nullptr)
       : _position(position), _lifetime(lifetime), _luminosity(luminosity),
-        _energy(energy), _has_exploded(false) {
+        _energy(energy), _has_exploded(false),_inform_dist(false) {
+
+
+
 
     if (log != nullptr) {
       log->write_status(
@@ -170,13 +209,13 @@ public:
    */
   virtual bool update(const double simulation_time) {
 
-    if (!_has_exploded && simulation_time >= _lifetime) {
-      _has_exploded = true;
+    if (_has_exploded && !_inform_dist) {
+      _inform_dist = true;
       return true;
     } else {
       // make sure the PhotonSource is warned if the number of sources is
       // zero
-      return _has_exploded;
+      return false;
     }
   }
 
@@ -206,6 +245,29 @@ public:
     return (!_has_exploded && current_time >= _lifetime);
   }
 
+
+
+  virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {
+
+    if (subgrid.is_in_box(_position)) {
+
+      HydroDensitySubGrid::hydroiterator cell =
+          subgrid.get_hydro_cell(_position);
+
+      _r_inj = get_r_inj(cell);
+      _r_st = get_r_st(cell);
+
+
+      double dx = std::pow(cell.get_volume(),1./3.);
+
+      double r_inj_cells= _r_inj/dx;
+
+      _num_cells_injected = std::pow(r_inj_cells,3) * 4.18879020479;
+
+
+
+    }
+  }
   /**
    * @brief Add stellar feedback to the given subgrid.
    *
@@ -214,12 +276,70 @@ public:
    * @param subgrid DensitySubGrid to operate on.
    */
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid) {
-    if (subgrid.is_in_box(_position)) {
-      HydroDensitySubGrid::hydroiterator cell =
-          subgrid.get_hydro_cell(_position);
-      cell.get_hydro_variables().set_energy_term(_energy);
+
+
+
+    for (auto cellit = subgrid.hydro_begin();
+         cellit != subgrid.hydro_end(); ++cellit) {
+         CoordinateVector<> cellpos = cellit.get_cell_midpoint();
+
+
+         if ((cellpos - _position).norm() < _r_inj) {
+
+
+
+           double dx = std::pow(cellit.get_volume(),1./3.);
+           if (_r_st < 4.*dx) {
+
+
+
+
+
+
+             CoordinateVector<> vel_prior =
+                     cellit.get_hydro_variables().get_primitives_velocity();
+
+             CoordinateVector<> mom_prior =
+                    cellit.get_hydro_variables().get_conserved_momentum();
+
+             double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
+             double mom_to_inj = 2.6e5*std::pow(_nbar,-2./17) * std::pow(_energy*1.e-44,16./17.);
+             // Msol km/s to kg m/s
+             mom_to_inj = 0.5 * mom_to_inj * 2.e30 * 1.e3;
+
+             mom_to_inj = mom_to_inj/_num_cells_injected;
+
+             CoordinateVector<> direction = (cellpos-_position)/((cellpos-_position).norm());
+
+             CoordinateVector<> vel_new = vel_prior + mom_to_inj*direction/cell_mass;
+
+             CoordinateVector<> mom_new = mom_prior + mom_to_inj*direction;
+
+             cellit.get_hydro_variables().set_conserved_momentum(mom_new);
+
+             cellit.get_hydro_variables().set_primitives_velocity(vel_new);
+
+             cellit.get_hydro_variables().set_energy_term(0.5*_energy/_num_cells_injected);
+
+
+
+
+
+           }
+           else {
+
+             cellit.get_hydro_variables().set_energy_term(_energy/_num_cells_injected);
+
+             
+           }
+         }
+         else {
+           //do nothing
+         }
+      }
+
     }
-  }
+
 
   /**
    * @brief Finalise adding stellar feedback to a distributed grid.

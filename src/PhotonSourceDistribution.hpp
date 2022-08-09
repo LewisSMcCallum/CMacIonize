@@ -98,6 +98,8 @@ public:
   virtual void add_stellar_feedback(DensityGrid &grid,
                                     const double current_time) {}
 
+  virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {}
+
   /**
    * @brief Will the distribution do stellar feedback at the given time?
    *

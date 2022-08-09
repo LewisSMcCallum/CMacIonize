@@ -1233,11 +1233,12 @@ public:
                              const IonizationVariables &ionization_variables,
                              const double volume) const {
 
-    const double cs = get_soundspeed(hydro_variables, ionization_variables);
+    //const double cs = get_soundspeed(hydro_variables, ionization_variables);
     const double v = hydro_variables.get_primitives_velocity().norm();
     const double R = std::cbrt(0.75 * volume * M_1_PI);
 
-    const double dt = R / (cs + v);
+    //const double dt = R / (cs + v);
+    const double dt = R/v;
     cmac_assert(dt > 0.);
     return dt;
   }
