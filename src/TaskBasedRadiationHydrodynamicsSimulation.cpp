@@ -762,7 +762,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
                               const double inverse_volume, const double nH2V,
                               const double total_dt,
                               DeRijckeRadiativeCooling &radiative_cooling,
-                              Hydro &hydro) {
+                              Hydro &hydro, double _cooling_temp_floor) {
 
   const double energy_start =
       hydro_variables.get_conserved_total_energy() -
@@ -777,7 +777,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
 
   double temperature = ionization_variables.get_temperature();
 
-  if (temperature <= radiative_cooling.get_minimum_temperature()) {
+  if (temperature <= _cooling_temp_floor) {
     return;
   }
 
@@ -1089,10 +1089,14 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   }
 
   DeRijckeRadiativeCooling *radiative_cooling = nullptr;
+  double _cooling_temp_floor = 10.;
   if (params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
           false)) {
     radiative_cooling = new DeRijckeRadiativeCooling();
+    _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
+            "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
+            "10 K");
   }
 
   const bool do_stellar_feedback = params->get_value< bool >(
@@ -2002,7 +2006,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             const double nH2 = nH * nH;
             do_cooling(ionization_variables, hydro_variables,
                        1. / cellit.get_volume(), nH2 * cellit.get_volume(),
-                       actual_timestep, *radiative_cooling, hydro);
+                       actual_timestep, *radiative_cooling, hydro,
+                        _cooling_temp_floor);
 
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
@@ -2011,11 +2016,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             cellit.get_hydro_variables().set_conserved_total_energy(
                 hydro_variables.get_conserved_total_energy());
             if (ionization_variables.get_temperature() <
-                radiative_cooling->get_minimum_temperature()) {
+                _cooling_temp_floor) {
               hydro.set_temperature(
                   cellit.get_ionization_variables(),
                   cellit.get_hydro_variables(), cellit.get_volume(),
-                  radiative_cooling->get_minimum_temperature());
+                  _cooling_temp_floor);
             }
 
           }
