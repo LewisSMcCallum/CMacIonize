@@ -833,7 +833,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
 
 
       temperature = ionization_variables.get_temperature();
-      if (temperature <= radiative_cooling.get_minimum_temperature()) {
+      if (temperature <= _cooling_temp_floor) {
         return;
       }
       cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
@@ -852,7 +852,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
       current_energy =
            1.5*temperature*1.38e-23*sqrt(nH2V)/sqrt(inverse_volume);
       temperature = ionization_variables.get_temperature();
-      if (temperature <= radiative_cooling.get_minimum_temperature()) {
+      if (temperature <= _cooling_temp_floor) {
         return;
       }
       cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
