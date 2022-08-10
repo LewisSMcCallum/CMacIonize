@@ -1369,16 +1369,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   if (restart_reader == nullptr && do_stellar_feedback &&
       sourcedistribution->do_stellar_feedback(0.)) {
 
+
+    sourcedistribution->get_sne_radii(*grid_creator);
+
     AtomicValue< size_t > igrid(0);
 
-    while (igrid.value() < grid_creator->number_of_original_subgrids()) {
-      const size_t this_igrid = igrid.post_increment();
-      if (this_igrid < grid_creator->number_of_original_subgrids()) {
-        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
-        sourcedistribution->get_sne_radii(subgrid);
-      }
-    }
-    igrid.set(0);
     start_parallel_timing_block();
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
@@ -1981,23 +1976,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       time_logger.end("radiation");
     }
 
-    AtomicValue< size_t > igrid(0);
-    while (igrid.value() < grid_creator->number_of_original_subgrids()) {
-      const size_t this_igrid = igrid.post_increment();
-      if (this_igrid < grid_creator->number_of_original_subgrids()) {
-        auto gridit = grid_creator->get_subgrid(this_igrid);
-        for (auto cellit = (*gridit).hydro_begin();
-             cellit != (*gridit).hydro_end(); ++cellit) {
-
-               if (cellit.get_ionization_variables().get_temperature() > 1.e8) {
-                 cellit.get_ionization_variables().set_temperature(1.e8);
-               }
-               }
-
-             }
-
-           }
-
 
     if (radiative_cooling != nullptr) {
       time_logger.start("cooling");
@@ -2271,16 +2249,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
     if (do_stellar_feedback &&
         sourcedistribution->do_stellar_feedback(current_time)) {
-      std::cout << "\n Starting stellar feedback.";
+       if (log) {
+         log->write_status("Starting stellar feedback.");
+       }
+
+
+      sourcedistribution->get_sne_radii(*grid_creator);
+
+
+
       AtomicValue< size_t > igrid(0);
-      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
-        const size_t this_igrid = igrid.post_increment();
-        if (this_igrid < grid_creator->number_of_original_subgrids()) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
-          sourcedistribution->get_sne_radii(subgrid);
-        }
-      }
-      igrid.set(0);
       start_parallel_timing_block();
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
@@ -2303,7 +2281,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         }
       }
       stop_parallel_timing_block();
-      std::cout << "\n Done stellar feedback.";
+      if (log) {
+        log->write_status("Done with stellar feedback.");
+      }
       sourcedistribution->done_stellar_feedback();
     }
 

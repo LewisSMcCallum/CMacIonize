@@ -30,6 +30,7 @@
 #include "ParameterFile.hpp"
 #include "PhotonSourceDistribution.hpp"
 #include "RandomGenerator.hpp"
+#include "DensitySubGridCreator.hpp"
 
 #include <algorithm>
 #include <cinttypes>
@@ -128,33 +129,77 @@ private:
     return CoordinateVector<>(x, y, z);
   }
 
-  double get_r_inj(HydroDensitySubGrid::hydroiterator cell) {
-    double rho = cell.get_hydro_variables().get_primitives_density();
 
-    double r_inj = std::pow(0.23873241*1.e3*2.e30/rho,1./3.);
-
-    double dx = std::pow(cell.get_volume(),1./3.);
-
-    if (r_inj < 4.*dx) {
-      r_inj = 4.*dx;
-    }
-
-    return r_inj;
-
-  }
+  double get_r_inj(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+                                         CoordinateVector<> sne_loc) {
 
 
-  double get_r_st(HydroDensitySubGrid::hydroiterator cell) {
 
-    double rho = cell.get_hydro_variables().get_primitives_density();
+      HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(sne_loc);
 
-    double nbar = 1.e-6*rho/1.67262192e-27;
+      double cell_vol =  subgrid.get_cell(sne_loc).get_volume();
 
-    double r_st = 3.086e+16 * 19.1 * std::pow(_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
 
-    return r_st;
+      double dx = std::pow(cell_vol,1./3.);
 
-  }
+      double r_run = 4*dx;
+
+      std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
+
+
+      vec = grid_creator->cells_within_radius(sne_loc,r_run);
+
+
+      double mtot = 0.0;
+      for (auto & pair : vec) {
+        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
+        mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
+
+      }
+      if (mtot > 1.988e+33) {
+        _num_cells_injected.push_back(268);
+        return r_run;
+      }
+
+      while (mtot < 1.988e+33) {
+        r_run = r_run+dx;
+        vec = grid_creator->cells_within_radius(sne_loc,r_run);
+        mtot = 0.0;
+        for (auto & pair : vec) {
+          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
+          double cell_mass = (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
+          mtot = mtot + cell_mass;
+        }
+      }
+      _num_cells_injected.push_back(vec.size());
+      return r_run;
+
+   }
+
+   double get_r_st(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+                                 CoordinateVector<> sne_loc, double r_inj) {
+
+       std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
+
+        vec = grid_creator->cells_within_radius(sne_loc,r_inj);
+        double mtot = 0.0;
+        for (auto & pair : vec) {
+          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
+          mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
+        }
+
+        double inj_vol = 1.3333*3.14159265*std::pow(r_inj,3.0);
+        double rho = mtot/inj_vol;
+        double nbar = 1.e-6*rho/1.67262192e-27;
+        _nbar.push_back(nbar);
+
+        double r_st = 3.086e+16 * 19.1 * std::pow(_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
+
+        return r_st;
+
+      }
+
+
 
 public:
   /**
@@ -357,36 +402,27 @@ public:
   }
 
 
-  virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {
 
-    for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
+  virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 
-      if (subgrid.is_in_box(_to_do_feedback[i])) {
+       for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
 
-        HydroDensitySubGrid::hydroiterator cell =
-           subgrid.get_hydro_cell(_to_do_feedback[i]);
+         double r_inj = get_r_inj(&grid_creator,_to_do_feedback[i]);
 
-        double r_inj = get_r_inj(cell);
-        double r_st = get_r_st(cell);
-
-        _r_inj.push_back(r_inj);
-        _r_st.push_back(r_st);
+         double r_st = get_r_st(&grid_creator,_to_do_feedback[i],r_inj);
 
 
-        double dx = std::pow(cell.get_volume(),1./3.);
+         _r_inj.push_back(r_inj);
+         _r_st.push_back(r_st);
 
-        double r_inj_cells= r_inj/dx;
 
-        _num_cells_injected.push_back(std::pow(r_inj_cells,3) * 4.18879020479);
-
-        double rho = cell.get_hydro_variables().get_primitives_density();
-        _nbar.push_back(1.e-6*rho/1.67262192e-27);
-      }
-    }
-
+       }
   }
 
+
+
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid) {
+
 
 
 
@@ -400,7 +436,7 @@ public:
 
 
              double dx = std::pow(cellit.get_volume(),1./3.);
-             if (_r_st[i] < 4.*dx || 1 == 1) {
+             if (_r_st[i] < 4.*dx) {
 
 
 

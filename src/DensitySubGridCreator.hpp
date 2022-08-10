@@ -33,6 +33,7 @@
 #include "Error.hpp"
 #include "OpenMP.hpp"
 #include "ParameterFile.hpp"
+#include "HydroDensitySubGrid.hpp"
 
 #include <cinttypes>
 #include <vector>
@@ -771,6 +772,38 @@ public:
    */
   inline iterator get_subgrid(const size_t index) {
     return iterator(index, *this);
+  }
+
+
+
+
+  inline std::vector<std::pair<uint_fast32_t,uint_fast32_t>> cells_within_radius(CoordinateVector<> midpoint, double radius) {
+
+
+    AtomicValue< size_t > igrid(0);
+    std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
+    uint_fast32_t num_subgrids = _number_of_subgrids[0]*_number_of_subgrids[1]*_number_of_subgrids[2];
+
+    while (igrid.value() < num_subgrids) {
+      const size_t this_igrid = igrid.post_increment();
+      if (this_igrid < num_subgrids) {
+        HydroDensitySubGrid &subgrid = *this->get_subgrid(this_igrid);
+        for (auto cellit = subgrid.hydro_begin();
+             cellit != subgrid.hydro_end(); ++cellit) {
+             CoordinateVector<> cellpos = cellit.get_cell_midpoint();
+
+             if ((cellpos - midpoint).norm() < radius) {
+               uint_fast32_t subgrid_index = this_igrid;
+               uint_fast32_t cell_index = cellit.get_index();
+               std::pair<uint_fast32_t,uint_fast32_t> pair = std::make_pair(subgrid_index,cell_index);
+               vec.push_back(pair);
+             }
+
+           }
+
+      }
+    }
+    return vec;
   }
 
   /**

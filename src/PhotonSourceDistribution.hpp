@@ -29,6 +29,7 @@
 #include "CoordinateVector.hpp"
 #include "DensityGrid.hpp"
 #include "HydroDensitySubGrid.hpp"
+#include "DensitySubGridCreator.hpp"
 
 /*! @brief Size of a variable that stores the number of photon sources. */
 typedef uint_fast32_t photonsourcenumber_t;
@@ -99,6 +100,8 @@ public:
                                     const double current_time) {}
 
   virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {}
+
+  virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {}
 
   /**
    * @brief Will the distribution do stellar feedback at the given time?
