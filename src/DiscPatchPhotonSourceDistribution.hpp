@@ -425,12 +425,19 @@ public:
 
 
 
-
     for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
 
       for (auto cellit = subgrid.hydro_begin();
            cellit != subgrid.hydro_end(); ++cellit) {
            CoordinateVector<> cellpos = cellit.get_cell_midpoint();
+
+           if (cellit.get_hydro_variables().get_primitives_density() == 0) {
+             //dont add energy to cell without mass...
+             continue;
+           }
+           cmac_assert_message(cellit.get_hydro_variables().get_primitives_density() < 1.e40,
+                "rho exceeded. Simulation is failing.");
+
 
            if ((cellpos - _to_do_feedback[i]).norm() < _r_inj[i]) {
 
@@ -440,19 +447,15 @@ public:
 
 
 
-            //   CoordinateVector<> vel_prior =
-              //         cellit.get_hydro_variables().get_primitives_velocity();
-
-               CoordinateVector<> mom_prior =
-                      cellit.get_hydro_variables().get_conserved_momentum();
-
-            //   double kinetic_energy_prior =
-              //     0.5 * CoordinateVector<>::dot_product(vel_prior,mom_prior);
+              CoordinateVector<> vel_prior =
+                       cellit.get_hydro_variables().get_primitives_velocity();
 
 
-               //double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
 
-              // double init_tot_en = cellit.get_hydro_variables().get_conserved_total_energy();
+
+
+               double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
+
 
                double mom_to_inj = 2.6e5*std::pow(_nbar[i],-2./17) * std::pow(_energy*1.e-44,16./17.);
                // Msol km/s to kg m/s
@@ -462,31 +465,9 @@ public:
 
                CoordinateVector<> direction = (cellpos-_to_do_feedback[i])/((cellpos-_to_do_feedback[i]).norm());
 
-               //CoordinateVector<> vel_new = vel_prior + mom_to_inj*direction/cell_mass;
+               CoordinateVector<> vel_new = vel_prior + mom_to_inj*direction/cell_mass;
 
-               CoordinateVector<> mom_new = mom_prior + mom_to_inj*direction;
-
-               cellit.get_hydro_variables().set_conserved_momentum(mom_new);
-
-
-              // double kinetic_energy_new =
-                //   0.5 * CoordinateVector<>::dot_product(vel_new,mom_new);
-
-              //double energy_change = kinetic_energy_new - kinetic_energy_prior;
-
-
-
-              //cellit.get_hydro_variables().set_conserved_total_energy(init_tot_en + energy_change);
-
-
-
-               //cellit.get_hydro_variables().set_primitives_velocity(vel_new);
-
-
-               //cellit.get_hydro_variables().set_energy_term(0.01*_energy/_num_cells_injected[i]);
-
-
-
+               cellit.get_hydro_variables().set_primitives_velocity(vel_new);
 
 
              }
@@ -495,11 +476,21 @@ public:
                cellit.get_hydro_variables().set_energy_term(_energy/_num_cells_injected[i]);
              }
            }
+           cmac_assert_message(cellit.get_hydro_variables().get_conserved_total_energy() >=0,
+             "Energy negative after SNe feedback.");
         }
     }
   }
 
   virtual void done_stellar_feedback() {
+
+    for (uint_fast32_t i=0; i<_to_do_feedback.size();i++) {
+
+    std::cout << "\n SNe INJECTION HERE: R_inj = " << _r_inj[i] << " R_st = " <<  _r_st[i]
+       << " num_cells = " <<  _num_cells_injected[i] << " nbar = "  << _nbar[i] << "\n";
+    }
+
+
 
     _to_do_feedback.clear();
     _r_inj.clear();

@@ -764,52 +764,67 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
                               DeRijckeRadiativeCooling &radiative_cooling,
                               Hydro &hydro, double _cooling_temp_floor) {
 
-  const double energy_start =
-      hydro_variables.get_conserved_total_energy() -
-      0.5 * CoordinateVector<>::dot_product(
-                hydro_variables.get_primitives_velocity(),
-                hydro_variables.get_conserved_momentum());
 
-  if (energy_start == 0.) {
+  double rho = hydro_variables.get_primitives_density();
+  double xh = ionization_variables.get_ionic_fraction(ION_H_n);
+  double volume = 1./inverse_volume;
+  double k= 1.38e-23;
+  double mh = 1.67e-27;
+  double gamma_minus_one = 0.66666;
+
+  double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
+
+  double t_start = ionization_variables.get_temperature();
+  double temperature = t_start;
+
+  double current_energy = t_start*e_factor;
+
+  double calced_e = current_energy;
+
+  double kinetic_energy =
+        0.5*CoordinateVector<>::dot_product(
+                   hydro_variables.get_primitives_velocity(),
+                   hydro_variables.get_conserved_momentum());
+
+  double bkp_thermal = hydro_variables.get_conserved_total_energy() - kinetic_energy;
+
+  current_energy = std::min(bkp_thermal, calced_e);
+
+   cmac_assert_message(kinetic_energy >= 0, "KE <0 = %g", kinetic_energy);
+   cmac_assert_message(bkp_thermal >=0, "thermal < 0 = %g", bkp_thermal);
+
+
+
+
+  if (current_energy == 0. || hydro_variables.get_conserved_total_energy() == 0. ||
+    hydro_variables.get_conserved_total_energy() - kinetic_energy <= 0) {
     // don't cool gas that has no thermal energy
     return;
   }
 
-  double temperature = ionization_variables.get_temperature();
 
-  if (temperature <= _cooling_temp_floor) {
+
+  if (t_start <= _cooling_temp_floor) {
     return;
   }
 
-  if (temperature > radiative_cooling.get_maximum_temperature()) {
-    cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
-                  temperature);
-  }
-
-  double cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
-
-
-
+  //if (temperature > radiative_cooling.get_maximum_temperature()) {
+  //  cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
+  //                temperature);
+  //}
+  double cooling = radiative_cooling.get_cooling_rate(t_start) * nH2V;
 
 
   double cool_limit = 0.01;
-  double current_energy =
-       1.5*temperature*1.38e-23*sqrt(nH2V)/sqrt(inverse_volume);
   double clock = 0.;
   double tstep = total_dt;
   double e_lost = 0.0;
 
 
-
-  int it_counter = 0;
   while (clock < total_dt) {
-    it_counter = it_counter + 1;
-
 
     tstep = total_dt - clock;
     if (cooling*tstep > cool_limit*current_energy) {
-
-
 
       tstep = cool_limit * current_energy/cooling;
 
@@ -817,48 +832,66 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         tstep = total_dt/1.e6;
       }
 
-      if (energy_start < e_lost+(tstep*cooling)) {
-        return;
+      double dE = tstep*cooling;
+
+      if (current_energy < dE) {
+        break;
       }
 
 
-      hydro.update_energy_variables(ionization_variables, hydro_variables,
-                                    inverse_volume, -1*(tstep*cooling));
-
-      e_lost = e_lost + (tstep*cooling);
-
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+      temperature = current_energy/e_factor;
       clock = clock + tstep;
-      current_energy =
-           1.5*temperature*1.38e-23*sqrt(nH2V)/sqrt(inverse_volume);
 
 
-      temperature = ionization_variables.get_temperature();
       if (temperature <= _cooling_temp_floor) {
-        return;
+        break;
       }
       cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
     } else {
 
-      if (energy_start < e_lost + (tstep*cooling)) {
-        return;
+      if (current_energy < tstep*cooling) {
+        break;
       }
 
-      hydro.update_energy_variables(ionization_variables, hydro_variables,
-                                    inverse_volume, -1*(tstep*cooling));
 
-      e_lost = e_lost + (tstep*cooling);
+      double dE = tstep*cooling;
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
 
+      // do actual cooling step
+
+      temperature = current_energy/e_factor;
       clock = clock + tstep;
-      current_energy =
-           1.5*temperature*1.38e-23*sqrt(nH2V)/sqrt(inverse_volume);
-      temperature = ionization_variables.get_temperature();
+
+
       if (temperature <= _cooling_temp_floor) {
-        return;
+        break;
       }
       cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
+
+
+
     }
 
   }
+
+  cmac_assert_message(e_lost < hydro_variables.get_conserved_total_energy(), "Trying to remove e = %g from total = %g",
+                e_lost, hydro_variables.get_conserved_total_energy());
+
+  cmac_assert_message(bkp_thermal > e_lost, "Update energy will fail as e_lost > thermal, elost = %g, thermal=%g, calc e= %g, KE = %g, tstart=%g, press = %g",
+                       e_lost, bkp_thermal,calced_e, kinetic_energy, t_start, hydro_variables.get_primitives_pressure());
+
+  double pressure = gamma_minus_one*inverse_volume*(bkp_thermal-e_lost);
+
+  hydro_variables.set_conserved_total_energy(hydro_variables.get_conserved_total_energy() - e_lost);
+  hydro_variables.set_primitives_pressure(pressure);
+  ionization_variables.set_temperature(temperature);
+
+  cmac_assert_message(hydro_variables.get_conserved_total_energy() >= 0, "Negative energy after cooling.");
 }
 
 /**
@@ -1396,6 +1429,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                                         1. / cellit.get_volume(), dE);
 
           cellit.get_hydro_variables().set_energy_term(0.);
+          hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
         }
       }
     }
@@ -1566,8 +1600,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     }
 
     // decide whether or not to do the radiation step
-
-
     if (do_radiation &&
         (hydro_radtime < 0. ||
          (current_time - actual_timestep) >= hydro_lastrad * hydro_radtime)) {
@@ -1999,6 +2031,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           auto gridit = grid_creator->get_subgrid(this_igrid);
           for (auto cellit = (*gridit).hydro_begin();
                cellit != (*gridit).hydro_end(); ++cellit) {
+            hydro.align_temp_to_p(cellit.get_hydro_variables(), cellit.get_ionization_variables());
             IonizationVariables ionization_variables =
                 cellit.get_ionization_variables();
             HydroVariables hydro_variables = cellit.get_hydro_variables();
@@ -2008,7 +2041,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                        1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                        actual_timestep, *radiative_cooling, hydro,
                         _cooling_temp_floor);
-
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
             cellit.get_hydro_variables().set_primitives_pressure(
@@ -2282,6 +2314,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                                           cellit.get_hydro_variables(),
                                           1. / cellit.get_volume(), dE);
             cellit.get_hydro_variables().set_energy_term(0.);
+            hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
           }
         }
       }
