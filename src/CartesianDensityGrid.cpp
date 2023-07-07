@@ -375,7 +375,7 @@ double CartesianDensityGrid::integrate_optical_depth(const Photon &photon) {
 DensityGrid::iterator CartesianDensityGrid::interact(Photon &photon,
                                                      double optical_depth) {
 
-  double S = 0.;
+
 
   CoordinateVector<> photon_origin = photon.get_position();
   const CoordinateVector<> photon_direction = photon.get_direction();
@@ -431,7 +431,7 @@ DensityGrid::iterator CartesianDensityGrid::interact(Photon &photon,
     // update contributions to mean intensity integrals
     update_integrals(ds, it, photon);
 
-    S += ds;
+
   }
 
   if (ncell == 0 && optical_depth > 0.) {

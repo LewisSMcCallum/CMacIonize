@@ -60,9 +60,9 @@
  * @param log Log to write logging information to.
  */
 HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
-    std::string filename, const Box<> box, double luminosity,
+    std::string filename, const Box<> box,
     Log *log)
-    : _luminosity(luminosity), _log(log) {
+    : _log(log) {
 
   // turn off default HDF5 error handling: we catch errors ourselves
   HDF5Tools::initialize();
@@ -159,8 +159,6 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
                     "SimulationBox:anchor"),
                 params.get_physical_vector< QUANTITY_LENGTH >(
                     "SimulationBox:sides")),
-          params.get_physical_value<QUANTITY_FREQUENCY >
-                    ("PhotonSourceDistribution:luminosity"),
           log) {}
 
 /**

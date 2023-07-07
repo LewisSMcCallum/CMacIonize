@@ -130,7 +130,7 @@ set(CMACIONIZE_VERSION_MAJOR ${GIT_VERSION_MAJOR})
 set(CMACIONIZE_VERSION_MINOR ${GIT_VERSION_MINOR})
 
 # Enable C++11, since we need this for delegating constructors
-add_compiler_flag("-std=c++11" REQUIRED)
+add_compiler_flag("-std=c++14" REQUIRED)
 
 # Check if the compiler supports atomic floating point operations (it should if
 # it truly supports C++11, but e.g. the Intel compiler does actually not)
@@ -189,7 +189,7 @@ else(OUTPUT_PHOTOIONIZATION_RATES)
 endif(OUTPUT_PHOTOIONIZATION_RATES)
 
 # Enable all standard compiler warnings and enforce them
-add_compiler_flag("-Wall -Werror" OPTIONAL)
+add_compiler_flag("-Wall -Werror -Wno-deprecated -Wno-inconsistent-missing-override" OPTIONAL)
 
 # Enable the address sanitizer in debug builds
 # (to symbolize the code, run

@@ -210,7 +210,6 @@ private:
                        DensitySubGridCreator<HydroDensitySubGrid>* grid_creator,
                        CoordinateVector<double> midpoint, double midpoint_potential,
                        CoordinateVector<double> midpoint_velocity) {
-    double total_density = 0.0;
     double total_thermal_energy = 0.0;
     double total_kinetic_energy = 0.0;
     double total_potential_energy = 0.0;
@@ -229,13 +228,13 @@ private:
       auto hydro_iterator = subgrid.hydro_begin() + (index_pair.second);
 
       double density = hydro_iterator.get_hydro_variables().get_primitives_density();
-      total_density += density;
+      if (density < _rho_critical){
+        return false;
+      }
+
     }
 
-    //double mean_density = total_density / indexes.size();
-    //if (mean_density <= _rho_critical) {
-    //  return false;
-    //}
+
 
 
 

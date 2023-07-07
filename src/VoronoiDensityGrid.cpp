@@ -485,7 +485,7 @@ double VoronoiDensityGrid::integrate_optical_depth(const Photon &photon) {
 DensityGrid::iterator VoronoiDensityGrid::interact(Photon &photon,
                                                    double optical_depth) {
 
-  double S = 0.;
+
 
   CoordinateVector<> photon_origin = photon.get_position();
   const CoordinateVector<> photon_direction = photon.get_direction();
@@ -566,7 +566,7 @@ DensityGrid::iterator VoronoiDensityGrid::interact(Photon &photon,
 
     update_integrals(mins, it, photon);
 
-    S += mins;
+
   }
 
   photon.set_position(photon_origin);

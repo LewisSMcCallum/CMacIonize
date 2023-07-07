@@ -173,7 +173,6 @@ public:
 
 private:
   std::vector<TreeNode*> roots;
-  double resolution;
   CoordinateVector<double> grid_dimensions;
   CoordinateVector<double> box_anchor;
   double _theta;

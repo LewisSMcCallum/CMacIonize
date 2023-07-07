@@ -114,24 +114,14 @@ ArepoSnapshotPhotonSourceDistribution::ArepoSnapshotPhotonSourceDistribution(
 
   // units
   double unit_length_in_SI = fallback_unit_length_in_SI;
-  double unit_time_in_SI = fallback_unit_time_in_SI;
-  double unit_mass_in_SI = fallback_unit_mass_in_SI;
+
   if (HDF5Tools::group_exists(file, "/Parameters")) {
     HDF5Tools::HDF5Group units = HDF5Tools::open_group(file, "/Parameters");
     const double unit_length_in_cgs =
         HDF5Tools::read_attribute< double >(units, "UnitLength_in_cm");
-    const double unit_vel_in_cgs =
-        HDF5Tools::read_attribute< double >(units, "UnitVelocity_in_cm_per_s");
-    const double unit_mass_in_cgs =
-        HDF5Tools::read_attribute< double >(units, "UnitMass_in_g");
-    const double unit_time_in_cgs =
-        unit_length_in_cgs/unit_vel_in_cgs;
     unit_length_in_SI =
         UnitConverter::to_SI< QUANTITY_LENGTH >(unit_length_in_cgs, "cm");
-    // seconds are seconds
-    unit_time_in_SI = unit_time_in_cgs;
-    unit_mass_in_SI =
-        UnitConverter::to_SI< QUANTITY_MASS >(unit_mass_in_cgs, "g");
+
     HDF5Tools::close_group(units);
   } else {
     if (_log) {
@@ -147,28 +137,11 @@ ArepoSnapshotPhotonSourceDistribution::ArepoSnapshotPhotonSourceDistribution(
       unit_length_in_SI = 1.;
     }
 
-    if (fallback_unit_time_in_SI == 0.) {
-      if (_log) {
-        _log->write_warning(
-            "No fallback time unit found in parameter file, using s!");
-      }
-      unit_time_in_SI = 1.;
-    }
-
-    if (fallback_unit_mass_in_SI == 0.) {
-      if (_log) {
-        _log->write_warning(
-            "No fallback mass unit found in parameter file, using kg!");
-      }
-      unit_mass_in_SI = 1.;
-    }
   }
 
   if (comoving_integration) {
     // code values are in comoving units
     unit_length_in_SI /= hubble_parameter;
-    unit_mass_in_SI /= hubble_parameter;
-    unit_time_in_SI /= hubble_parameter;
   }
 
   _total_luminosity = 0.;

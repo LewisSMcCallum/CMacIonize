@@ -49,8 +49,6 @@ private:
   std::vector< double > _luminosities;
 
 
-  double _luminosity;
-
 
   /*! @brief Total luminosity of all sources in the snapshot file (in s^-1). */
   double _total_luminosity;
@@ -60,7 +58,7 @@ private:
 
 public:
   HDF5PhotonSourceDistribution(
-      std::string filename, const Box<> box, double luminosity,
+      std::string filename, const Box<> box,
       Log *log = nullptr);
   HDF5PhotonSourceDistribution(ParameterFile &params,
                                          Log *log = nullptr);

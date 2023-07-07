@@ -139,7 +139,7 @@ InterpolatedDensityFunction::InterpolatedDensityFunction(std::string filename,
   uint_fast32_t x_column = 0;
   uint_fast32_t y_column = 0;
   uint_fast32_t z_column = 0;
-  uint_fast32_t num_variable = 1;
+
   if (num_x != 0) {
     if (name_to_column.count("x") == 0) {
       cmac_error("No column found containing x values!");
@@ -149,7 +149,6 @@ InterpolatedDensityFunction::InterpolatedDensityFunction(std::string filename,
   if (num_x > 1) {
     _x_coords.resize(num_x);
     _number_densities.resize(num_x);
-    num_variable *= num_x;
   } else {
     _x_coords.resize(2);
     _x_coords[0] = _x_bounds.first;
@@ -167,7 +166,7 @@ InterpolatedDensityFunction::InterpolatedDensityFunction(std::string filename,
     for (size_t ix = 0; ix < _number_densities.size(); ++ix) {
       _number_densities[ix].resize(num_y);
     }
-    num_variable *= num_y;
+
   } else {
     _y_coords.resize(2);
     _y_coords[0] = _y_bounds.first;
@@ -189,7 +188,7 @@ InterpolatedDensityFunction::InterpolatedDensityFunction(std::string filename,
         _number_densities[ix][iy].resize(num_z);
       }
     }
-    num_variable *= num_z;
+
   } else {
     _z_coords.resize(2);
     _z_coords[0] = _z_bounds.first;
@@ -251,10 +250,10 @@ InterpolatedDensityFunction::InterpolatedDensityFunction(std::string filename,
             row[number_density_column], units[number_density_column]);
 
     ++i;
-    cmac_assert(i <= num_variable);
+
   }
 
-  cmac_assert(i == num_variable);
+
 
   // now copy the arrays to complete the missing data
   if (num_x < 2) {

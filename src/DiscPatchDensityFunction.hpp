@@ -243,7 +243,7 @@ public:
   virtual DensityValues operator()(const Cell &cell) {
 
 
-    const double abs_z = std::abs(cell.get_cell_midpoint().z())/3.086e+19;
+    const double abs_z = std::abs(cell.get_cell_midpoint().z() - _disc_z)/3.086e+19;
     const double nH = 0.47*std::exp(-0.5*std::pow(abs_z/0.09,2)) + 0.13*std::exp(-0.5*std::pow(abs_z/0.225,2))
          + 0.077*std::exp(-1*(abs_z/0.403)) +
            0.025*std::exp(-abs_z);
