@@ -33,6 +33,7 @@
 
 class Abundances;
 class ChargeTransferRates;
+class CollisionalRates;
 class LineCoolingData;
 class Log;
 class RecombinationRates;
@@ -87,6 +88,8 @@ private:
   /*! @brief ChargeTransferRates used to calculate ionic fractions. */
   const ChargeTransferRates &_charge_transfer_rates;
 
+  const CollisionalRates &_collisional_rates;
+
   /*! @brief IonizationStateCalculator used for low iteration numbers. */
   IonizationStateCalculator _ionization_state_calculator;
 
@@ -120,12 +123,15 @@ public:
       const double minimum_ionized_temperature,
       const LineCoolingData &line_cooling_data,
       const RecombinationRates &recombination_rates,
-      const ChargeTransferRates &charge_transfer_rates, Log *log = nullptr);
+      const ChargeTransferRates &charge_transfer_rates,
+      const CollisionalRates &collisional_rates,
+      Log *log = nullptr);
 
   TemperatureCalculator(double luminosity, const Abundances &abundances,
                         const LineCoolingData &line_cooling_data,
                         const RecombinationRates &recombination_rates,
                         const ChargeTransferRates &charge_transfer_rates,
+                        const CollisionalRates &collisional_rates,
                         ParameterFile &params, Log *log = nullptr);
 
   static void compute_cooling_and_heating_balance(
@@ -136,7 +142,8 @@ public:
       const double h[NUMBER_OF_HEATINGTERMS], double pahfac, double crfac,
       double crscale, const LineCoolingData &line_cooling_data,
       const RecombinationRates &recombination_rates,
-      const ChargeTransferRates &charge_transfer_rates);
+      const ChargeTransferRates &charge_transfer_rates,
+      const CollisionalRates &collisional_rates);
 
   void calculate_temperature(IonizationVariables &ionization_variables,
                              const double jfac, const double hfac,

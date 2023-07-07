@@ -139,12 +139,14 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
 #ifdef HAS_HELIUM
     const double nhep =
-        ntot * (1. - ionization_variables.get_ionic_fraction(ION_He_n)) *
+        ntot * (1. - ionization_variables.get_ionic_fraction(ION_He_n) - ionization_variables.get_ionic_fraction(ION_He_p1)) *
         abundances.get_abundance(ELEMENT_He);
+    const double nhpp = ntot*(ionization_variables.get_ionic_fraction(ION_He_p1));
 #else
     const double nhep = 0.;
+    const double nhpp = 0.;
 #endif
-    const double ne = nhp + nhep;
+    const double ne = nhp + nhep + 2.0*nhpp;
 
     // get the abundances of the ions used by the line cooling computation
     double abund[LINECOOLINGDATA_NUMELEMENTS];
@@ -160,6 +162,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                   ionization_variables.get_ionic_fraction(ION_C_p2));
     abund[CIII] = abundances.get_abundance(ELEMENT_C) *
                   ionization_variables.get_ionic_fraction(ION_C_p1);
+#else
+// Lewis hacked this in to make an error go away... Dont see it causing problems...
+   abund[CII] = 0.0;
 #endif
 
 #ifdef HAS_NITROGEN

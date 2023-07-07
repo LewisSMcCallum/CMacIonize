@@ -38,6 +38,7 @@
 #include "SPHVoronoiGeneratorDistribution.hpp"
 #include "UniformRandomVoronoiGeneratorDistribution.hpp"
 #include "UniformRegularVoronoiGeneratorDistribution.hpp"
+#include "NormalRandomVoronoiGeneratorDistribution.hpp"
 
 // HDF5 dependent implementations
 #ifdef HAVE_HDF5
@@ -113,6 +114,9 @@ public:
     } else if (type == "SPHNG") {
       // added by Maya
       return new SPHNGVoronoiGeneratorDistribution(simulation_box, params, log);
+    } else if (type == "NormalRandom") {
+      return new NormalRandomVoronoiGeneratorDistribution(simulation_box,
+                                                          params, log);
     } else if (type == "UniformRandom") {
       return new UniformRandomVoronoiGeneratorDistribution(simulation_box,
                                                            params, log);

@@ -347,4 +347,73 @@ static inline int_fast32_t get_element(const int_fast32_t ion) {
   }
 }
 
+
+static inline std::string get_ion_collisional_filename(const int_fast32_t ion) {
+
+  switch (ion) {
+
+  case ION_H_n:
+    return "HI.dat";
+
+#ifdef HAS_HELIUM
+  case ION_He_n:
+    return "He";
+#endif
+
+#ifdef HAS_CARBON
+  case ION_C_p1:
+    return "C+";
+  case ION_C_p2:
+    return "C++";
+#endif
+
+#ifdef HAS_NITROGEN
+  case ION_N_n:
+    return "N";
+  case ION_N_p1:
+    return "N+";
+  case ION_N_p2:
+    return "N++";
+#endif
+
+#ifdef HAS_OXYGEN
+  case ION_O_n:
+    return "O";
+  case ION_O_p1:
+    return "O+";
+#endif
+
+#ifdef HAS_NEON
+  case ION_Ne_n:
+    return "Ne";
+  case ION_Ne_p1:
+    return "Ne+";
+#endif
+
+#ifdef HAS_SULPHUR
+  case ION_S_p1:
+    return "S+";
+  case ION_S_p2:
+    return "S++";
+  case ION_S_p3:
+    return "S+++";
+#endif
+
+#ifdef HAS_ARGON
+  case ION_Ar_n:
+    return "Ar";
+  case ION_Ar_p1:
+    return "Ar+";
+  case ION_Ar_p2:
+    return "Ar++";
+  case ION_Ar_p3:
+    return "Ar+++";
+#endif
+
+  default:
+    cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
+    return "";
+  }
+}
+
 #endif // ELEMENTNAMES_HPP

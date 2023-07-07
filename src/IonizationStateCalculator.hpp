@@ -33,6 +33,7 @@ class Abundances;
 class ChargeTransferRates;
 class DensitySubGrid;
 class RecombinationRates;
+class CollisionalRates;
 
 /**
  * @brief Class that calculates the ionization state on a grid after the photon
@@ -60,11 +61,14 @@ private:
    *  calculation for coolants. */
   const ChargeTransferRates &_charge_transfer_rates;
 
+  const CollisionalRates &_collisional_rates;
+
 public:
   IonizationStateCalculator(const double luminosity,
                             const Abundances &abundances,
                             const RecombinationRates &recombination_rates,
-                            const ChargeTransferRates &charge_transfer_rates);
+                            const ChargeTransferRates &charge_transfer_rates,
+                            const CollisionalRates &collisional_rates);
 
   void
   calculate_ionization_state(const double jfac, const double hfac,
@@ -93,7 +97,8 @@ public:
 
   static double compute_ionization_state_hydrogen(const double alphaH,
                                                   const double jH,
-                                                  const double nH);
+                                                  const double nH,
+                                                  const double gammaH);
 
   /**
    * @brief Functor used to calculate the ionization state of a single cell.

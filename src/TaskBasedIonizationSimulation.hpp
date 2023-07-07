@@ -30,6 +30,7 @@
 #include "AbundanceModel.hpp"
 #include "Abundances.hpp"
 #include "ChargeTransferRates.hpp"
+#include "CollisionalRates.hpp"
 #include "LineCoolingData.hpp"
 #include "MemoryLogger.hpp"
 #include "ParameterFile.hpp"
@@ -127,6 +128,8 @@ private:
 
   /*! @brief Charge transfer rates. */
   const ChargeTransferRates _charge_transfer_rates;
+
+  const CollisionalRates _collisional_rates;
 
   /*! @brief Abundance model. */
   const AbundanceModel *_abundance_model;

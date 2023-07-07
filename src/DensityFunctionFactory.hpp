@@ -52,6 +52,7 @@
 #include "CMacIonizeSnapshotDensityFunction.hpp"
 #include "FLASHSnapshotDensityFunction.hpp"
 #include "GadgetSnapshotDensityFunction.hpp"
+#include "HDF5DensityFunction.hpp"
 #endif
 
 #include <string>
@@ -164,6 +165,8 @@ public:
       return new BufferedCMacIonizeSnapshotDensityFunction(params, log);
     } else if (type == "CMacIonizeSnapshot") {
       return new CMacIonizeSnapshotDensityFunction(params, log);
+    } else if (type == "HDF5File") {
+        return new HDF5DensityFunction(params,log);
     } else if (type == "FLASHSnapshot") {
       return new FLASHSnapshotDensityFunction(params, log);
     } else if (type == "GadgetSnapshot") {

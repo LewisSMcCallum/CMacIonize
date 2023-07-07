@@ -26,6 +26,7 @@
 #include "IonizationStateCalculator.hpp"
 #include "Abundances.hpp"
 #include "ChargeTransferRates.hpp"
+#include "CollisionalRates.hpp"
 #include "DensityGrid.hpp"
 #include "DensityGridTraversalJobMarket.hpp"
 #include "DensitySubGrid.hpp"
@@ -50,13 +51,15 @@
 IonizationStateCalculator::IonizationStateCalculator(
     double luminosity, const Abundances &abundances,
     const RecombinationRates &recombination_rates,
-    const ChargeTransferRates &charge_transfer_rates)
+    const ChargeTransferRates &charge_transfer_rates,
+    const CollisionalRates &collisional_rates)
     : _luminosity(luminosity),
 #ifndef HAVE_HYDROGEN_ONLY
       _abundances(abundances),
 #endif
       _recombination_rates(recombination_rates),
-      _charge_transfer_rates(charge_transfer_rates) {
+      _charge_transfer_rates(charge_transfer_rates),
+      _collisional_rates(collisional_rates) {
 }
 
 /**
@@ -98,6 +101,8 @@ void IonizationStateCalculator::calculate_ionization_state(
     const double T = ionization_variables.get_temperature();
     const double alphaH =
         _recombination_rates.get_recombination_rate(ION_H_n, T);
+    const double gammaH =
+       _collisional_rates.get_collisional_rate(ION_H_n, T);
 
     cmac_assert(alphaH >= 0.);
 
@@ -116,10 +121,10 @@ void IonizationStateCalculator::calculate_ionization_state(
       compute_ionization_states_hydrogen_helium(alphaH, alphaHe, jH, jHe, ntot,
                                                 AHe, T, h0, he0);
     } else {
-      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot);
+      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
     }
 #else
-    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot);
+    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
 #endif
 
     ionization_variables.set_ionic_fraction(ION_H_n, h0);
@@ -188,8 +193,16 @@ void IonizationStateCalculator::calculate_ionization_state(
     // either we have a vacuum cell, or the mean intensity integral for hydrogen
     // was zero
     if (ntot > 0.) {
-      // mean intensity for hydrogen was zero: cell is entirely neutral
-      ionization_variables.set_ionic_fraction(ION_H_n, 1.);
+      // mean intensity for hydrogen was zero, but we are collisionally ionizing, so do calulation
+      const double T = ionization_variables.get_temperature();
+      const double alphaH =
+          _recombination_rates.get_recombination_rate(ION_H_n, T);
+      const double gammaH =
+         _collisional_rates.get_collisional_rate(ION_H_n, T);
+
+      const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
+      ionization_variables.set_ionic_fraction(ION_H_n, h0);
+
 
 #ifdef HAS_HELIUM
       ionization_variables.set_ionic_fraction(ION_He_n, 1.);
@@ -538,9 +551,23 @@ void IonizationStateCalculator::calculate_ionization_state(
 void IonizationStateCalculator::calculate_ionization_state(
     const double totweight, DensitySubGrid &subgrid) const {
 
-  const double jfac = _luminosity / totweight;
-  const double hfac =
-      jfac * PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_PLANCK);
+
+  double jfac;
+  double hfac;
+
+  if (totweight == 0 || _luminosity == 0){
+    jfac = 0.0;
+    hfac = 0.0;
+
+  } else {
+
+    jfac = _luminosity / totweight;
+    hfac =
+        jfac * PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_PLANCK);
+
+  }
+
+
   for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
     calculate_ionization_state(jfac / cellit.get_volume(),
                                hfac / cellit.get_volume(),
@@ -800,21 +827,25 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
  * @return Neutral fraction of hydrogen.
  */
 double IonizationStateCalculator::compute_ionization_state_hydrogen(
-    const double alphaH, const double jH, const double nH) {
+    const double alphaH, const double jH, const double nH, const double gammaH) {
 
-  if (jH > 0. && nH > 0.) {
-    const double aa = 0.5 * jH / (nH * alphaH);
-    const double bb = 2. / aa;
-    if (bb < 1.e-10) {
-      return std::max(1.e-14, 0.25 * bb);
-    } else {
-      const double cc = std::sqrt(bb + 1.);
-      // For very large values of jH, we can actually over-ionize the cell,
-      // resulting in a negative neutral fraction
-      // To overcome this issue, we impose a lower limit.
-      return std::max(1.e-14, 1. + aa * (1. - cc));
-    }
+  double xn;
+
+
+
+
+  if (jH ==0 && nH > 0) {
+    xn = alphaH/(alphaH+gammaH);
+  } else if (jH > 0 && nH > 0){
+    //equation (4) from K+O (2020), in turn from somewhere else...
+    double denom = jH + (2*alphaH + gammaH)*nH;
+    const double in_root = std::pow(jH + gammaH*nH,2.0) + 4.0*jH*alphaH*nH;
+    denom = denom + std::pow(in_root,0.5);
+    xn = 2.0*alphaH*nH/denom;
+
   } else {
-    return 1.;
+    xn = 0;
   }
+
+  return std::max(1.e-14,xn);
 }

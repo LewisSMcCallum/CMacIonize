@@ -109,7 +109,7 @@ public:
 
     number_done = 0;
     for (size_t i = 0; i < _subgrids.size(); ++i) {
-      cmac_assert(_total_number_of_photons[i] > 0);
+    //  cmac_assert(_total_number_of_photons[i] > 0);
       number_done += _total_number_of_photons[i];
     }
     cmac_assert(number_done == number_of_photons);

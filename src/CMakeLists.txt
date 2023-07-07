@@ -47,6 +47,7 @@ configure_file(
     ${PROJECT_BINARY_DIR}/src/VernerRecombinationRatesDataLocation.hpp
                @ONLY)
 
+
 # HeliumTwoPhotonContinuumDataLocation.hpp
 configure_file(${PROJECT_SOURCE_DIR}/data/He2q.dat
                ${PROJECT_BINARY_DIR}/data/He2q.dat COPYONLY)
@@ -80,6 +81,8 @@ message(STATUS "DeRijckeDataLocation.hpp: ${DERIJCKEDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/DeRijckeDataLocation.hpp.in
                ${PROJECT_BINARY_DIR}/src/DeRijckeDataLocation.hpp @ONLY)
 
+
+
 # WMBasicDataLocation.hpp
 set(WMBASIC_DATA ${PROJECT_BINARY_DIR}/data/wmbasic.tar.gz)
 configure_file(${PROJECT_SOURCE_DIR}/data/wmbasic.tar.gz
@@ -90,6 +93,18 @@ set(WMBASICDATALOCATION ${PROJECT_BINARY_DIR}/data/wmbasic/)
 message(STATUS "WMBasicDataLocation.hpp: ${WMBASICDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/WMBasicDataLocation.hpp.in
                ${PROJECT_BINARY_DIR}/src/WMBasicDataLocation.hpp @ONLY)
+
+
+
+# CollisionalRatesDataLocation.hpp
+set(COLLISIONALDATA ${PROJECT_SOURCE_DIR}/data/col_rates)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${COLLISIONALDATA}
+                ${PROJECT_BINARY_DIR}/data/col_rates)
+set(COLLISIONALDATALOCATION ${PROJECT_BINARY_DIR}/data/col_rates/)
+message(STATUS "CollisionalRatesDataLocation.hpp: ${COLLISIONALDATALOCATION}")
+configure_file(${PROJECT_SOURCE_DIR}/src/CollisionalRatesDataLocation.hpp.in
+                ${PROJECT_BINARY_DIR}/src/CollisionalRatesDataLocation.hpp @ONLY)
 
 # Pegase3DataLocation.hpp
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/data/Pegase3)
@@ -136,8 +151,10 @@ set(LIBSHAREDENGINE_SOURCES
   AsciiFileDensityFunction.cpp
   AsciiFileDensityGridWriter.cpp
   AsciiFileTablePhotonSourceDistribution.cpp
+  TextFilePhotonSourceDistribution.cpp
   BimodalCrossSections.hpp
   ChargeTransferRates.cpp
+  CollisionalRates.cpp
   CommandLineOption.cpp
   CommandLineParser.cpp
   DeRijckeRadiativeCooling.cpp
@@ -145,6 +162,7 @@ set(LIBSHAREDENGINE_SOURCES
   FaucherGiguerePhotonSourceSpectrum.cpp
   FixedValueDiffuseReemissionHandler.hpp
   HeliumLymanContinuumSpectrum.cpp
+  HDF5DensityFunction.cpp
   HeliumTwoPhotonContinuumSpectrum.cpp
   HydrogenLymanContinuumSpectrum.cpp
   InterpolatedDensityFunction.cpp

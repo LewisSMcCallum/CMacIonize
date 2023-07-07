@@ -56,6 +56,8 @@ private:
   /*! @brief External instanteneous energy terms (in J). */
   double _energy_term;
 
+  double _gravitational_potential;
+
 public:
   /**
    * @brief (Empty) constructor.
@@ -63,7 +65,7 @@ public:
   inline HydroVariables()
       : _primitives{0., 0., 0., 0., 0.}, _conserved{0., 0., 0., 0., 0.},
         _delta_conserved{0., 0., 0., 0., 0.}, _energy_rate_term(0.),
-        _energy_term(0.) {}
+        _energy_term(0.),_gravitational_potential(0.) {}
 
   /**
    * @brief Get read only access to the given component of the primitive
@@ -267,6 +269,11 @@ public:
     return _gravitational_acceleration;
   }
 
+
+  inline const double get_gravitational_potential() const {
+    return _gravitational_potential;
+  }
+
   /**
    * @brief Set the gravitational acceleration.
    *
@@ -275,6 +282,12 @@ public:
   inline void set_gravitational_acceleration(
       const CoordinateVector<> gravitational_acceleration) {
     _gravitational_acceleration = gravitational_acceleration;
+  }
+
+
+
+  inline void set_gravitational_potential(const double gravitational_potential) {
+    _gravitational_potential = gravitational_potential;
   }
 
   /**
