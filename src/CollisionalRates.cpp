@@ -12,11 +12,17 @@
  */
 CollisionalRates::CollisionalRates() {
 
+std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
-
+  _collisional_rates.resize(NUMBER_OF_IONNAMES);
+  _temperatures.resize(250);
 
 
   for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
+
+    std::cout << "Setting up data from file - " << get_ion_collisional_filename(i) << std::endl;
+
+    _collisional_rates[i].resize(250);
 
 
     std::stringstream filenamestream;
@@ -37,12 +43,18 @@ CollisionalRates::CollisionalRates() {
       std::getline(drfile, line);
 
       std::istringstream linestream(line);
+
       //overwriting temperatures 181 times.... not great but fine
+
       linestream >> _temperatures[j] >> _collisional_rates[i][j];
       // temperature to K
       _temperatures[j] = std::pow(10.,_temperatures[j]);
       // cm^3/s to m^3/s
+
       _collisional_rates[i][j] *= 1.e-6;
+  
+
+      //std::cout << _temperatures[j] << "kelvin with " << _collisional_rates[i][j] << std::endl;
     }
 
   }

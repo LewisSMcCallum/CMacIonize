@@ -26,9 +26,14 @@ configure_file(${PROJECT_SOURCE_DIR}/data/verner_B.dat
                ${PROJECT_BINARY_DIR}/data/verner_B.dat COPYONLY)
 configure_file(${PROJECT_SOURCE_DIR}/data/verner_C.dat
                ${PROJECT_BINARY_DIR}/data/verner_C.dat COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/DraineDustSi.dat
+              ${PROJECT_BINARY_DIR}/data/DraineDustSi.dat COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/DraineDustGr.dat
+              ${PROJECT_BINARY_DIR}/data/DraineDustGr.dat COPYONLY)
 set(VERNERCROSSSECTIONSDATALOCATION_A ${PROJECT_BINARY_DIR}/data/verner_A.dat)
 set(VERNERCROSSSECTIONSDATALOCATION_B ${PROJECT_BINARY_DIR}/data/verner_B.dat)
 set(VERNERCROSSSECTIONSDATALOCATION_C ${PROJECT_BINARY_DIR}/data/verner_C.dat)
+set(DRAINEDATALOCATION ${PROJECT_BINARY_DIR}/data/)
 message(STATUS
       "VernerCrossSectionsDataLocation.hpp: ${VERNERCROSSSECTIONSDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/VernerCrossSectionsDataLocation.hpp.in
@@ -106,6 +111,18 @@ message(STATUS "CollisionalRatesDataLocation.hpp: ${COLLISIONALDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/CollisionalRatesDataLocation.hpp.in
                 ${PROJECT_BINARY_DIR}/src/CollisionalRatesDataLocation.hpp @ONLY)
 
+
+
+# BenjaminRecombinationRatesDataLocation.hpp
+set(BENJAMINRECOMBDATA ${PROJECT_SOURCE_DIR}/data/rrrates)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${BENJAMINRECOMBDATA}
+                    ${PROJECT_BINARY_DIR}/data/rrrates)
+set(BENJAMINRECOMBDATALOCATION ${PROJECT_BINARY_DIR}/data/rrrates/)
+message(STATUS "BenjaminRecombinationRatesDataLocation.hpp: ${BENJAMINRECOMBDATALOCATION}")
+configure_file(${PROJECT_SOURCE_DIR}/src/BenjaminRecombinationRatesDataLocation.hpp.in
+                ${PROJECT_BINARY_DIR}/src/BenjaminRecombinationRatesDataLocation.hpp @ONLY)
+
 # Pegase3DataLocation.hpp
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/data/Pegase3)
 set(PEGASE3_DATA ${PROJECT_BINARY_DIR}/data/Pegase3/pegase3_chab.tar.gz)
@@ -148,11 +165,14 @@ configure_file(${PROJECT_SOURCE_DIR}/src/ConfigurationInfo.hpp.in
                ${PROJECT_BINARY_DIR}/src/ConfigurationInfo.hpp @ONLY)
 
 set(LIBSHAREDENGINE_SOURCES
+  ArepoSnapshotDensityFunction.cpp
+  ArepoSnapshotPhotonSourceDistribution.cpp
   AsciiFileDensityFunction.cpp
   AsciiFileDensityGridWriter.cpp
   AsciiFileTablePhotonSourceDistribution.cpp
   TextFilePhotonSourceDistribution.cpp
   BimodalCrossSections.hpp
+  BenjaminRecombinationRates.cpp
   ChargeTransferRates.cpp
   CollisionalRates.cpp
   CommandLineOption.cpp
@@ -161,8 +181,9 @@ set(LIBSHAREDENGINE_SOURCES
   DiffuseReemissionHandlerFactory.hpp
   FaucherGiguerePhotonSourceSpectrum.cpp
   FixedValueDiffuseReemissionHandler.hpp
-  HeliumLymanContinuumSpectrum.cpp
+  HDF5PhotonSourceDistribution.cpp
   HDF5DensityFunction.cpp
+  HeliumLymanContinuumSpectrum.cpp
   HeliumTwoPhotonContinuumSpectrum.cpp
   HydrogenLymanContinuumSpectrum.cpp
   InterpolatedDensityFunction.cpp
