@@ -1238,14 +1238,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
 
 
-  CollisionalRates collisional_rates;
-
-  // used to calculate both the ionization state and the temperature
-  TemperatureCalculator *temperature_calculator = new TemperatureCalculator(
-      sourcedistribution->get_total_luminosity(), abundances, line_cooling_data,
-      *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
-
-
   RestartManager restart_manager(*params);
   RandomGenerator restart_generator(random_seed);
 
