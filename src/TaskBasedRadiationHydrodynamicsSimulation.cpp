@@ -1238,6 +1238,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
 
 
+  CollisionalRates collisional_rates;
+
+  // used to calculate both the ionization state and the temperature
+  TemperatureCalculator *temperature_calculator = new TemperatureCalculator(
+      sourcedistribution->get_total_luminosity(), abundances, line_cooling_data,
+      *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
 
 
   RestartManager restart_manager(*params);
@@ -1904,20 +1910,26 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
           bool global_run_flag = true;
           AtomicValue< uint_fast32_t > num_photon_done(0);
+          AtomicValue< uint_fast32_t > num_abs_gas(0);
+          AtomicValue< uint_fast32_t > num_abs_dust(0);
 
           // create task contexts
-          TaskContext *task_contexts[TASKTYPE_NUMBER] = {nullptr};
+         TaskContext *task_contexts[TASKTYPE_NUMBER] = {nullptr};
           task_contexts[TASKTYPE_SOURCE_DISCRETE_PHOTON] =
               new SourceDiscretePhotonTaskContext< HydroDensitySubGrid >(
                   photon_source, *buffers, random_generators, 1., *spectrum,
-                  abundances, *cross_sections, *grid_creator, *tasks);
+                  abundances, *cross_sections, *grid_creator, *tasks,
+                   *sourcedistribution);
+
+
           if (reemission_handler) {
             task_contexts[TASKTYPE_PHOTON_REEMIT] =
                 new PhotonReemitTaskContext< HydroDensitySubGrid >(
                     *buffers, random_generators, *reemission_handler,
                     abundances, *cross_sections, *grid_creator, *tasks,
-                    num_photon_done);
+                    num_photon_done,num_abs_gas,num_abs_dust);
           }
+
           task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =
               new PhotonTraversalTaskContext< HydroDensitySubGrid >(
                   *buffers, *grid_creator, *tasks, num_photon_done, nullptr,

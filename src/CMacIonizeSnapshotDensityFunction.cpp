@@ -41,10 +41,13 @@
  */
 CMacIonizeSnapshotDensityFunction::CMacIonizeSnapshotDensityFunction(
     std::string filename, const bool use_density, const bool use_pressure,
-    const double initial_neutral_fraction, Log *log)
+    const double initial_neutral_fraction, const double dust_gas_ratio,
+    const double fraction_silicates, Log *log)
     : _filename(filename), _use_density(use_density),
       _use_pressure(use_pressure),
-      _initial_neutral_fraction(initial_neutral_fraction), _log(log),
+      _initial_neutral_fraction(initial_neutral_fraction),
+      _dust_gas_ratio(dust_gas_ratio), _fraction_silicates(fraction_silicates),
+      _log(log),
       _cartesian_grid(nullptr), _amr_grid(nullptr),
       _voronoi_pointlocations(nullptr) {
 
@@ -76,6 +79,11 @@ CMacIonizeSnapshotDensityFunction::CMacIonizeSnapshotDensityFunction(
           params.get_value< bool >("DensityFunction:use pressure", false),
           params.get_value< double >("DensityFunction:initial neutral fraction",
                                      1.e-6),
+          params.get_value< double >("DensityFunction:dust to gas",
+                                      0.0),
+          params.get_value< double >("DensityFunction:fraction silicates",
+                                                    1.e-6),
+
           log) {}
 
 /**
@@ -369,9 +377,14 @@ void CMacIonizeSnapshotDensityFunction::initialize() {
                     cell_densities[cell_index]);
                 _cartesian_grid[ix][iy][iz].set_temperature(
                     cell_temperatures[cell_index]);
+                _cartesian_grid[ix][iy][iz].set_fraction_silicates(_fraction_silicates);
+                _cartesian_grid[ix][iy][iz].set_dust_gas_ratio(_dust_gas_ratio);
                 for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
-                  _cartesian_grid[ix][iy][iz].set_ionic_fraction(
-                      ion, neutral_fractions[ion][cell_index]);
+                 _cartesian_grid[ix][iy][iz].set_ionic_fraction(
+                     ion, neutral_fractions[ion][cell_index]);
+
+
+
                 }
                 if (cell_velocities.size() > 0) {
                   _cartesian_grid[ix][iy][iz].set_velocity(

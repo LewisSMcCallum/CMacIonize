@@ -48,6 +48,8 @@ public:
    */
   virtual double get_cross_section(const int_fast32_t ion,
                                    const double energy) const = 0;
+
+  virtual double get_dust_opacity(const double energy, const bool silicate) const {return 0;}
 };
 
 #endif // CROSSSECTIONS_HPP

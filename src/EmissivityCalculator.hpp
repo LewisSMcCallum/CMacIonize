@@ -84,14 +84,14 @@ public:
                                 double &emission_helium_low) const;
 
   EmissivityValues
-  calculate_emissivities(const IonizationVariables &ionization_variables,
+  calculate_emissivities(IonizationVariables &ionization_variables,
                          const Abundances &abundances,
                          const LineCoolingData &line_cooling_data) const;
 
   void calculate_emissivities(DensityGrid &grid) const;
   std::vector< EmissivityValues > get_emissivities(DensityGrid &grid) const;
 
-  void calculate_emissivities(const IonizationVariables &ionization_variables,
+  void calculate_emissivities(IonizationVariables &ionization_variables,
                               const bool do_line[NUMBER_OF_EMISSIONLINES],
                               double output[NUMBER_OF_EMISSIONLINES]) const;
 };

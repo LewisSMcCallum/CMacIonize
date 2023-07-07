@@ -31,6 +31,7 @@
 #include "PhysicalConstants.hpp"
 #include "Utilities.hpp"
 #include <cmath>
+#include <iostream>
 
 /**
  * @brief Constructor.
@@ -124,29 +125,41 @@ void EmissivityCalculator::get_balmer_jump_emission(
  * @return EmissivityValues in the cell.
  */
 EmissivityValues EmissivityCalculator::calculate_emissivities(
-    const IonizationVariables &ionization_variables,
+    IonizationVariables &ionization_variables,
     const Abundances &abundances,
     const LineCoolingData &line_cooling_data) const {
 
-  const double h0max = 0.2;
+  const double h0max = 1.0;
+  const double tmin = 1.e3;
+  const double tmax = 1.e5;
 
   EmissivityValues eval;
 
+  if (ionization_variables.get_ionic_fraction(ION_H_n) < 0.1 &&
+       ionization_variables.get_temperature() < 10000) {
+         ionization_variables.set_temperature(10000);
+  }
+  if (ionization_variables.get_ionic_fraction(ION_H_n) > 0.9 &&
+      ionization_variables.get_temperature() > 500) {
+        ionization_variables.set_temperature(500);
+      }
+
   if (ionization_variables.get_ionic_fraction(ION_H_n) < h0max &&
-      ionization_variables.get_temperature() > 3000.) {
+      ionization_variables.get_temperature() > tmin &&
+      ionization_variables.get_temperature() < tmax) {
     const double ntot = ionization_variables.get_number_density();
     const double nhp =
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
 #ifdef HAS_HELIUM
     const double nhep =
-        ntot * (1. - ionization_variables.get_ionic_fraction(ION_He_n) - ionization_variables.get_ionic_fraction(ION_He_p1)) *
+        ntot * (ionization_variables.get_ionic_fraction(ION_He_p1)) *
         abundances.get_abundance(ELEMENT_He);
-    const double nhpp = ntot*(ionization_variables.get_ionic_fraction(ION_He_p1));
+    const double nhepp = ntot * (1.0 - ionization_variables.get_ionic_fraction(ION_He_n) -
+              ionization_variables.get_ionic_fraction(ION_He_p1))*abundances.get_abundance(ELEMENT_He);
 #else
     const double nhep = 0.;
-    const double nhpp = 0.;
+    const double nhepp = 0.;
 #endif
-    const double ne = nhp + nhep + 2.0*nhpp;
 
     // get the abundances of the ions used by the line cooling computation
     double abund[LINECOOLINGDATA_NUMELEMENTS];
@@ -187,7 +200,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // we use all of them
     abund[OI] = abundances.get_abundance(ELEMENT_O) *
                 (1. - ionization_variables.get_ionic_fraction(ION_O_n) -
-                 ionization_variables.get_ionic_fraction(ION_O_p1));
+                 ionization_variables.get_ionic_fraction(ION_O_p1) -
+                 ionization_variables.get_ionic_fraction(ION_O_p2) -
+                  ionization_variables.get_ionic_fraction(ION_O_p3));
     abund[OII] = abundances.get_abundance(ELEMENT_O) *
                  ionization_variables.get_ionic_fraction(ION_O_n);
     abund[OIII] = abundances.get_abundance(ELEMENT_O) *
@@ -504,7 +519,7 @@ EmissivityCalculator::get_emissivities(DensityGrid &grid) const {
  * @param output Array to store the output in.
  */
 void EmissivityCalculator::calculate_emissivities(
-    const IonizationVariables &ionization_variables,
+    IonizationVariables &ionization_variables,
     const bool do_line[NUMBER_OF_EMISSIONLINES],
     double output[NUMBER_OF_EMISSIONLINES]) const {
 

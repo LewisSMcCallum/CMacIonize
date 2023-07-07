@@ -57,6 +57,10 @@ private:
    *  additional abundance factor. */
   double _photoionization_cross_section[NUMBER_OF_IONNAMES];
 
+  double _si_opacity;
+
+  double _c_opacity;
+
   /*! @brief Energy of the photon packet (in Hz). */
   double _energy;
 
@@ -229,6 +233,11 @@ public:
     return _photoionization_cross_section[ion];
   }
 
+
+  inline double get_si_opacity() const {return _si_opacity;}
+
+  inline double get_c_opacity() const {return _c_opacity;}
+
   /**
    * @brief Set the photoionization cross section for the given ion for the
    * photon packet.
@@ -240,6 +249,14 @@ public:
   inline void set_photoionization_cross_section(
       const int_fast32_t ion, const double photoionization_cross_section) {
     _photoionization_cross_section[ion] = photoionization_cross_section;
+  }
+
+  inline void set_si_opacity(const double opacity) {
+    _si_opacity = opacity;
+  }
+
+  inline void set_gr_opacity(const double opacity) {
+    _c_opacity = opacity;
   }
 
   /**

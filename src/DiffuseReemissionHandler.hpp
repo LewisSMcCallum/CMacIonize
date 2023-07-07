@@ -27,6 +27,7 @@
 #define DIFFUSEREEMISSIONHANDLER_HPP
 
 #include "DensityGrid.hpp"
+#include "AtomicValue.hpp"
 
 class RandomGenerator;
 class PhotonPacket;
@@ -75,7 +76,14 @@ public:
   virtual double reemit(const Photon &photon, double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const = 0;
+                        PhotonType &type,
+                        AtomicValue< uint_fast32_t > &num_abs_gas,
+                        AtomicValue< uint_fast32_t > &num_abs_dust) const {return 0;}
+
+
+
+
+
 
   /**
    * @brief Reemit the given photon packet.
@@ -88,11 +96,14 @@ public:
    * @param type New type of the reemitted photon.
    * @return New frequency for the photon, or zero if the photon is absorbed.
    */
+
   virtual double reemit(const PhotonPacket &photon,
                         const double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const = 0;
+                        PhotonType &type,
+                        AtomicValue< uint_fast32_t > &num_abs_gas,
+                        AtomicValue< uint_fast32_t > &num_abs_dust) const {return 0;}
 };
 
 #endif // DIFFUSEREEMISSIONHANDLER_HPP

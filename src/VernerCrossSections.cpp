@@ -40,6 +40,73 @@
  */
 VernerCrossSections::VernerCrossSections() {
 
+
+
+  std::stringstream filenamestream;
+   filenamestream << DRAINEDATALOCATION
+                  << "DraineDustSi.dat";
+   std::ifstream drfile(filenamestream.str());
+
+   double dummy1;
+
+   // skip the first three lines
+   std::string line;
+   std::getline(drfile, line);
+   std::getline(drfile, line);
+   std::getline(drfile,line);
+
+
+   // now parse the remaining lines
+   for (uint_fast32_t i = 0; i < _num_dust_vals; ++i) {
+     std::getline(drfile, line);
+     std::istringstream linestream(line);
+     linestream >> _draine_freq[i] >>  _draine_kappa_si[i];
+
+
+
+
+     _draine_freq[i] = 299792458./(_draine_freq[i]*1e-6); // to Hz
+     _draine_kappa_si[i] = _draine_kappa_si[i]; //already in SI
+
+
+   }
+
+
+   std::stringstream filenamestream2;
+    filenamestream2 << DRAINEDATALOCATION
+                   << "DraineDustGr.dat";
+    std::ifstream drfile2(filenamestream2.str());
+   std::getline(drfile2, line);
+   std::getline(drfile2, line);
+   std::getline(drfile2,line);
+
+   // now parse the remaining lines
+   for (uint_fast32_t i = 0; i < _num_dust_vals; ++i) {
+     std::getline(drfile2, line);
+     std::istringstream linestream(line);
+     linestream >> dummy1 >> _draine_kappa_gr[i];
+
+     //NOTE - I am using lambda axis from the Silicate file, under the assumption the Graphite file is interpolated on the same axis.
+
+     _draine_kappa_gr[i] = _draine_kappa_gr[i]; // already in SI
+
+
+
+
+   }
+
+
+
+
+
+
+
+   _min_logE = std::log(_draine_freq[0]);
+   _inverse_avg_dlogE =
+       (_num_dust_vals-1) /
+       (std::log(_draine_freq[_num_dust_vals-1]) -
+        _min_logE);
+
   // we apply som data conversions:
   //  - sigma values are always converted by multiplying with 1.e-22, so we
   //    premultiply them here
@@ -151,6 +218,67 @@ VernerCrossSections::VernerCrossSections() {
       _data_C[iN][VERNERDATA_C_Ntot] = Ntot;
     }
   }
+}
+
+
+
+
+double VernerCrossSections::get_dust_opacity(const double energy,const bool silicate) const {
+  // we need to find the index of the lower limit and the upper limit of
+// the temperature interval that contains the given temperature
+uint_fast32_t ilow, ihigh;
+
+// first handle the special cases
+if (energy < _draine_freq[0]) {
+  // we will linearly extrapolate
+  ilow = 0;
+  ihigh = 1;
+} else if (energy >=
+           _draine_freq[_num_dust_vals-1]) {
+  ilow = _num_dust_vals-2;
+  ihigh = _num_dust_vals-1;
+} else {
+  // normal case
+  // first, get a reasonable first guess for ilow and ihigh
+  ilow = static_cast< uint_fast32_t >((std::log(energy) - _min_logE) *
+                                      _inverse_avg_dlogE);
+  if (energy < _draine_freq[ilow]) {
+    ihigh = ilow;
+    ilow = 0;
+  } else {
+    ihigh = _num_dust_vals;
+  }
+
+
+  // now search for the actual indices using bisection
+  while ((ihigh - ilow) != 1) {
+    const uint_fast32_t imid = (ilow + ihigh) >> 1;
+    if (energy >= _draine_freq[imid]) {
+      ilow = imid;
+    } else {
+      ihigh = imid;
+    }
+  }
+
+}
+
+// we now have the appropriate interval for linear inter/extrapolation
+const double fac = (energy - _draine_freq[ilow]) /
+                   (_draine_freq[ihigh] - _draine_freq[ilow]);
+
+double opacity;
+if (silicate) {
+  opacity =
+      (1. - fac) * _draine_kappa_si[ilow] + fac * _draine_kappa_si[ihigh];
+} else {
+  opacity =
+      (1. - fac) * _draine_kappa_gr[ilow] + fac * _draine_kappa_gr[ihigh];
+}
+
+
+
+
+return std::max(opacity, 0.);
 }
 
 /**
@@ -266,6 +394,8 @@ double VernerCrossSections::get_cross_section(const int_fast32_t ion,
 #ifdef HAS_HELIUM
   case ION_He_n:
     return get_cross_section_verner(2, 2, 1, energy);
+  case ION_He_p1:
+    return 0.0;
 #endif
 
 #ifdef HAS_CARBON
@@ -294,6 +424,10 @@ double VernerCrossSections::get_cross_section(const int_fast32_t ion,
   case ION_O_p1:
     return get_cross_section_verner(8, 7, 3, energy) +
            get_cross_section_verner(8, 7, 2, energy);
+  case ION_O_p2:
+    return 0.0;
+  case ION_O_p3:
+    return 0.0;
 #endif
 
 #ifdef HAS_NEON
@@ -302,6 +436,10 @@ double VernerCrossSections::get_cross_section(const int_fast32_t ion,
            get_cross_section_verner(10, 10, 2, energy);
   case ION_Ne_p1:
     return get_cross_section_verner(10, 9, 3, energy);
+  case ION_Ne_p2:
+    return 0.0;
+  case ION_Ne_p3:
+    return 0.0;
 #endif
 
 #ifdef HAS_SULPHUR

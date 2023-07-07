@@ -87,8 +87,8 @@ HDF5DensityFunction::HDF5DensityFunction(
   // open the group containing the cell data
   HDF5Tools::HDF5Group maingroup = HDF5Tools::open_group(file, "/PartType0");
   // read the positions, masses
-  _densities = HDF5Tools::read_dataset< double >(maingroup,
-                                                             "NumberDensity");
+  _densities = HDF5Tools::read_dataset< double >(maingroup, "NumberDensity");
+
 
 
 
@@ -188,10 +188,13 @@ DensityValues HDF5DensityFunction::operator()(const Cell &cell) {
 
    values.set_number_density(_densities[ind1d]);
 
-  
+   values.set_dust_gas_ratio(_dust_gas_ratio);
 
-   values.set_temperature(8000);
-   values.set_ionic_fraction(ION_H_n,1e-6);
+   values.set_fraction_silicates(_fraction_silicates);
+
+   values.set_temperature(10000);
+   values.set_ionic_fraction(ION_H_n,1e-3);
+
 
 
   return values;
@@ -207,5 +210,5 @@ double HDF5DensityFunction::get_total_hydrogen_number() const {
   for (size_t i = 0; i < _densities.size(); ++i) {
     mtot += _densities[i]*_cell_vol;
   }
-  return mtot / 1.6737236e-27;
+  return mtot;
 }

@@ -285,8 +285,10 @@ bool PhotonSource::reemit(Photon &photon,
 #else
     const double AHe = 0.;
 #endif
+    AtomicValue<uint_fast32_t> dummy(0);
+    AtomicValue<uint_fast32_t> dummy2(0);
     const double new_frequency = _reemission_handler->reemit(
-        photon, AHe, ionization_variables, random_generator, type);
+        photon, AHe, ionization_variables, random_generator,type,dummy,dummy2);
 
     photon.set_type(type);
     if (new_frequency == 0.) {

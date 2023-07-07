@@ -557,6 +557,30 @@ protected:
   inline double get_optical_depth(const int_fast32_t active_cell,
                                   const double distance,
                                   const PhotonPacket &photon) const {
+
+    bool destroy_carbon = true;
+
+    double dust_opacity_si = photon.get_si_opacity();
+    double dust_opacity_c = photon.get_c_opacity();
+    double fraction_silicon = _ionization_variables[active_cell].get_fraction_silicon();
+
+    double dust_contr = fraction_silicon * distance
+              * dust_opacity_si * _ionization_variables[active_cell].get_dust_density();
+
+
+   if (destroy_carbon) {
+     dust_contr += (1.-fraction_silicon) * distance * dust_opacity_c
+                 * _ionization_variables[active_cell].get_dust_density()
+                  *_ionization_variables[active_cell].get_ionic_fraction(ION_H_n);
+
+   } else {
+     dust_contr += (1.-fraction_silicon)*distance*dust_opacity_c
+                  *_ionization_variables[active_cell].get_dust_density();
+   }
+
+
+
+
 #ifdef HAS_HELIUM
 #ifdef VARIABLE_ABUNDANCES
     return distance * _ionization_variables[active_cell].get_number_density() *
@@ -566,19 +590,20 @@ protected:
                 ELEMENT_He) *
                 photon.get_photoionization_cross_section(ION_He_n) *
                 _ionization_variables[active_cell].get_ionic_fraction(
-                    ION_He_n));
+                    ION_He_n)) + dust_contr;
 #else
     return distance * _ionization_variables[active_cell].get_number_density() *
            (photon.get_photoionization_cross_section(ION_H_n) *
                 _ionization_variables[active_cell].get_ionic_fraction(ION_H_n) +
             photon.get_photoionization_cross_section(ION_He_n) *
                 _ionization_variables[active_cell].get_ionic_fraction(
-                    ION_He_n));
+                    ION_He_n)) + dust_contr;
 #endif
 #else
+
     return distance * _ionization_variables[active_cell].get_number_density() *
            photon.get_photoionization_cross_section(ION_H_n) *
-           _ionization_variables[active_cell].get_ionic_fraction(ION_H_n);
+           _ionization_variables[active_cell].get_ionic_fraction(ION_H_n) + dust_contr;
 #endif
   }
 

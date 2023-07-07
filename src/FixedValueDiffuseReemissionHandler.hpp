@@ -50,6 +50,7 @@ public:
    * @param reemission_probability Reemission probability.
    * @param reemission_frequency Reemission frequency (in Hz).
    */
+
   inline FixedValueDiffuseReemissionHandler(const double reemission_probability,
                                             const double reemission_frequency)
       : _reemission_probability(reemission_probability),
@@ -85,7 +86,8 @@ public:
   virtual double reemit(const Photon &photon, double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const {
+                        PhotonType &type,AtomicValue<uint_fast32_t> &num_abs_gas,
+                        AtomicValue<uint_fast32_t> &num_abs_dust) const {
 
     const double u = random_generator.get_uniform_random_double();
     if (u < _reemission_probability) {
@@ -96,6 +98,7 @@ public:
       return 0.;
     }
   }
+
 
   /**
    * @brief Reemit the given photon packet.
@@ -112,7 +115,8 @@ public:
                         const double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const {
+                        PhotonType &type, AtomicValue<uint_fast32_t> &num_abs_gas,
+                        AtomicValue<uint_fast32_t> &num_abs_dust) const {
 
     const double u = random_generator.get_uniform_random_double();
     if (u < _reemission_probability) {

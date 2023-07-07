@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 /**
  * @brief Constructor.
@@ -76,12 +77,12 @@ void IonizationStateCalculator::calculate_ionization_state(
 
   // normalize the mean intensity integrals
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
-  cmac_assert_message(jH >= 0., "jH: %g, jfac: %g, mean_intensity: %g", jH,
-                      jfac, ionization_variables.get_mean_intensity(ION_H_n));
+  //cmac_assert_message(jH >= 0., "jH: %g, jfac: %g, mean_intensity: %g", jH,
+    //                  jfac, ionization_variables.get_mean_intensity(ION_H_n));
 
 #ifdef HAS_HELIUM
   const double jHe = jfac * ionization_variables.get_mean_intensity(ION_He_n);
-  cmac_assert(jHe >= 0.);
+  //cmac_assert(jHe >= 0.);
 #endif
 
   // normalize the heating integrals (for explicit heating in RHD)
@@ -97,7 +98,7 @@ void IonizationStateCalculator::calculate_ionization_state(
   cmac_assert(ntot >= 0.);
 
   // find the ionization equilibrium for hydrogen and helium
-  if (jH > 0. && ntot > 0.) {
+  if (ntot > 0.) {
     const double T = ionization_variables.get_temperature();
     const double alphaH =
         _recombination_rates.get_recombination_rate(ION_H_n, T);
@@ -114,12 +115,21 @@ void IonizationStateCalculator::calculate_ionization_state(
     const double AHe = _abundances.get_abundance(ELEMENT_He);
 #endif
     // h0find
-    double h0, he0 = 0.;
+    double h0 = 0.;
+    double he0 = 0.;
+    double hep = 0.;
     if (AHe != 0.) {
       const double alphaHe =
           _recombination_rates.get_recombination_rate(ION_He_n, T);
-      compute_ionization_states_hydrogen_helium(alphaH, alphaHe, jH, jHe, ntot,
-                                                AHe, T, h0, he0);
+      const double gammaHe1 = _collisional_rates.get_collisional_rate(ION_He_n, T);
+
+      const double gammaHe2 = _collisional_rates.get_collisional_rate(ION_He_p1, T);
+      const double alphaHe2 = _recombination_rates.get_recombination_rate(ION_He_p1, T);
+      compute_ionization_states_hydrogen_helium(alphaH, alphaHe,alphaHe2, jH, jHe, ntot,
+                                                AHe, T, h0, he0, hep, gammaH, gammaHe1,
+                                                 gammaHe2);
+
+
     } else {
       h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
     }
@@ -131,12 +141,13 @@ void IonizationStateCalculator::calculate_ionization_state(
 
 #ifdef HAS_HELIUM
     ionization_variables.set_ionic_fraction(ION_He_n, he0);
+    ionization_variables.set_ionic_fraction(ION_He_p1,hep);
 #endif
 
     // do the coolants
     const double nhp = ntot * (1. - h0);
 #ifdef HAS_HELIUM
-    const double ne = ntot * (1. - h0 + AHe * (1. - he0));
+    const double ne = ntot*(1-h0) + 2.0*AHe*ntot*(1-he0-hep) + ntot*hep*AHe;
 #else
     const double ne = nhp;
 #endif
@@ -185,59 +196,16 @@ void IonizationStateCalculator::calculate_ionization_state(
 #else
     const double nhe0 = 0.;
 #endif
+
     compute_ionization_states_metals(
         j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
-        _charge_transfer_rates, ionization_variables);
+        _charge_transfer_rates, _collisional_rates, ionization_variables);
+
+
 
   } else {
-    // either we have a vacuum cell, or the mean intensity integral for hydrogen
-    // was zero
-    if (ntot > 0.) {
-      // mean intensity for hydrogen was zero, but we are collisionally ionizing, so do calulation
-      const double T = ionization_variables.get_temperature();
-      const double alphaH =
-          _recombination_rates.get_recombination_rate(ION_H_n, T);
-      const double gammaH =
-         _collisional_rates.get_collisional_rate(ION_H_n, T);
 
-      const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
-      ionization_variables.set_ionic_fraction(ION_H_n, h0);
-
-
-#ifdef HAS_HELIUM
-      ionization_variables.set_ionic_fraction(ION_He_n, 1.);
-#endif
-
-      // all coolants are also neutral, so their ionic fractions are 0
-#ifdef HAS_CARBON
-      ionization_variables.set_ionic_fraction(ION_C_p1, 0.);
-      ionization_variables.set_ionic_fraction(ION_C_p2, 0.);
-#endif
-
-#ifdef HAS_NITROGEN
-      ionization_variables.set_ionic_fraction(ION_N_n, 1.);
-      ionization_variables.set_ionic_fraction(ION_N_p1, 0.);
-      ionization_variables.set_ionic_fraction(ION_N_p2, 0.);
-#endif
-
-#ifdef HAS_OXYGEN
-      ionization_variables.set_ionic_fraction(ION_O_n, 1.);
-      ionization_variables.set_ionic_fraction(ION_O_p1, 0.);
-#endif
-
-#ifdef HAS_NEON
-      ionization_variables.set_ionic_fraction(ION_Ne_n, 1.);
-      ionization_variables.set_ionic_fraction(ION_Ne_p1, 0.);
-#endif
-
-#ifdef HAS_SULPHUR
-      ionization_variables.set_ionic_fraction(ION_S_p1, 0.);
-      ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
-      ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
-#endif
-
-    } else {
-      // vacuum cell: set all values to 0
+    // vacuum cell: set all values to 0
       ionization_variables.set_ionic_fraction(ION_H_n, 0.);
 
 #ifdef HAS_HELIUM
@@ -270,7 +238,7 @@ void IonizationStateCalculator::calculate_ionization_state(
       ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
       ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
 #endif
-    }
+
   }
 
   cmac_assert(ionization_variables.get_ionic_fraction(ION_H_n) >= 0.);
@@ -338,6 +306,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
     const double nh0, const double nhe0, const double nhp,
     const RecombinationRates &recombination_rates,
     const ChargeTransferRates &charge_transfer_rates,
+    const CollisionalRates &collisional_rates,
     IonizationVariables &ionization_variables) {
 
 #ifdef HAS_CARBON
@@ -381,15 +350,19 @@ void IonizationStateCalculator::compute_ionization_states_metals(
 #endif
 
 #ifdef HAS_OXYGEN
-  const double alphaO[2] = {
+  const double alphaO[4] = {
       recombination_rates.get_recombination_rate(ION_O_n, T),
-      recombination_rates.get_recombination_rate(ION_O_p1, T)};
+      recombination_rates.get_recombination_rate(ION_O_p1, T),
+      recombination_rates.get_recombination_rate(ION_O_p2, T),
+      recombination_rates.get_recombination_rate(ION_O_p3, T)};
 #endif
 
 #ifdef HAS_NEON
-  const double alphaNe[2] = {
+  const double alphaNe[4] = {
       recombination_rates.get_recombination_rate(ION_Ne_n, T),
-      recombination_rates.get_recombination_rate(ION_Ne_p1, T)};
+      recombination_rates.get_recombination_rate(ION_Ne_p1, T),
+      recombination_rates.get_recombination_rate(ION_Ne_p2, T),
+      recombination_rates.get_recombination_rate(ION_Ne_p3, T)};
 #endif
 
 #ifdef HAS_SULPHUR
@@ -402,9 +375,10 @@ void IonizationStateCalculator::compute_ionization_states_metals(
 #ifdef HAS_CARBON
   // carbon
   // the charge transfer recombination rates for C+ are negligble
-  const double C21 = jCp1 / (ne * alphaC[0]);
+
+  const double C21 = (jCp1 + ne*collisional_rates.get_collisional_rate(ION_C_p1, T)) / (ne * alphaC[0]);
   const double C32 =
-      jCp2 /
+      (jCp2 + ne*collisional_rates.get_collisional_rate(ION_C_p2, T)) /
       (ne * alphaC[1] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_C_p2, T4) +
@@ -420,19 +394,19 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   // nitrogen
   const double N21 =
       (jNn + nhp * charge_transfer_rates.get_charge_transfer_ionization_rate_H(
-                       ION_N_n, T4)) /
+                       ION_N_n, T4) + ne*collisional_rates.get_collisional_rate(ION_N_n, T)) /
       (ne * alphaN[0] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_N_n, T4));
   const double N32 =
-      jNp1 /
+      (jNp1 + ne*collisional_rates.get_collisional_rate(ION_N_p1, T)) /
       (ne * alphaN[1] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_N_p1, T4) +
        nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
                   ION_N_p1, T4));
   const double N43 =
-      jNp2 /
+      (jNp2 + ne*collisional_rates.get_collisional_rate(ION_N_p2, T)) /
       (ne * alphaN[2] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_N_p2, T4) +
@@ -448,57 +422,105 @@ void IonizationStateCalculator::compute_ionization_states_metals(
 
 #ifdef HAS_OXYGEN
   // Oxygen
+
   const double O21 =
       (jOn + nhp * charge_transfer_rates.get_charge_transfer_ionization_rate_H(
-                       ION_O_n, T4)) /
+                       ION_O_n, T4) +
+                     ne*collisional_rates.get_collisional_rate(ION_O_n, T)) /
       (ne * alphaO[0] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_O_n, T4));
   const double O32 =
-      jOp1 /
+      (jOp1 + ne*collisional_rates.get_collisional_rate(ION_O_p1, T)) /
       (ne * alphaO[1] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_O_p1, T4) +
        nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
                   ION_O_p1, T4));
+
+
+  const double O43 =
+     (ne*collisional_rates.get_collisional_rate(ION_O_p2, T))/
+     (ne*alphaO[2] +
+       nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
+                 ION_O_p2, T4) +
+       nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
+                  ION_O_p2, T4));
+
+
+  const double O54 =
+      (ne*collisional_rates.get_collisional_rate(ION_O_p3, T))/
+            (ne*alphaO[3] +
+          nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
+                                 ION_O_p3, T4) +
+            nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
+                        ION_O_p3, T4));
+
+
   const double O31 = O32 * O21;
-  const double sumO_inv = 1. / (1. + O21 + O31);
+  const double O41 = O43 * O31;
+  const double O51 = O54 * O41;
+  const double sumO_inv = 1. / (1. + O21 + O31 + O41 + O51);
+
+
+
   ionization_variables.set_ionic_fraction(ION_O_n, O21 * sumO_inv);
   ionization_variables.set_ionic_fraction(ION_O_p1, O31 * sumO_inv);
+  ionization_variables.set_ionic_fraction(ION_O_p2, O41 * sumO_inv);
+  ionization_variables.set_ionic_fraction(ION_O_p3, O51 * sumO_inv);
 #endif
 
 #ifdef HAS_NEON
   // Neon
-  const double Ne21 = jNen / (ne * alphaNe[0]);
+  const double Ne21 = (jNen + ne*collisional_rates.get_collisional_rate(ION_Ne_n, T)) / (ne * alphaNe[0]);
   const double Ne32 =
-      jNep1 /
+      (jNep1 + ne*collisional_rates.get_collisional_rate(ION_Ne_p1, T)) /
       (ne * alphaNe[1] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_Ne_p1, T4) +
        nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
                   ION_Ne_p1, T4));
+  const double Ne43 = (ne*collisional_rates.get_collisional_rate(ION_Ne_p2, T)) /
+       (ne*alphaNe[2] +
+         nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
+                   ION_Ne_p2, T4) +
+         nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
+                    ION_Ne_p2, T4));
+
+  const double Ne54 = (ne*collisional_rates.get_collisional_rate(ION_Ne_p3, T)) /
+        (ne*alphaNe[3]);
   const double Ne31 = Ne32 * Ne21;
-  const double sumNe_inv = 1. / (1. + Ne21 + Ne31);
+  const double Ne41 = Ne43 * Ne31;
+  const double Ne51 = Ne54 * Ne41;
+  const double sumNe_inv = 1. / (1. + Ne21 + Ne31 + Ne41 + Ne51);
+
+  //if (std::isnan(sumNe_inv) || std::isinf(sumNe_inv)) {
+  //  std::cout << "FOR T OF" << T << " " << Ne21 << " " << jNen << " " << alphaNe[0] << " " << ne << std::endl;
+  //  std::cout << "COL RATE " << collisional_rates.get_collisional_rate(ION_Ne_n, T) << std::endl;
+  //}
+
   ionization_variables.set_ionic_fraction(ION_Ne_n, Ne21 * sumNe_inv);
   ionization_variables.set_ionic_fraction(ION_Ne_p1, Ne31 * sumNe_inv);
+  ionization_variables.set_ionic_fraction(ION_Ne_p2, Ne41 * sumNe_inv);
+  ionization_variables.set_ionic_fraction(ION_Ne_p3, Ne51 *sumNe_inv);
 #endif
 
 #ifdef HAS_SULPHUR
   // Sulphur
   const double S21 =
-      jSp1 /
+      (jSp1 + ne*collisional_rates.get_collisional_rate(ION_S_p1, T)) /
       (ne * alphaS[0] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_S_p1, T4));
   const double S32 =
-      jSp2 /
+      (jSp2 + ne*collisional_rates.get_collisional_rate(ION_S_p2, T)) /
       (ne * alphaS[1] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_S_p2, T4) +
        nhe0 * charge_transfer_rates.get_charge_transfer_recombination_rate_He(
                   ION_S_p2, T4));
   const double S43 =
-      jSp3 /
+      (jSp3 + ne*collisional_rates.get_collisional_rate(ION_S_p3, T)) /
       (ne * alphaS[2] +
        nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
                  ION_S_p3, T4) +
@@ -674,109 +696,132 @@ void IonizationStateCalculator::calculate_ionization_state(
  * @param he0 Variable to store resulting helium neutral fraction in.
  */
 void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
-    const double alphaH, const double alphaHe, const double jH,
+    const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
     const double jHe, const double nH, const double AHe, const double T,
-    double &h0, double &he0) {
+    double &h0, double &he0, double &hep, const double gammaH, const double gammaHe1,
+    const double gammaHe2) {
+
+
+  if ((jH == 0) && (jHe == 0) && (gammaH < 1e-25) && (gammaHe1 < 1e-25) && (gammaHe2 < 1e-25)) {
+    h0 = 0.999999;
+    he0 = 0.999999;
+    hep = 0.0;
+    return;
+  }
+
+
 
   // make sure the input to this function is physical
   cmac_assert(alphaH >= 0.);
   cmac_assert(alphaHe >= 0.);
-  cmac_assert(jH >= 0.);
-  cmac_assert(jHe >= 0.);
+  //cmac_assert(jH >= 0.);
+  //cmac_assert(jHe >= 0.);
   cmac_assert(nH >= 0.);
   cmac_assert(AHe >= 0.);
   cmac_assert(T >= 0.);
 
   // shortcut: if jH is very small, then the gas is neutral
-  if (jH < 1.e-20) {
-    h0 = 1.;
-    he0 = 1.;
-    return;
-  }
+
+  //got rid of this because not the case any more
+  //if (jH < 1.e-20) {
+  //  h0 = 1.;
+  //  he0 = 1.;
+  //  return;
+  //}
 
   // we multiplied Kenny's value with 1.e-6 to convert from cm^3s^-1 to m^3s^-1
   // NOTE that this is a different expression from the one in Kenny's code!
   const double alpha_e_2sP = 4.17e-20 * std::pow(T * 1.e-4, -0.861);
-  const double ch1 = alphaH * nH / jH;
-  const double ch2 = AHe * alpha_e_2sP * nH / jH;
-  double che = 0.;
-  if (jHe > 0.) {
-    che = alphaHe * nH / jHe;
-  }
-  // che should always be positive
-  cmac_assert(che >= 0.);
+
+
+
 
   // initial guesses for the neutral fractions
-  double h0old = 0.99 * (1. - std::exp(-0.5 / ch1));
+  double h0old = 0.99*(1. - std::exp(-1.*(jH+nH*gammaH)/(2.*alphaH*nH)));
+
   cmac_assert(h0old >= 0. && h0old <= 1.);
 
   // by enforcing a relative difference of 10%, we make sure we have at least
   // one iteration
   h0 = 0.9 * h0old;
-  double he0old = 1.;
-  // we make sure che is 0 if the helium intensity integral is 0
-  if (che > 0.) {
-    he0old = 0.5 / che;
-    // make sure the neutral fraction is at most 100%
-    he0old = std::min(he0old, 1.);
-  }
+
+  double he0old = 0.5/(alphaHe*nH/(gammaHe1*nH + jHe));
+  he0old = std::min(he0old, 1.);
+
   // again, by using this value we make sure we have at least one iteration
-  he0 = 0.;
+  he0 = 0.9*he0old;
   uint_fast8_t niter = 0;
+
   while (std::abs(h0 - h0old) > 1.e-4 * h0old &&
          std::abs(he0 - he0old) > 1.e-4 * he0old) {
     ++niter;
     h0old = h0;
-    if (he0 > 0.) {
-      he0old = he0;
-    } else {
-      he0old = 0.;
-    }
+    he0old = he0;
+
+
+
+
+//calculate Helium neutral fraction and helium+ fraction
+
+    const double Bhe = nH*(1-h0 + AHe*alphaHe2/(alphaHe2+gammaHe2) + 2*gammaHe2*AHe/(alphaHe2+gammaHe2));
+    const double Che = alphaHe2*AHe/(gammaHe2 + alphaHe2) + 2*gammaHe2*AHe/(alphaHe2+gammaHe2);
+    const double Dhe = Che*nH*alphaHe*alphaHe2/(alphaHe2+gammaHe2) + nH*Che*gammaHe1;
+    const double Ehe = -Che*nH*alphaHe*alphaHe2/(alphaHe2+gammaHe2) - Bhe*alphaHe*alphaHe2/(alphaHe2+gammaHe2) - Bhe*gammaHe1 - jHe;
+    const double Fhe = Bhe*alphaHe*alphaHe2/(alphaHe2+gammaHe2);
+
+    he0 = (-1.0*Ehe - std::sqrt(Ehe * Ehe - 4. * Dhe*Fhe)) /
+          (2. * Dhe);
+
+    const double hepp = (1.0-he0)*gammaHe2/(alphaHe2+gammaHe2);
+
+    hep = (1.0 - he0 - hepp);
+
+    double ne = nH*(1 - h0) + 2*hepp*AHe*nH + hep*AHe*nH;
+
+
+
     // calculate a new guess for C_H
-    const double pHots = 1. / (1. + 77. * he0old / std::sqrt(T) / h0old);
+    const double pHots = 1. / (1. + 77. * he0 / std::sqrt(T) / h0old);
     // make sure pHots is not NaN
     cmac_assert(pHots == pHots);
-    const double ch = ch1 - ch2 * AHe * (1. - he0old) * pHots / (1. - h0old);
 
-    // find the helium neutral fraction
-    he0 = 1.;
-    if (che) {
-      const double bhe = (1. + 2. * AHe - h0) * che + 1.;
-      const double che_bhe = che / bhe;
-      const double opAHeh0 = 1. + AHe - h0;
-      const double t1he = 4. * AHe * opAHeh0 * che_bhe * che_bhe;
-      if (t1he < 1.e-3) {
-        // first order expansion of the square root in the exact solution of the
-        // quadratic equation
-        he0 = opAHeh0 * che_bhe;
-      } else {
-        // exact solution of the quadratic equation
-        he0 = (bhe - std::sqrt(bhe * bhe - 4. * AHe * opAHeh0 * che * che)) /
-              (2. * AHe * che);
-      }
-    }
-    // find the hydrogen neutral fraction
-    const double b = ch * (2. + AHe - he0 * AHe) + 1.;
-    const double ch_b = ch / b;
-    const double opAHeh0AHe = 1. + AHe - he0 * AHe;
-    const double t1 = 4. * ch_b * ch_b * opAHeh0AHe;
-    if (t1 < 1.e-3) {
-      h0 = ch_b * opAHeh0AHe;
-    } else {
-      cmac_assert_message(b * b > 4. * ch * ch * opAHeh0AHe,
-                          "T: %g, jH: %g, jHe: %g, nH: %g", T, jH, jHe, nH);
-      h0 = (b - std::sqrt(b * b - 4. * ch * ch * opAHeh0AHe)) / (2. * ch);
-    }
-    if (niter > 10) {
+
+
+    // find the hydrogen neutral fraction -
+
+    double ots = AHe*ne*hep*pHots*alpha_e_2sP;
+
+    h0 = (ne*alphaH - ots)/(jH + ne*alphaH + ne*gammaH);
+
+    if (niter > 20) {
       // if we have a lot of iterations: use the mean value to speed up
       // convergence
       h0 = 0.5 * (h0 + h0old);
       he0 = 0.5 * (he0 + he0old);
     }
-    if (niter > 20) {
-      cmac_error("Too many iterations in ionization loop!");
+    if (niter > 100) {
+      if (h0 < 1e-6) {
+        break;
+      } else {
+        std::cout << "UH OH " << std::endl;
+        std::cout << alphaH << " " << alphaHe << " " << alphaHe2 << " " << gammaH << " " << gammaHe1 << " " << alphaHe2 << std::endl;
+        std::cout << jH << " " << jHe << std::endl;
+        std::cout << T << " " << nH << std::endl;
+        std::cout << h0 << " " << he0 << std::endl;
+        cmac_error("Too many iterations in ionization loop!");
+
+      }
+
     }
   }
+  if (h0 != h0){
+    std::cout << alphaH << " " << alphaHe << " " << alphaHe2 << " " << gammaH << " " << gammaHe1 << " " << alphaHe2 << std::endl;
+    std::cout << jH << " " << jHe << std::endl;
+    std::cout << T << " " << nH << std::endl;
+    std::cout << h0 << " " << he0 << std::endl;
+    cmac_error("SHTAP");
+  }
+
 }
 
 /**

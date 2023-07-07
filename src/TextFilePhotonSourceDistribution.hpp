@@ -36,6 +36,8 @@
 
 class Log;
 class ParameterFile;
+class PhotonSourceSpectrum;
+class RandomGenerator;
 
 /**
  * @brief PhotonSourceDistribution that reads photon sources from an Ascii file.
@@ -48,11 +50,18 @@ private:
   /*! @brief Luminosity weights of the sources in the ASCII file. */
   std::vector< double > _weights;
 
+  std::vector<double > _luminosities;
+
 
   std::vector<int> _to_delete;
 
   /*! @brief Total luminosity of all sources in the ASCII file (in s^-1). */
   double _total_luminosity;
+
+
+  std::vector<PhotonSourceSpectrum*> _all_spectra;
+
+  std::vector<int> _spectrum_index;
 
   /*! @brief Log to write logging information to. */
   Log *_log;
@@ -64,7 +73,10 @@ public:
   virtual photonsourcenumber_t get_number_of_sources() const;
   virtual CoordinateVector<> get_position(photonsourcenumber_t index);
   virtual double get_weight(photonsourcenumber_t index) const;
+  virtual double get_photon_weighting(photonsourcenumber_t index) const;
   virtual double get_total_luminosity() const;
+  virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index);
+
 };
 
 #endif // TEXTFILEPHOTONSOURCEDISTRIBUTION_HPP

@@ -88,12 +88,13 @@ public:
       const double nh0, const double nhe0, const double nhp,
       const RecombinationRates &recombination_rates,
       const ChargeTransferRates &charge_transfer_rates,
+      const CollisionalRates &collisional_rates,
       IonizationVariables &ionization_variables);
 
   static void compute_ionization_states_hydrogen_helium(
-      const double alphaH, const double alphaHe, const double jH,
+      const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
       const double jHe, const double nH, const double AHe, const double T,
-      double &h0, double &he0);
+      double &h0, double &he0, double &hep, double gammaH, double gammaHe1, double gammaHe2);
 
   static double compute_ionization_state_hydrogen(const double alphaH,
                                                   const double jH,

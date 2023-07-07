@@ -24,6 +24,8 @@
  * @author Lewis McCallum (lm261@st-andrews.ac.uk)
  */
 #include "TextFilePhotonSourceDistribution.hpp"
+#include "WMBasicPhotonSourceSpectrum.hpp"
+#include "Pegase3PhotonSourceSpectrum.hpp"
 #include "CoordinateVector.hpp"
 #include "Log.hpp"
 #include "ParameterFile.hpp"
@@ -42,6 +44,15 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
     std::string filename, double time, Log *log)
     : _log(log) {
 
+
+
+
+
+  _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+  _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+
+
+
   std::ifstream file;
   file.open(filename);
   if (!file.is_open()) {
@@ -51,17 +62,19 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
   }
 
 
-  double time_val,posx,posy,posz,luminosity;
+  double time_val,posx,posy,posz,luminosity,mass;
   int event,index;
 
 
-  std::string dummyLine;
+  std::string dummyLine,star_type;
+
   std::getline(file, dummyLine);
 
   time_val = 0.0;
 
   while (!file.eof() && time_val <= time) {
-    file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity;
+    file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
+
     if (event == 2) {
       _to_delete.push_back(index);
     }
@@ -79,24 +92,30 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
   time_val = 0.0;
   while (!file.eof() && time_val <= time) {
-    file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity;
-
+    file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
     if (event == 1) {
       if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end() && luminosity > 0.0) {
         _positions.push_back(CoordinateVector<double>(posx,posy,posz));
-        _weights.push_back(luminosity);
+
+        _luminosities.push_back(luminosity);
+        if (star_type == "HOLMES") {
+          _spectrum_index.push_back(1);
+        } else {
+          _spectrum_index.push_back(0);
+        }
       }
 
     }
 
   }
 
-  int number_of_positions = _weights.size();
+  int number_of_positions = _luminosities.size();
+
 
  _total_luminosity = 0.0;
 
  for (int i=0;i<number_of_positions;i++) {
-   _total_luminosity += _weights[i];
+   _total_luminosity += _luminosities[i];
  }
 
 
@@ -167,7 +186,13 @@ CoordinateVector<> TextFilePhotonSourceDistribution::get_position(
  */
 double TextFilePhotonSourceDistribution::get_weight(
     photonsourcenumber_t index) const {
-  return _weights[index];
+  return _luminosities[index]/_total_luminosity;
+}
+
+double TextFilePhotonSourceDistribution::get_photon_weighting(photonsourcenumber_t index) const {
+
+
+  return _luminosities[index]/_total_luminosity;
 }
 
 /**
@@ -177,4 +202,15 @@ double TextFilePhotonSourceDistribution::get_weight(
  */
 double TextFilePhotonSourceDistribution::get_total_luminosity() const {
   return _total_luminosity;
+}
+
+
+double TextFilePhotonSourceDistribution::get_photon_frequency(RandomGenerator &random_generator,
+  photonsourcenumber_t index) {
+
+
+
+
+  return _all_spectra[_spectrum_index[index]]->get_random_frequency(random_generator,0.0);
+
 }

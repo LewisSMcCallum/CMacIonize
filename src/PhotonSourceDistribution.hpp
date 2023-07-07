@@ -33,6 +33,7 @@
 
 /*! @brief Size of a variable that stores the number of photon sources. */
 typedef uint_fast32_t photonsourcenumber_t;
+class RandomGenerator;
 
 /**
  * @brief General interface for photon source distribution functors.
@@ -72,6 +73,9 @@ public:
    * emitted from this particular source.
    */
   virtual double get_weight(photonsourcenumber_t index) const = 0;
+
+
+  virtual double get_photon_weighting(photonsourcenumber_t index) const {return 0.0;}
 
   /**
    * @brief Get the total luminosity of all sources together.
@@ -161,6 +165,10 @@ public:
   virtual void write_restart_file(RestartWriter &restart_writer) const {
     cmac_error(
         "Restarting is not supported for this PhotonSourceDistribution!");
+  }
+
+  virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index) {
+    return 0.0;
   }
 };
 

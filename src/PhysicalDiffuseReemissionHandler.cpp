@@ -33,7 +33,13 @@
  */
 PhysicalDiffuseReemissionHandler::PhysicalDiffuseReemissionHandler(
     const CrossSections &cross_sections)
-    : _HLyc_spectrum(cross_sections), _HeLyc_spectrum(cross_sections) {}
+    : _HLyc_spectrum(cross_sections), _HeLyc_spectrum(cross_sections) {
+    }
+
+
+
+
+
 
 /**
  * @brief Reemit the given Photon.
@@ -52,7 +58,11 @@ PhysicalDiffuseReemissionHandler::PhysicalDiffuseReemissionHandler(
 double PhysicalDiffuseReemissionHandler::reemit(
     const PhotonPacket &photon, const double helium_abundance,
     const IonizationVariables &ionization_variables,
-    RandomGenerator &random_generator, PhotonType &type) const {
+    RandomGenerator &random_generator, PhotonType &type,
+    AtomicValue<uint_fast32_t> &num_abs_gas,
+    AtomicValue<uint_fast32_t> &num_abs_dust) const {
+
+      
 
   double new_frequency = 0.;
 
@@ -60,14 +70,63 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
   // determine whether the photon is absorbed by hydrogen or by helium
   const double nH0anuH0 = ionization_variables.get_ionic_fraction(ION_H_n) *
-                          photon.get_photoionization_cross_section(ION_H_n);
+                          photon.get_photoionization_cross_section(ION_H_n)*
+                          ionization_variables.get_number_density();
 #ifdef HAS_HELIUM
   const double nHe0anuHe0 = ionization_variables.get_ionic_fraction(ION_He_n) *
                             helium_abundance *
-                            photon.get_photoionization_cross_section(ION_He_n);
+                            photon.get_photoionization_cross_section(ION_He_n)*
+                            ionization_variables.get_number_density();
 #else
   const double nHe0anuHe0 = 0.;
 #endif
+
+    double dust_opacity_si = photon.get_si_opacity();
+    double dust_opacity_c = photon.get_c_opacity();
+    double fraction_silicon = ionization_variables.get_fraction_silicon();
+
+    double ndustdust = fraction_silicon
+          * dust_opacity_si * ionization_variables.get_dust_density();
+
+    ndustdust += (1.-fraction_silicon) * dust_opacity_c
+             *ionization_variables.get_dust_density()
+             *ionization_variables.get_ionic_fraction(ION_H_n);
+
+    const double pDustabs = ndustdust / (nH0anuH0 + nHe0anuHe0 + ndustdust);
+
+
+
+
+
+    double x = random_generator.get_uniform_random_double();
+
+    if (x <= pDustabs) {
+      // interaction wuth dust, lets do stuff
+
+      x = random_generator.get_uniform_random_double();
+      if (x <= ionization_variables.get_reemission_probability(
+                   REEMISSIONPROBABILITY_DUST_ALBEDO)) {
+
+        // keep same frequency as incoming photon
+        new_frequency = photon.get_energy();
+        type = PHOTONTYPE_SCATTERED;
+
+
+      } else {
+
+
+
+        // photon absorbed
+        type = PHOTONTYPE_ABSORBED;
+        num_abs_dust.pre_increment();
+
+      }
+
+
+
+    } else {
+
+  // not dust, do hydrogen stuff
   const double pHabs = nH0anuH0 / (nH0anuH0 + nHe0anuHe0);
 
   double x = random_generator.get_uniform_random_double();
@@ -88,6 +147,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
       // photon absorbed
       type = PHOTONTYPE_ABSORBED;
+      num_abs_gas.pre_increment();
     }
 
   } else {
@@ -133,6 +193,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
         // photon absorbed
         type = PHOTONTYPE_ABSORBED;
+        num_abs_gas.pre_increment();
       }
 
     } else if (x <= ionization_variables.get_reemission_probability(
@@ -171,6 +232,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
+          num_abs_gas.pre_increment();
         }
 
       } else {
@@ -188,6 +250,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
+          num_abs_gas.pre_increment();
         }
       }
 
@@ -196,10 +259,13 @@ double PhysicalDiffuseReemissionHandler::reemit(
       // photon absorbed
       // this code should never be called, as the total probabilities sum to 1
       type = PHOTONTYPE_ABSORBED;
+      num_abs_gas.pre_increment();
     }
   }
+}
 
   return new_frequency;
+
 }
 
 /**
@@ -219,9 +285,12 @@ double PhysicalDiffuseReemissionHandler::reemit(
 double PhysicalDiffuseReemissionHandler::reemit(
     const Photon &photon, double helium_abundance,
     const IonizationVariables &ionization_variables,
-    RandomGenerator &random_generator, PhotonType &type) const {
+    RandomGenerator &random_generator, PhotonType &type,
+    AtomicValue<uint_fast32_t> &num_abs_gas,
+    AtomicValue<uint_fast32_t> &num_abs_dust) const {
 
   double new_frequency = 0.;
+  std::cout << "IM WORKING UNDER THE ASSUMPTION THIS NEVER GETS CALLED" << std::endl;
 
   // Wood, Mathis & Ercolano (2004), section 3.3
 

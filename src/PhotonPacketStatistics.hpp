@@ -45,6 +45,11 @@ private:
    */
   std::vector< AtomicValue< uint_fast64_t > > _scatter_histogram;
 
+
+  AtomicValue<uint_fast32_t> _num_abs;
+  AtomicValue<uint_fast32_t> _num_escape;
+
+
 public:
   /**
    * @brief constructor
@@ -52,7 +57,11 @@ public:
    * @param max_scatter maximum number of scatters recorded by the statistics
    */
   inline PhotonPacketStatistics(uint_fast32_t max_scatter)
-      : _scatter_histogram(max_scatter + 2) {}
+      : _scatter_histogram(max_scatter + 2) {
+
+        _num_abs.set(0);
+        _num_escape.set(0);
+      }
   /**
    * @brief parameter file constructor
    *
@@ -69,6 +78,7 @@ public:
    * @param packet photon packet retrieved to be terminated
    */
   inline void absorb_photon(const PhotonPacket &packet) {
+    _num_abs.pre_increment();
     size_t scatter_counter = packet.get_scatter_counter();
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
@@ -79,9 +89,26 @@ public:
    * @param packet Photon packet.
    */
   inline void escape_photon(const PhotonPacket &packet) {
+    _num_escape.pre_increment();
     size_t scatter_counter = packet.get_scatter_counter();
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
+  }
+
+
+
+  inline uint_fast32_t get_num_escaped() {
+    return _num_escape.value();
+  }
+
+  inline uint_fast8_t get_num_absorbed() {
+    return _num_abs.value();
+  }
+
+
+  inline void reset_counters() {
+    _num_abs.set(0);
+    _num_escape.set(0);
   }
   /**
    * @brief function that outputs re-emission statistics of photons
