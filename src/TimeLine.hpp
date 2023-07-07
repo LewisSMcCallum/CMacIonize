@@ -210,7 +210,8 @@ public:
     actual_timestep = to_physical_time_interval(integer_timestep);
     current_time = to_physical_time(_current_time);
 
-    return _current_time < TIMELINE_MAX_INTEGER_TIMELINE_SIZE;
+   return _current_time < TIMELINE_MAX_INTEGER_TIMELINE_SIZE;
+
   }
 
   /**
@@ -231,6 +232,8 @@ public:
    * @brief Restart constructor.
    *
    * @param restart_reader Restart file to read from.
+
+
    */
   inline TimeLine(RestartReader &restart_reader)
       : _minimum_timestep(restart_reader.read< uint64_t >()),

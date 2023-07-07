@@ -323,6 +323,8 @@ public:
     hydro_state.set_primitives_density(density);
     hydro_state.set_primitives_velocity(velocity);
     hydro_state.set_primitives_pressure(pressure);
+
+    set_conserved_variables(hydro_state, 1./inverse_volume);
   }
 
   /**
@@ -484,13 +486,19 @@ public:
         fluxfac = std::min(
             fluxfac,
             FLUX_LIMITER * left_state.get_conserved_total_energy() / absEflux);
+            cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac1a: %g , absEflux = %g, eflux = %g, e_r = %g",
+                                        fluxfac, absEflux, Eflux, left_state.get_conserved_total_energy());
+
       }
       if (-absEflux > FLUX_LIMITER * right_state.get_conserved_total_energy()) {
         fluxfac = std::min(
             fluxfac, -FLUX_LIMITER * right_state.get_conserved_total_energy() /
                          absEflux);
+        cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac1b: %g , absEflux = %g, eflux = %g, e_r = %g",
+                                    fluxfac, absEflux, Eflux, right_state.get_conserved_total_energy());
       }
     }
+    cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac2: %g", fluxfac);
     // momentum flux limiter
     // note that we only apply this for cells that have high momentum, i.e.
     // whose momentum is higher than the thermal momentum of the cell
@@ -507,6 +515,7 @@ public:
             fluxfac, std::sqrt((FLUX_LIMITER * FLUX_LIMITER) * p2 / pflux2));
       }
     }
+    cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac3: %g", fluxfac);
     {
       const double pn2 = right_state.get_conserved_momentum().norm2();
       const double mn2 =
@@ -520,7 +529,7 @@ public:
         }
       }
     }
-    cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac: %g", fluxfac);
+    cmac_assert_message(fluxfac >= 0. && fluxfac <= 1., "fluxfac4: %g", fluxfac);
     mflux *= fluxfac;
     pflux *= fluxfac;
     Eflux *= fluxfac;
@@ -977,6 +986,7 @@ public:
     // the velocity is directly set from the initial condition
     hydro_variables.set_primitives_density(density);
     hydro_variables.set_primitives_pressure(pressure);
+    set_conserved_variables(hydro_variables, hydro_variables.get_conserved_mass()/density);
   }
 
   /**
@@ -1194,6 +1204,7 @@ public:
         hydro_variables.primitives(4) *= factor * factor;
       }
     }
+    set_conserved_variables(hydro_variables, 1./inverse_volume);
   }
 
   /**
@@ -1221,6 +1232,23 @@ public:
     ionization_variables.set_number_density(number_density);
   }
 
+
+  inline void align_temp_to_p(const HydroVariables &hydro_variables,
+                                IonizationVariables &ionization_variables) const {
+
+
+          double inverse_density = 1./hydro_variables.get_primitives_density();
+
+          double pressure = hydro_variables.get_primitives_pressure();
+          double mean_molecular_mass = 0.5*(1 +  ionization_variables.get_ionic_fraction(ION_H_n));
+
+          double temperature = _T_conversion_factor*mean_molecular_mass*pressure*inverse_density;
+
+          ionization_variables.set_temperature(temperature);
+
+
+                                }
+
   /**
    * @brief Get the hydrodynamical timestep for the given cell.
    *
@@ -1238,6 +1266,7 @@ public:
     const double R = std::cbrt(0.75 * volume * M_1_PI);
 
     const double dt = R / (cs + v);
+
     cmac_assert(dt > 0.);
     return dt;
   }

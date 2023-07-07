@@ -47,8 +47,10 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
 
 
+
   _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
   _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+
 
 
   std::ifstream file;
@@ -65,12 +67,14 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
 
   std::string dummyLine,star_type;
+
   std::getline(file, dummyLine);
 
   time_val = 0.0;
 
   while (!file.eof() && time_val <= time) {
     file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
+
     if (event == 2) {
       _to_delete.push_back(index);
     }
@@ -89,10 +93,10 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
   time_val = 0.0;
   while (!file.eof() && time_val <= time) {
     file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
-
     if (event == 1) {
       if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end() && luminosity > 0.0) {
         _positions.push_back(CoordinateVector<double>(posx,posy,posz));
+
         _luminosities.push_back(luminosity);
         if (star_type == "HOLMES") {
           _spectrum_index.push_back(1);
@@ -106,6 +110,7 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
   }
 
   int number_of_positions = _luminosities.size();
+
 
  _total_luminosity = 0.0;
 

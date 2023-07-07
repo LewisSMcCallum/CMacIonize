@@ -26,6 +26,7 @@
 
 #include "TaskBasedRadiationHydrodynamicsSimulation.hpp"
 #include "AlveliusTurbulenceForcing.hpp"
+#include "BarnesHutTree.hpp"
 #include "ChargeTransferRates.hpp"
 #include "CollisionalRates.hpp"
 #include "CommandLineParser.hpp"
@@ -763,88 +764,137 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
                               const double inverse_volume, const double nH2V,
                               const double total_dt,
                               DeRijckeRadiativeCooling &radiative_cooling,
-                              Hydro &hydro) {
+                              Hydro &hydro, double _cooling_temp_floor,
+                              double gamma_minus_one) {
 
-  const double energy_start =
-      hydro_variables.get_conserved_total_energy() -
-      0.5 * CoordinateVector<>::dot_product(
-                hydro_variables.get_primitives_velocity(),
-                hydro_variables.get_conserved_momentum());
 
-  if (energy_start == 0.) {
+  double rho = hydro_variables.get_primitives_density();
+  double xh = ionization_variables.get_ionic_fraction(ION_H_n);
+  double volume = 1./inverse_volume;
+  double k= 1.38064852e-23;
+  double mh = 1.672621898e-27;
+
+
+  double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
+
+  double t_start = ionization_variables.get_temperature();
+  double temperature = t_start;
+
+  double current_energy = t_start*e_factor;
+
+  double calced_e = current_energy;
+
+  double kinetic_energy =
+        0.5*CoordinateVector<>::dot_product(
+                   hydro_variables.get_primitives_velocity(),
+                   hydro_variables.get_conserved_momentum());
+
+  double bkp_thermal = hydro_variables.get_conserved_total_energy() - kinetic_energy;
+
+  current_energy = std::min(bkp_thermal, calced_e);
+
+   //cmac_assert_message(kinetic_energy >= 0, "KE <0 = %g", kinetic_energy);
+   //cmac_assert_message(bkp_thermal >=0, "thermal < 0 = %g", bkp_thermal);
+
+
+
+
+  if (current_energy == 0.) {
     // don't cool gas that has no thermal energy
     return;
   }
 
-  const double temperature_start = ionization_variables.get_temperature();
 
-  double energy_low = energy_start;
-  double energy_high = energy_start;
 
-  double temperature = temperature_start;
-  double cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
-
-  cmac_assert(energy_high - energy_start + total_dt * cooling > 0.);
-  cmac_assert(energy_low - energy_start + total_dt * cooling > 0.);
-
-  uint_fast32_t loopcount = 0;
-  while (loopcount < 1e6 &&
-         energy_low - energy_start + total_dt * cooling > 0.) {
-
-    ++loopcount;
-
-    if (energy_low == 0.) {
-      hydro.update_energy_variables(ionization_variables, hydro_variables,
-                                    inverse_volume, -energy_start);
-      return;
-    }
-
-    energy_high = energy_low;
-    energy_low *= 0.5;
-
-    cmac_assert(energy_high - energy_start + total_dt * cooling > 0.);
-
-    temperature =
-        temperature_start + hydro.get_temperature_difference(
-                                ionization_variables, hydro_variables,
-                                inverse_volume, energy_start - energy_low);
-    cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+  if (t_start <= _cooling_temp_floor) {
+    return;
   }
-  cmac_assert_message(
-      loopcount < 1e6,
-      "energy_low: %g, energy_start: %g, total_dt: %g, cooling: %g", energy_low,
-      energy_start, total_dt, cooling);
 
-  double energy_next = 0.5 * (energy_low + energy_high);
-  temperature =
-      temperature_start + hydro.get_temperature_difference(
-                              ionization_variables, hydro_variables,
-                              inverse_volume, energy_start - energy_next);
-  cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
-  loopcount = 0;
-  while (loopcount < 1e6 &&
-         std::abs(energy_low - energy_high) > 1.e-5 * energy_next) {
+  //if (temperature > radiative_cooling.get_maximum_temperature()) {
+  //  cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
+  //                temperature);
+  //}
+  double cooling = radiative_cooling.get_cooling_rate(t_start) * nH2V;
 
-    ++loopcount;
 
-    if (energy_next - energy_start + total_dt * cooling > 0.) {
-      energy_high = energy_next;
+  double cool_limit = 0.001;
+  double clock = 0.;
+  double tstep = total_dt;
+  double e_lost = 0.0;
+
+
+  while (clock < total_dt) {
+
+    tstep = total_dt - clock;
+    if (cooling*tstep > cool_limit*current_energy) {
+
+      tstep = cool_limit * current_energy/cooling;
+
+    //  if (tstep < total_dt/1.e6) {
+    //    tstep = total_dt/1.e6;
+    //  }
+
+      double dE = tstep*cooling;
+
+      if (current_energy < dE) {
+        break;
+      }
+
+
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
+      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
     } else {
-      energy_low = energy_next;
-    }
-    energy_next = 0.5 * (energy_low + energy_high);
-    temperature =
-        temperature_start + hydro.get_temperature_difference(
-                                ionization_variables, hydro_variables,
-                                inverse_volume, energy_start - energy_next);
-    cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
-  }
-  cmac_assert(loopcount < 1e6);
 
-  double dE = energy_next - energy_start;
-  dE = std::max(dE, -0.5 * energy_start);
-  hydro.update_energy_variables(ionization_variables, hydro_variables,
-                                inverse_volume, dE);
+      if (current_energy < tstep*cooling) {
+        break;
+      }
+
+
+      double dE = tstep*cooling;
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+
+      // do actual cooling step
+
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
+      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
+
+
+
+    }
+
+  }
+
+  cmac_assert_message(e_lost < hydro_variables.get_conserved_total_energy(), "Trying to remove e = %g from total = %g",
+                e_lost, hydro_variables.get_conserved_total_energy());
+
+  cmac_assert_message(bkp_thermal > e_lost, "Update energy will fail as e_lost > thermal, elost = %g, thermal=%g, calc e= %g, KE = %g, tstart=%g, press = %g",
+                       e_lost, bkp_thermal,calced_e, kinetic_energy, t_start, hydro_variables.get_primitives_pressure());
+
+  double pressure = gamma_minus_one*inverse_volume*(current_energy);
+
+  //hydro_variables.set_conserved_total_energy(hydro_variables.get_conserved_total_energy() - e_lost);
+  hydro_variables.set_primitives_pressure(pressure);
+  ionization_variables.set_temperature(temperature);
+//  hydro.update_energy_variables(ionization_variables,hydro_variables,inverse_volume,-1.*e_lost);
+
+  cmac_assert_message(hydro_variables.get_conserved_total_energy() >= 0, "Negative energy after cooling.");
 }
 
 /**
@@ -1025,6 +1075,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool do_radiation = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:do radiation", true);
 
+
+  const bool do_self_gravity = params->get_value< bool>(
+         "TaskBasedRadiationHydrodynamicsSimulation:do self gravity",false);
+  const double self_grav_theta = params->get_value<double>(
+       "TaskBasedRadiationHydrodynamicsSimulation:self gravity theta", 0.5);
+
+
   if (restart_reader != nullptr) {
     hydro_lastsnap = restart_reader->read< uint_fast32_t >();
     hydro_lastrad = restart_reader->read< uint_fast32_t >();
@@ -1075,11 +1132,23 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   }
 
   DeRijckeRadiativeCooling *radiative_cooling = nullptr;
+  std::ofstream *_cooling_file = nullptr;
+  double _cooling_temp_floor = 10.;
   if (params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
           false)) {
     radiative_cooling = new DeRijckeRadiativeCooling();
+    _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
+            "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
+            "10 K");
+    _cooling_file = new std::ofstream("CoolingProgression.txt");
+    *_cooling_file << "#time (s)\tTotal lost Energy\n";
+    _cooling_file->flush();
   }
+
+  double total_thermal_lost=0.0;
+
+  double _gamma = params->get_value< double >("Hydro:polytropic index", 5. / 3.);
 
   const bool do_stellar_feedback = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:do stellar feedback", false);
@@ -1143,10 +1212,31 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const double source_copy_level = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:source copy level", 4);
 
+
+
+  const double _max_velocity = params->get_physical_value< QUANTITY_VELOCITY >(
+      "Hydro:maximum velocity", "1.e99 m s^-1");
+
   Hydro hydro(*params);
   HydroBoundaryManager hydro_boundary_manager(*params);
 
   ChargeTransferRates charge_transfer_rates;
+  CollisionalRates collisional_rates;
+
+  TemperatureCalculator *temperature_calculator;
+
+  if (sourcedistribution == nullptr) {
+    temperature_calculator = new TemperatureCalculator(
+        0.0, abundances, line_cooling_data,
+        *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
+  } else {
+    temperature_calculator = new TemperatureCalculator(
+        sourcedistribution->get_total_luminosity(), abundances, line_cooling_data,
+        *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
+
+  }
+
+
 
   CollisionalRates collisional_rates;
 
@@ -1154,6 +1244,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   TemperatureCalculator *temperature_calculator = new TemperatureCalculator(
       sourcedistribution->get_total_luminosity(), abundances, line_cooling_data,
       *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
+
 
   RestartManager restart_manager(*params);
   RandomGenerator restart_generator(random_seed);
@@ -1353,10 +1444,62 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     stop_parallel_timing_block();
   }
 
+
+
+  if (do_self_gravity) {
+
+
+    BarnesHutTree tree(simulation_box.get_box().get_sides(),simulation_box.get_box().get_anchor(),self_grav_theta);
+
+
+    AtomicValue< size_t > igrid(0);
+    while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+      const size_t this_igrid = igrid.post_increment();
+      if (this_igrid < grid_creator->number_of_original_subgrids()) {
+        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
+        for (auto it = subgrid.hydro_begin(); it != subgrid.hydro_end();
+             ++it) {
+               tree.insert(it);
+        }
+
+      }
+    }
+
+    igrid.set(0);
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+    while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+      const size_t this_igrid = igrid.post_increment();
+      if (this_igrid < grid_creator->number_of_original_subgrids()) {
+        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
+        for (auto it = subgrid.hydro_begin(); it != subgrid.hydro_end();
+             ++it) {
+            CoordinateVector<double> accel = tree.compute_gravity(it);
+            if (external_potential!= nullptr){
+              it.get_hydro_variables().set_gravitational_acceleration(accel + it.get_hydro_variables().get_gravitational_acceleration());
+            } else {
+              it.get_hydro_variables().set_gravitational_acceleration(accel);
+            }
+
+        }
+
+      }
+    }
+
+
+  }
+
+  if (sourcedistribution != nullptr) {
   // do the initial stellar feedback
   if (restart_reader == nullptr && do_stellar_feedback &&
       sourcedistribution->do_stellar_feedback(0.)) {
+
+
+    sourcedistribution->get_sne_radii(*grid_creator);
+
     AtomicValue< size_t > igrid(0);
+
     start_parallel_timing_block();
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
@@ -1365,22 +1508,40 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       const size_t this_igrid = igrid.post_increment();
       if (this_igrid < grid_creator->number_of_original_subgrids()) {
         HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
-        sourcedistribution->add_stellar_feedback(subgrid);
+        sourcedistribution->add_stellar_feedback(subgrid, hydro);
         auto gridit = grid_creator->get_subgrid(this_igrid);
         for (auto cellit = (*gridit).hydro_begin();
              cellit != (*gridit).hydro_end(); ++cellit) {
           const double dE = cellit.get_hydro_variables().get_energy_term();
-          hydro.update_energy_variables(cellit.get_ionization_variables(),
-                                        cellit.get_hydro_variables(),
-                                        1. / cellit.get_volume(), dE);
-          cellit.get_hydro_variables().set_energy_term(0.);
+          if (dE > 0.0) {
+            hydro.update_energy_variables(cellit.get_ionization_variables(),
+                                          cellit.get_hydro_variables(),
+                                          1. / cellit.get_volume(), dE);
+            cellit.get_hydro_variables().set_energy_term(0.);
+          }
+
+          //if (dE > 0) {
+          //  hydro.set_temperature(cellit.get_ionization_variables(), cellit.get_hydro_variables(),
+          //         cellit.get_volume(), 1.e4);
+          //}
+          CoordinateVector<> cell_vel = cellit.get_hydro_variables().get_primitives_velocity();
+          if (cell_vel.norm() > _max_velocity) {
+            double factor = cell_vel.norm()/_max_velocity;
+            cellit.get_hydro_variables().set_primitives_velocity(cell_vel /factor);
+          }
+          hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
+        //  if (cellit.get_ionization_variables().get_temperature() > 9.9999e8) {
+        //    hydro.set_temperature(cellit.get_ionization_variables(), cellit.get_hydro_variables(),
+        //            cellit.get_volume(), 9.9999e8);
+        //  }
+
         }
       }
     }
     stop_parallel_timing_block();
     sourcedistribution->done_stellar_feedback();
   }
-
+ }
   if (write_output && restart_reader == nullptr && hydro_firstsnap == 0) {
     time_logger.start("snapshot");
     writer->write(*grid_creator, 0, *params, 0.);
@@ -1438,8 +1599,14 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     // set the copy level off all subgrids containing a source to the given
     // parameter value (for now)
     {
-      const photonsourcenumber_t number_of_sources =
-          sourcedistribution->get_number_of_sources();
+      photonsourcenumber_t number_of_sources;
+
+      if (sourcedistribution == nullptr) {
+        number_of_sources = 0;
+      } else {
+        number_of_sources =
+            sourcedistribution->get_number_of_sources();
+      }
       for (photonsourcenumber_t isource = 0; isource < number_of_sources;
            ++isource) {
         const CoordinateVector<> position =
@@ -1548,6 +1715,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         (hydro_radtime < 0. ||
          (current_time - actual_timestep) >= hydro_lastrad * hydro_radtime)) {
 
+        if (_cooling_file != nullptr) {
+          *_cooling_file << current_time << "\t" << total_thermal_lost<< "\n";
+           _cooling_file->flush();
+          }
+
       time_logger.start("radiation");
 
       if (log) {
@@ -1556,7 +1728,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
       ++hydro_lastrad;
       // update the PhotonSource
-      if (sourcedistribution->update(current_time)) {
+
+      if (sourcedistribution != nullptr) {
+
+
+      if (sourcedistribution->update(grid_creator)) {
+
         time_logger.start("source update");
 
         temperature_calculator->update_luminosity(
@@ -1615,6 +1792,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
         time_logger.end("source update");
       }
+    }
+    if(sourcedistribution != nullptr) {
 
       if (sourcedistribution->get_total_luminosity() > 0.) {
         time_logger.start("radiation transfer");
@@ -1657,6 +1836,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           }
           stop_parallel_timing_block();
         }
+
 
         for (uint_fast32_t iloop = 0; iloop < nloop; ++iloop) {
 
@@ -1709,7 +1889,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             }
             stop_parallel_timing_block();
           }
-
           size_t number_of_photons_done = 0;
           while (number_of_photons_done < numphoton) {
             for (size_t isrc = 0; isrc < photon_source.get_number_of_sources();
@@ -1911,7 +2090,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         }
 
         // there are no ionising sources: skip radiation for this step
-        // manually set all neutral fractions to 1
+        // still call temperature_calculator to get collisional ionised gas
         {
           AtomicValue< size_t > igrid(0);
           start_parallel_timing_block();
@@ -1922,11 +2101,36 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             const size_t this_igrid = igrid.post_increment();
             if (this_igrid < grid_creator->number_of_original_subgrids()) {
               auto gridit = grid_creator->get_subgrid(this_igrid);
-              for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
-                   ++cellit) {
-                cellit.get_ionization_variables().set_ionic_fraction(ION_H_n,
-                                                                     1.);
-              }
+              (*gridit).reset_intensities();
+              temperature_calculator->calculate_temperature(0, 0,
+                                                            *gridit);
+            }
+          }
+          stop_parallel_timing_block();
+        }
+
+      }
+    } else {
+
+        if (log) {
+          log->write_status("No source distribution!");
+        }
+
+        // there are no ionising sources: skip radiation for this step
+        // still call temperature_calculator to get collisional ionised gas
+        {
+          AtomicValue< size_t > igrid(0);
+          start_parallel_timing_block();
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+          while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+            const size_t this_igrid = igrid.post_increment();
+            if (this_igrid < grid_creator->number_of_original_subgrids()) {
+              auto gridit = grid_creator->get_subgrid(this_igrid);
+              (*gridit).reset_intensities();
+              temperature_calculator->calculate_temperature(0, 0,
+                                                            *gridit);
             }
           }
           stop_parallel_timing_block();
@@ -1961,46 +2165,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       time_logger.end("radiation");
     }
 
-    if (radiative_cooling != nullptr) {
-      time_logger.start("cooling");
-      AtomicValue< size_t > igrid(0);
-      start_parallel_timing_block();
-#ifdef HAVE_OPENMP
-#pragma omp parallel default(shared)
-#endif
-      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
-        const size_t this_igrid = igrid.post_increment();
-        if (this_igrid < grid_creator->number_of_original_subgrids()) {
-          auto gridit = grid_creator->get_subgrid(this_igrid);
-          for (auto cellit = (*gridit).hydro_begin();
-               cellit != (*gridit).hydro_end(); ++cellit) {
-            IonizationVariables ionization_variables =
-                cellit.get_ionization_variables();
-            HydroVariables hydro_variables = cellit.get_hydro_variables();
-            const double nH = ionization_variables.get_number_density();
-            const double nH2 = nH * nH;
-            do_cooling(ionization_variables, hydro_variables,
-                       1. / cellit.get_volume(), nH2 * cellit.get_volume(),
-                       actual_timestep, *radiative_cooling, hydro);
-            cellit.get_ionization_variables().set_temperature(
-                ionization_variables.get_temperature());
-            cellit.get_hydro_variables().set_primitives_pressure(
-                hydro_variables.get_primitives_pressure());
-            cellit.get_hydro_variables().set_conserved_total_energy(
-                hydro_variables.get_conserved_total_energy());
-            if (ionization_variables.get_temperature() <
-                radiative_cooling->get_minimum_temperature()) {
-              hydro.set_temperature(
-                  cellit.get_ionization_variables(),
-                  cellit.get_hydro_variables(), cellit.get_volume(),
-                  radiative_cooling->get_minimum_temperature());
-            }
-          }
-        }
-      }
-      stop_parallel_timing_block();
-      time_logger.end("cooling");
-    }
+
+
 
     time_logger.start("hydro");
 
@@ -2027,6 +2193,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             const CoordinateVector<> a =
                 external_potential->get_acceleration(it.get_cell_midpoint());
             it.get_hydro_variables().set_gravitational_acceleration(a);
+
+            //remember and implement the below properly
+            it.get_hydro_variables().set_gravitational_potential(0.0);
           }
           cpucycle_tick(task_stop);
           active_time[get_thread_index()] += task_stop - task_start;
@@ -2034,6 +2203,68 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       }
       stop_parallel_timing_block();
       time_logger.end("gravity");
+    }
+
+
+    if (do_self_gravity) {
+
+      BarnesHutTree tree(simulation_box.get_box().get_sides(),simulation_box.get_box().get_anchor(),self_grav_theta);
+
+
+      AtomicValue< size_t > igrid(0);
+      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+        const size_t this_igrid = igrid.post_increment();
+        if (this_igrid < grid_creator->number_of_original_subgrids()) {
+          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
+          for (auto it = subgrid.hydro_begin(); it != subgrid.hydro_end();
+               ++it) {
+
+
+              tree.insert(it);
+
+
+          }
+
+        }
+      }
+  //    if (sourcedistribution != nullptr) {
+//
+  //      tree.remove_all_particles();
+//
+  //      std::vector<CoordinateVector<double>> sink_pos = sourcedistribution->get_sink_positions();
+  //      std::vector<double> sink_masses = sourcedistribution->get_sink_masses();
+  //      for (size_t i=0;i<sink_masses.size();i++) {
+  //        tree.insert_particle(sink_pos[i],sink_masses[i]);
+  //      }
+//
+  //    }
+
+
+      igrid.set(0);
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+        const size_t this_igrid = igrid.post_increment();
+        if (this_igrid < grid_creator->number_of_original_subgrids()) {
+          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
+          for (auto it = subgrid.hydro_begin(); it != subgrid.hydro_end();
+               ++it) {
+              if (external_potential== nullptr) {
+                it.get_hydro_variables().set_gravitational_potential(0.0);
+              }
+              CoordinateVector<double> accel = tree.compute_gravity(it);
+              if (external_potential!= nullptr){
+                it.get_hydro_variables().set_gravitational_acceleration(accel + it.get_hydro_variables().get_gravitational_acceleration());
+              } else {
+                it.get_hydro_variables().set_gravitational_acceleration(accel);
+              }
+
+          }
+
+        }
+      }
+
     }
 
     // apply the turbulent forcing if applicable
@@ -2150,6 +2381,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       time_logger.end("mask");
     }
 
+    if (sourcedistribution != nullptr) {
+      sourcedistribution->float_sources(grid_creator,actual_timestep);
+      sourcedistribution->accrete_gas(grid_creator,hydro);
+    }
+
     cpucycle_tick(iteration_end);
 
     if (log) {
@@ -2165,6 +2401,63 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         const double percentage =
             (100. * active_time[ithread]) / total_interval;
         log->write_status("Thread ", ithread, ": ", percentage, "%.");
+      }
+    }
+
+    if (radiative_cooling != nullptr) {
+      time_logger.start("cooling");
+
+      if (log) {
+        log->write_status("Starting cooling step.");
+      }
+
+      AtomicValue< size_t > igrid(0);
+      start_parallel_timing_block();
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+        const size_t this_igrid = igrid.post_increment();
+        if (this_igrid < grid_creator->number_of_original_subgrids()) {
+          auto gridit = grid_creator->get_subgrid(this_igrid);
+          for (auto cellit = (*gridit).hydro_begin();
+               cellit != (*gridit).hydro_end(); ++cellit) {
+            hydro.hydro_to_ionization(cellit.get_hydro_variables(), cellit.get_ionization_variables());
+            hydro.align_temp_to_p(cellit.get_hydro_variables(), cellit.get_ionization_variables());
+
+            IonizationVariables ionization_variables =
+                cellit.get_ionization_variables();
+            HydroVariables hydro_variables = cellit.get_hydro_variables();
+            const double nH = ionization_variables.get_number_density();
+            const double nH2 = nH * nH;
+            do_cooling(ionization_variables, hydro_variables,
+                       1. / cellit.get_volume(), nH2 * cellit.get_volume(),
+                       actual_timestep, *radiative_cooling, hydro,
+                        _cooling_temp_floor,_gamma-1.);
+            cellit.get_ionization_variables().set_temperature(
+                ionization_variables.get_temperature());
+            cellit.get_hydro_variables().set_primitives_pressure(
+                hydro_variables.get_primitives_pressure());
+            cellit.get_hydro_variables().set_conserved_total_energy(
+                hydro_variables.get_conserved_total_energy());
+            if (ionization_variables.get_temperature() <
+                _cooling_temp_floor) {
+              hydro.set_temperature(
+                  cellit.get_ionization_variables(),
+                  cellit.get_hydro_variables(), cellit.get_volume(),
+                  _cooling_temp_floor);
+            }
+            hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
+
+          }
+        }
+      }
+
+
+      stop_parallel_timing_block();
+      time_logger.end("cooling");
+      if (log) {
+        log->write_status("Done with cooling step.");
       }
     }
 
@@ -2219,32 +2512,67 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     tasks->clear_after(radiation_task_offset);
     time_logger.end("task cleanup");
 
+
+    if (sourcedistribution != nullptr) {
     if (do_stellar_feedback &&
         sourcedistribution->do_stellar_feedback(current_time)) {
+       if (log) {
+         log->write_status("Starting stellar feedback.");
+       }
+
+
+     sourcedistribution->get_sne_radii(*grid_creator);
+
+
+
       AtomicValue< size_t > igrid(0);
       start_parallel_timing_block();
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
 #endif
+
       while (igrid.value() < grid_creator->number_of_original_subgrids()) {
         const size_t this_igrid = igrid.post_increment();
         if (this_igrid < grid_creator->number_of_original_subgrids()) {
           HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(this_igrid);
-          sourcedistribution->add_stellar_feedback(subgrid);
+          sourcedistribution->add_stellar_feedback(subgrid, hydro);
           auto gridit = grid_creator->get_subgrid(this_igrid);
           for (auto cellit = (*gridit).hydro_begin();
                cellit != (*gridit).hydro_end(); ++cellit) {
             const double dE = cellit.get_hydro_variables().get_energy_term();
-            hydro.update_energy_variables(cellit.get_ionization_variables(),
-                                          cellit.get_hydro_variables(),
-                                          1. / cellit.get_volume(), dE);
-            cellit.get_hydro_variables().set_energy_term(0.);
+            if (dE > 0.0) {
+              hydro.update_energy_variables(cellit.get_ionization_variables(),
+                                            cellit.get_hydro_variables(),
+                                            1. / cellit.get_volume(), dE);
+              cellit.get_hydro_variables().set_energy_term(0.);
+
+            }
+
+            //if (dE > 0) {
+            //  hydro.set_temperature(cellit.get_ionization_variables(), cellit.get_hydro_variables(),
+            //         cellit.get_volume(), 1.e4);
+            //}
+            CoordinateVector<> cell_vel = cellit.get_hydro_variables().get_primitives_velocity();
+            if (cell_vel.norm() > _max_velocity) {
+              double factor = cell_vel.norm()/_max_velocity;
+              cellit.get_hydro_variables().set_primitives_velocity(cell_vel /factor);
+            }
+            hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
+          //  if (cellit.get_ionization_variables().get_temperature() > 9.9999e8) {
+          //    hydro.set_temperature(cellit.get_ionization_variables(), cellit.get_hydro_variables(),
+          //            cellit.get_volume(), 9.9999e8);
+          //  }
+
           }
         }
       }
       stop_parallel_timing_block();
+      if (log) {
+        log->write_status("Done with stellar feedback.");
+      }
       sourcedistribution->done_stellar_feedback();
     }
+  }
 
     time_logger.start("time step");
     requested_timestep = DBL_MAX;

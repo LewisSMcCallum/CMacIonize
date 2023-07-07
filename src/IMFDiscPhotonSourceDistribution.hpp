@@ -17,14 +17,14 @@
  ******************************************************************************/
 
 /**
- * @file DiscPatchPhotonSourceDistribution.hpp
+ * @file IMFDiscPhotonSourceDistribution.hpp
  *
- * @brief Disc patch PhotonSourceDistribution.
+ * @brief IMF Disc PhotonSourceDistribution.
  *
  * @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
  */
-#ifndef DISCPATCHPHOTONSOURCEDISTRIBUTION_HPP
-#define DISCPATCHPHOTONSOURCEDISTRIBUTION_HPP
+#ifndef IMFDISCPHOTONSOURCEDISTRIBUTION_HPP
+#define IMFDISCPHOTONSOURCEDISTRIBUTION_HPP
 
 #include "Log.hpp"
 #include "ParameterFile.hpp"
@@ -41,19 +41,10 @@
 /**
  * @brief Disc patch PhotonSourceDistribution.
  */
-class DiscPatchPhotonSourceDistribution : public PhotonSourceDistribution {
+class IMFDiscPhotonSourceDistribution : public PhotonSourceDistribution {
 private:
   /*! @brief Lifetime of a source (in s). */
-  const double _source_lifetime;
-
-  /*! @brief Ionising luminosity of a single source (in s^-1). */
-  const double _source_luminosity;
-
-  /*! @brief Probability of a new source being created (in s^-1). */
-  const double _source_probability;
-
-  /*! @brief Average number of sources at any given time. */
-  const uint_fast32_t _average_number_of_sources;
+  const double _star_formation_rate;
 
   /*! @brief x component of the anchor of the rectangular disk (in m). */
   const double _anchor_x;
@@ -76,8 +67,9 @@ private:
   /*! @brief Update time interval (in s). */
   const double _update_interval;
 
-  /*! @brief Pseudo-random number generator. */
-  RandomGenerator _random_generator;
+
+
+
 
   /*! @brief Positions of the sources (in m). */
   std::vector< CoordinateVector<> > _source_positions;
@@ -85,8 +77,15 @@ private:
   /*! @brief Remaining lifetime of the sources (in s). */
   std::vector< double > _source_lifetimes;
 
+  std::vector< double > _source_luminosities;
+
+  std::vector < double > _cum_imf;
+  std::vector < double > _mass_range;
+
   /*! @brief Output file for the sources (if applicable). */
   std::ofstream *_output_file;
+
+  std::ofstream *_output_file2;
 
   /*! @brief Number of updates since the start of the simulation. */
   uint_fast32_t _number_of_updates;
@@ -97,6 +96,10 @@ private:
   /*! @brief Index of the next source to add (if output is enabled). */
   uint_fast32_t _next_index;
 
+  uint_fast32_t _num_sne = 0;
+
+
+
   std::vector< CoordinateVector<> > _to_do_feedback;
 
   std::vector< double > _r_inj;
@@ -106,6 +109,26 @@ private:
 
 
   const double _sne_energy = 1.e44;
+
+
+  const double _init_star_dens;
+
+  const double _lum_adjust;
+
+  /*! @brief Pseudo-random number generator. */
+  RandomGenerator _random_generator;
+
+
+  const bool _clustered = false;
+
+  bool _cluster_lacking = false;
+
+
+  CoordinateVector<double >_previous_cluster_loc;
+
+  double _missing_mass;
+
+
 
   /**
    * @brief Generate a new source position.
@@ -143,6 +166,7 @@ private:
       double dx = std::pow(cell_vol,1./3.);
 
       double r_run = 4*dx;
+
 
       std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
 
@@ -198,6 +222,92 @@ private:
         return r_st;
 
       }
+    static double kroupa_imf(double mass) {
+      if (mass > 0.5) {
+        return std::pow(mass,-2.3);
+      } else if (mass < 0.08){
+        return 2*std::pow(mass,-1.3);
+      } else {
+        return 25*std::pow(mass,-0.3);
+      }
+    }
+
+    double integral(double (*f)(double), double a, double b, int n) {
+    double step = (b - a) / n;  // width of each small rectangle
+    double area = 0.0;  // signed area
+    for (int i = 0; i < n; i ++) {
+        area += f(a + (i + 0.5) * step) * step; // sum up each small rectangle
+    }
+    return area;
+    }
+
+    double get_single_mass(std::vector<double> mass_range,
+           std::vector<double> cum_imf, double rand_num) {
+
+       int Nup = mass_range.size()-1;
+       int Nlow=0;
+       int mid=(Nup + Nlow)/2;
+       while(Nup - Nlow > 1){
+         mid=(Nup + Nlow)/2;
+         if (rand_num > cum_imf[mid]){
+           Nlow = mid;
+         } else {
+           Nup = mid;
+         }
+       }
+
+     return (mass_range[Nup] + mass_range[Nlow])/2.0;
+
+
+    }
+
+    double lum_from_mass(double mass) {
+      double lum;
+      if (mass < 19.3) {
+        lum=0.0;
+      } else if (mass < 21.2) {
+        lum=std::pow(10,47.865);
+      } else if (mass < 23.3) {
+        lum=std::pow(10,48.14);
+      } else if (mass < 25.4) {
+        lum=std::pow(10,48.365);
+      } else if (mass < 28.0) {
+        lum=std::pow(10,48.54);
+      } else if (mass < 30.8) {
+        lum=std::pow(10,48.68);
+      } else if (mass < 34.1) {
+        lum=std::pow(10,48.835);
+      } else if (mass < 37.7) {
+        lum=std::pow(10,48.99);
+      } else if (mass < 41.0) {
+        lum=std::pow(10,49.12);
+      } else if (mass < 45.2) {
+        lum=std::pow(10,49.235);
+      } else if (mass < 50.4) {
+        lum=std::pow(10,49.34);
+      } else if (mass < 56.6) {
+        lum=std::pow(10,49.44);
+      } else if (mass < 62.3) {
+        lum=std::pow(10,49.54);
+      } else if (mass < 68.9) {
+        lum=std::pow(10,49.635);
+      } else if (mass < 87.6) {
+        lum=std::pow(10,49.775);
+      } else {
+        lum=std::pow(10,49.87);
+      }
+
+
+    //  if (mass > 40) {
+    //    lum = std::pow(10,49);
+    //  } else {
+    //    lum = 0.0;
+    //  }
+
+      lum = lum*_lum_adjust;
+      return lum;
+
+    }
 
 
 
@@ -222,99 +332,190 @@ public:
    * evolved forward in time to this point before it is used (in s).
    * @param output_sources Should the source positions be written to a file?
    */
-  inline DiscPatchPhotonSourceDistribution(
-      const double source_lifetime, const double source_luminosity,
-      const uint_fast32_t average_number, const double anchor_x,
+  inline IMFDiscPhotonSourceDistribution(
+      const double star_formation_rate, const double anchor_x,
       const double sides_x, const double anchor_y, const double sides_y,
       const double origin_z, const double scaleheight_z,
       const int_fast32_t seed, const double update_interval,
       const double starting_time, bool output_sources = false,
-      const double sne_energy = 1.e44)
-      : _source_lifetime(source_lifetime),
-        _source_luminosity(source_luminosity),
-        _source_probability(update_interval / source_lifetime),
-        _average_number_of_sources(average_number), _anchor_x(anchor_x),
+      const double sne_energy = 1.e44, const double init_star_dens = 0.0,
+      const double lum_adjust=1.0)
+      : _star_formation_rate(star_formation_rate), _anchor_x(anchor_x),
         _anchor_y(anchor_y), _sides_x(sides_x), _sides_y(sides_y),
         _origin_z(origin_z), _scaleheight_z(scaleheight_z),
-        _update_interval(update_interval), _random_generator(seed),
+        _update_interval(update_interval),
         _output_file(nullptr), _number_of_updates(1), _next_index(0),
-        _sne_energy(sne_energy) {
+        _sne_energy(sne_energy),_init_star_dens(init_star_dens),
+        _lum_adjust(lum_adjust),_random_generator(seed) {
 
-    // generate sources
-    for (uint_fast32_t i = 0; i < _average_number_of_sources; ++i) {
-      const double lifetime =
-          _random_generator.get_uniform_random_double() * _source_lifetime;
-      _source_lifetimes.push_back(lifetime);
-      _source_positions.push_back(generate_source_position());
+
+
+
+    // form cumulative IMF
+    double imf_start = 8.0;
+    double imf_end = 120;
+
+    double full_area = integral(kroupa_imf, imf_start, imf_end, 10000);
+
+
+    uint_fast32_t range_length = 10000;
+    for (uint_fast32_t i=0; i< range_length; ++i){
+      double step = (imf_end-imf_start)/range_length;
+      _mass_range.push_back(imf_start + step*i);
+      double part_integral = integral(kroupa_imf, imf_start,imf_start + step*i,10000);
+      _cum_imf.push_back(part_integral/full_area);
     }
 
+
+
+    // generate sources
+
+    //total mass of stars, in MSol, with 0.073 correction for >8Msol (from Kroupa IMF)
+
+
+    double mass_to_start = _init_star_dens*_sides_x*_sides_y/1.98847e30*0.073;
+
+
+    if (_clustered) {
+      double mass_generated = 0.0;
+      while (mass_generated<mass_to_start){
+        double cluster_extent = 8.0e16; //about 10 pc
+        CoordinateVector< double > cluster_loc = generate_source_position();
+        double cluster_goal = 10000*0.073;
+        double cluster_mass = 0.0;
+        while (cluster_mass < cluster_goal && mass_generated<mass_to_start){
+          double m_cur = get_single_mass(_mass_range,_cum_imf,
+                 _random_generator.get_uniform_random_double());
+          if (m_cur > 8) {
+            CoordinateVector<double> blur;
+            blur[0] = cluster_extent*std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                    std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+            blur[1] = std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                    cluster_extent*std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+            blur[2] = std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                    cluster_extent*std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+            _source_positions.push_back(cluster_loc+blur);
+            double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+            _source_lifetimes.push_back(lifetime);
+            _source_luminosities.push_back(lum_from_mass(m_cur));
+
+          }
+          cluster_mass += m_cur;
+          mass_generated += m_cur;
+        }
+
+      }
+
+    } else {
+
+      double mass_generated = 0.0;
+      while (mass_generated < mass_to_start){
+        double m_cur = get_single_mass(_mass_range,_cum_imf,
+            _random_generator.get_uniform_random_double());
+        if (m_cur > 8){
+          _source_positions.push_back(generate_source_position());
+          double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+          _source_lifetimes.push_back(lifetime);
+          _source_luminosities.push_back(lum_from_mass(m_cur));
+        }
+        mass_generated += m_cur;
+      }
+
+
+
+
+    }
+
+
+
+
+
+
+
+
+
     if (output_sources) {
-      _output_file = new std::ofstream("DiscPatch_source_positions.txt");
-      *_output_file << "#time (s)\tx (m)\ty (m)\tz (m)\tevent\tindex\n";
+      _output_file = new std::ofstream("IMFDisc_source_positions.txt");
+      *_output_file << "#time (s)\tx (m)\ty (m)\tz (m)\tevent\tindex\tluminosity\n";
       for (uint_fast32_t i = 0; i < _source_positions.size(); ++i) {
         _source_indices.push_back(_next_index);
         ++_next_index;
         const CoordinateVector<> &pos = _source_positions[i];
         *_output_file << 0. << "\t" << pos.x() << "\t" << pos.y() << "\t"
-                      << pos.z() << "\t1\t" << _source_indices[i] << "\n";
+                      << pos.z() << "\t1\t" << _source_indices[i] << "\t"
+                      << _source_luminosities[i] << "\n";
       }
       _output_file->flush();
+      _output_file2 = new std::ofstream("TotalLuminosity.txt");
+      *_output_file2 << "time (s)\tlum (s^-1)\tnumsne\n";
+      _output_file2->flush();
+
     }
+
+  }
 
     // make sure the distribution is evolved up to the right starting time
-    while (_number_of_updates * _update_interval <= starting_time) {
+//    while (_number_of_updates * _update_interval <= starting_time) {
+//
+//      const double total_time = _number_of_updates * _update_interval;
+//      // first clear out sources that do no longer exist
+//      size_t i = 0;
+//      while (i < _source_lifetimes.size()) {
+//        _source_lifetimes[i] -= _update_interval;
+//        if (_source_lifetimes[i] <= 0.) {
+//          // remove the element
+//          if (_output_file != nullptr) {
+//            *_output_file << total_time << "\t0.\t0.\t0.\t2\t"
+//                          << _source_indices[i] << "\n";
+//            _source_indices.erase(_source_indices.begin() + i);
+//          }
+//
+//          _source_positions.erase(_source_positions.begin() + i);
+//          _source_lifetimes.erase(_source_lifetimes.begin() + i);
+//        } else {
+//          // check the next element
+//          ++i;
+//        }
+//      }
 
-      const double total_time = _number_of_updates * _update_interval;
-      // first clear out sources that do no longer exist
-      size_t i = 0;
-      while (i < _source_lifetimes.size()) {
-        _source_lifetimes[i] -= _update_interval;
-        if (_source_lifetimes[i] <= 0.) {
-          // remove the element
-          if (_output_file != nullptr) {
-            *_output_file << total_time << "\t0.\t0.\t0.\t2\t"
-                          << _source_indices[i] << "\n";
-            _source_indices.erase(_source_indices.begin() + i);
-          }
 
-          _source_positions.erase(_source_positions.begin() + i);
-          _source_lifetimes.erase(_source_lifetimes.begin() + i);
-        } else {
-          // check the next element
-          ++i;
-        }
-      }
+// ALSO CHANGE THIS STUFF
+// -----------------------------------------------
 
-      // now check if new sources need to be generated
-      for (uint_fast32_t i = 0; i < _average_number_of_sources; ++i) {
-        double x = _random_generator.get_uniform_random_double();
-        if (x <= _source_probability) {
-          // bingo: create a new source
-          // the source could have been created at any given time during the
-          // past
-          // time step
-          const double offset =
-              _random_generator.get_uniform_random_double() * _update_interval;
-          _source_lifetimes.push_back(_source_lifetime - offset);
-          _source_positions.push_back(generate_source_position());
-          if (_output_file != nullptr) {
-            _source_indices.push_back(_next_index);
-            ++_next_index;
-            const CoordinateVector<> &pos = _source_positions.back();
-            *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
-                          << "\t" << pos.z() << "\t1\t"
-                          << _source_indices.back() << "\n";
-          }
-        }
-      }
+//      // now check if new sources need to be generated
+//      for (uint_fast32_t i = 0; i < _average_number_of_sources; ++i) {
+//        double x = _random_generator.get_uniform_random_double();
+//        if (x <= _source_probability) {
+//          // bingo: create a new source
+//          // the source could have been created at any given time during the
+//          // past
+//          // time step
+//          const double offset =
+//              _random_generator.get_uniform_random_double() * _update_interval;
+//          _source_lifetimes.push_back(_source_lifetime - offset);
+//          _source_positions.push_back(generate_source_position());
+//          if (_output_file != nullptr) {
+//            _source_indices.push_back(_next_index);
+//            ++_next_index;
+//            const CoordinateVector<> &pos = _source_positions.back();
+//            *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
+//                          << "\t" << pos.z() << "\t1\t"
+//                          << _source_indices.back() << "\n";
+//          }
+//        }
+//      }
+//
+//      if (_output_file != nullptr) {
+//        _output_file->flush();
+//      }
+//
+//      ++_number_of_updates;
+//    }
 
-      if (_output_file != nullptr) {
-        _output_file->flush();
-      }
 
-      ++_number_of_updates;
-    }
-  }
+
+
+  // -----------------------------------------------
 
   /**
    * @brief ParameterFile constructor.
@@ -345,14 +546,10 @@ public:
    * @param params ParameterFile to read from.
    * @param log Log to write logging info to.
    */
-  DiscPatchPhotonSourceDistribution(ParameterFile &params, Log *log = nullptr)
-      : DiscPatchPhotonSourceDistribution(
-            params.get_physical_value< QUANTITY_TIME >(
-                "PhotonSourceDistribution:source lifetime", "20. Myr"),
-            params.get_physical_value< QUANTITY_FREQUENCY >(
-                "PhotonSourceDistribution:source luminosity", "3.125e49 s^-1"),
-            params.get_value< photonsourcenumber_t >(
-                "PhotonSourceDistribution:average number of sources", 24),
+  IMFDiscPhotonSourceDistribution(ParameterFile &params, Log *log = nullptr)
+      : IMFDiscPhotonSourceDistribution(
+            params.get_physical_value< QUANTITY_MASS_RATE >(
+                "PhotonSourceDistribution:star formation rate", "0.01 Msol yr^-1"),
             params.get_physical_value< QUANTITY_LENGTH >(
                 "PhotonSourceDistribution:anchor x", "-1. kpc"),
             params.get_physical_value< QUANTITY_LENGTH >(
@@ -374,12 +571,15 @@ public:
             params.get_value< bool >("PhotonSourceDistribution:output sources",
                                      false),
             params.get_physical_value< QUANTITY_ENERGY > (
-                "PhotonSourceDistribution:supernova energy", "1.e51 erg")) {}
+                "PhotonSourceDistribution:supernova energy", "1.e51 erg"),
+            params.get_physical_value< QUANTITY_SURFACE_DENSITY > (
+                "PhotonSourceDistribution:initial stellar density", "30 Msol pc^-2"),
+            params.get_value< double >("PhotonSourceDistribution:luminosity adjust",1.0)) {}
 
   /**
    * @brief Virtual destructor.
    */
-  virtual ~DiscPatchPhotonSourceDistribution() {}
+  virtual ~IMFDiscPhotonSourceDistribution() {}
 
   /**
    * @brief Get the number of sources contained within this distribution.
@@ -425,7 +625,7 @@ public:
 
 
 
-  virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid) {
+  virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro) {
 
 
 
@@ -464,23 +664,52 @@ public:
                // Msol km/s to kg m/s
                mom_to_inj = mom_to_inj * 2.e30 * 1.e3;
 
-               double vel_to_inj = mom_to_inj/1.988e33;
+               double m_tot = (_nbar[i]*1e6*1.67e-27)*(4.*3.14159265*std::pow(_r_inj[i],3)/3.);
+
+               double vel_to_inj = mom_to_inj/m_tot;
 
                CoordinateVector<> direction = (cellpos-_to_do_feedback[i])/((cellpos-_to_do_feedback[i]).norm());
+
 
                CoordinateVector<> vel_new = vel_prior + vel_to_inj*direction;
 
                cellit.get_hydro_variables().set_primitives_velocity(vel_new);
 
 
+
+               double density = cellit.get_hydro_variables().get_primitives_density();
+
+             double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
+
+
+             double pressure = 8254.397014*1.e4*density*2./(1.+xH);
+
+              cellit.get_ionization_variables().set_temperature(1.e4);
+
+              cellit.get_hydro_variables().set_primitives_pressure(pressure);
+
+
+            //  if (vel_new.norm() > 1e6) {
+            //    double divisor = vel_new.norm()/1e6;
+            //    cellit.get_hydro_variables().set_primitives_velocity(vel_new/divisor);
+//
+            //  }
+
+              hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
+
+
+
+
+
+
              }
              else {
 
-               double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
+               //double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
 
-               double fraction_mass = cell_mass/1.988e33;
+              // double fraction_mass = cell_mass/1.988e33;
 
-               cellit.get_hydro_variables().set_energy_term(_sne_energy*fraction_mass);
+               cellit.get_hydro_variables().set_energy_term(_sne_energy/_num_cells_injected[i]);
              }
            }
            cmac_assert_message(cellit.get_hydro_variables().get_conserved_total_energy() >=0,
@@ -529,7 +758,7 @@ public:
    * emitted from this particular source.
    */
   virtual double get_weight(photonsourcenumber_t index) const {
-    return 1. / get_number_of_sources();
+    return _source_luminosities[index] / get_total_luminosity();
   }
 
   /**
@@ -537,9 +766,16 @@ public:
    *
    * @return Total luminosity (in s^-1).
    */
+
+
   virtual double get_total_luminosity() const {
-    return _source_luminosity * get_number_of_sources();
+    double tot_lum = 0.0;
+    for (uint_fast32_t i=0;i<_source_luminosities.size();++i) {
+      tot_lum += _source_luminosities[i];
+    }
+    return tot_lum;
   }
+
 
   /**
    * @brief Update the distribution after the system moved to the given time.
@@ -548,6 +784,13 @@ public:
    * @return True if the distribution changed, false otherwise.
    */
   virtual bool update(const double simulation_time) {
+
+    if (_output_file2 != nullptr) {
+      double totallum = get_total_luminosity();
+      *_output_file2 << simulation_time << "\t" << totallum << "\t" << _num_sne << "\n";
+      _output_file2->flush();
+
+    }
 
     bool changed = false;
     while (_number_of_updates * _update_interval <= simulation_time) {
@@ -561,13 +804,15 @@ public:
           // remove the element
           if (_output_file != nullptr) {
             *_output_file << total_time << "\t0.\t0.\t0.\t2\t"
-                          << _source_indices[i] << "\n";
+                          << _source_indices[i] << "\t0\n";
             _source_indices.erase(_source_indices.begin() + i);
           }
 
           _to_do_feedback.push_back(_source_positions[i]);
           _source_positions.erase(_source_positions.begin() + i);
           _source_lifetimes.erase(_source_lifetimes.begin() + i);
+          _source_luminosities.erase(_source_luminosities.begin() + i);
+          _num_sne = _num_sne + 1;
 
 
           changed = true;
@@ -577,29 +822,125 @@ public:
         }
       }
 
+// ANOTHER ONE
+
+// ---------------------------------------------
       // now check if new sources need to be generated
-      for (uint_fast32_t i = 0; i < _average_number_of_sources; ++i) {
-        double x = _random_generator.get_uniform_random_double();
-        if (x <= _source_probability) {
-          // bingo: create a new source
-          // the source could have been created at any given time during the
-          // past
-          // time step
-          const double offset =
-              _random_generator.get_uniform_random_double() * _update_interval;
-          _source_lifetimes.push_back(_source_lifetime - offset);
-          _source_positions.push_back(generate_source_position());
-          if (_output_file != nullptr) {
-            _source_indices.push_back(_next_index);
-            ++_next_index;
-            const CoordinateVector<> &pos = _source_positions.back();
-            *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
-                          << "\t" << pos.z() << "\t1\t"
-                          << _source_indices.back() << "\n";
+
+      double mass_to_generate = _update_interval*_star_formation_rate/1.988e30*0.073;
+
+
+
+
+      if (_clustered) {
+        double cluster_goal;
+        CoordinateVector<double> cluster_loc;
+        double mass_generated = 0.0;
+        while (mass_generated<mass_to_generate){
+          double cluster_extent = 8.0e16; //about 10 pc
+          if (_cluster_lacking) {
+            cluster_loc = _previous_cluster_loc;
+            cluster_goal = _missing_mass;
+          } else {
+            cluster_loc = generate_source_position();
+            cluster_goal = 10000*0.073;
           }
-          changed = true;
+          double cluster_mass = 0.0;
+          while (cluster_mass < cluster_goal && mass_generated<mass_to_generate){
+            double m_cur = get_single_mass(_mass_range,_cum_imf,
+                   _random_generator.get_uniform_random_double());
+            if (m_cur > 8) {
+              CoordinateVector<double> blur;
+              blur[0] = cluster_extent*std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                      std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+              blur[1] = std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                      cluster_extent*std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+              blur[2] = std::sqrt(-2. * std::log(_random_generator.get_uniform_random_double())) *
+                      cluster_extent*std::cos(2. * M_PI * _random_generator.get_uniform_random_double());
+              CoordinateVector<double> source_loc = cluster_loc+blur;
+
+
+              //periodic x and y
+              if(source_loc[0] < _anchor_x) {
+                double overlap = _anchor_x-source_loc[0];
+                source_loc[0] = _anchor_x+_sides_x-overlap;
+              } else if(source_loc[0] > _anchor_x+_sides_x) {
+                double overlap = source_loc[0]-(_anchor_x+_sides_x);
+                source_loc[0] = _anchor_x + overlap;
+              }
+              if(source_loc[1] < _anchor_y) {
+                double overlap = _anchor_y-source_loc[1];
+                source_loc[1] = _anchor_y+_sides_y-overlap;
+              } else if (source_loc[1] > _anchor_y + _sides_y) {
+                double overlap = source_loc[1]-(_anchor_y+_sides_y);
+                source_loc[1] = _anchor_y + overlap;
+              }
+
+              //add the source
+              _source_positions.push_back(source_loc);
+              double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+              double offset =
+                  _random_generator.get_uniform_random_double() * _update_interval;
+              _source_lifetimes.push_back(lifetime-offset);
+              _source_luminosities.push_back(lum_from_mass(m_cur));
+              if (_output_file != nullptr) {
+                _source_indices.push_back(_next_index);
+                ++_next_index;
+                const CoordinateVector<> &pos = _source_positions.back();
+                *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
+                              << "\t" << pos.z() << "\t1\t"
+                              << _source_indices.back() << "\t"
+                              << _source_luminosities.back() << "\n";
+              }
+
+
+
+            }
+            cluster_mass += m_cur;
+            mass_generated+= m_cur;
+          }
+          if (mass_generated >= mass_to_generate && cluster_mass< cluster_goal) {
+            _cluster_lacking = true;
+            _previous_cluster_loc = cluster_loc;
+            _missing_mass = cluster_goal-cluster_mass;
+          } else {
+            _cluster_lacking = false;
+          }
+
         }
+
+      } else {
+
+
+              double mass_generated = 0.0;
+              while (mass_generated < mass_to_generate){
+                double m_cur = get_single_mass(_mass_range,_cum_imf,
+                    _random_generator.get_uniform_random_double());
+                if (m_cur > 8){
+                  _source_positions.push_back(generate_source_position());
+                  double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+                  double offset =
+                      _random_generator.get_uniform_random_double() * _update_interval;
+                  _source_lifetimes.push_back(lifetime-offset);
+                  _source_luminosities.push_back(lum_from_mass(m_cur));
+                  if (_output_file != nullptr) {
+                    _source_indices.push_back(_next_index);
+                    ++_next_index;
+                    const CoordinateVector<> &pos = _source_positions.back();
+                    *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
+                                  << "\t" << pos.z() << "\t1\t"
+                                  << _source_indices.back() << "\t"
+                                  << _source_luminosities.back() << "\n";
+                  }
+                }
+                mass_generated += m_cur;
+              }
       }
+
+
+
+      changed = true;
+
 
       if (_output_file != nullptr) {
         _output_file->flush();
@@ -611,6 +952,9 @@ public:
     return changed;
   }
 
+
+// --------------------------------------
+
   /**
    * @brief Write the distribution to the given restart file.
    *
@@ -618,10 +962,7 @@ public:
    */
   virtual void write_restart_file(RestartWriter &restart_writer) const {
 
-    restart_writer.write(_source_lifetime);
-    restart_writer.write(_source_luminosity);
-    restart_writer.write(_source_probability);
-    restart_writer.write(_average_number_of_sources);
+    restart_writer.write(_star_formation_rate);
     restart_writer.write(_anchor_x);
     restart_writer.write(_anchor_y);
     restart_writer.write(_sides_x);
@@ -629,6 +970,8 @@ public:
     restart_writer.write(_origin_z);
     restart_writer.write(_scaleheight_z);
     restart_writer.write(_update_interval);
+    restart_writer.write(_init_star_dens);
+    restart_writer.write(_lum_adjust);
     _random_generator.write_restart_file(restart_writer);
     {
       const auto size = _source_positions.size();
@@ -644,6 +987,14 @@ public:
         restart_writer.write(_source_lifetimes[i]);
       }
     }
+    {
+      const auto size = _source_luminosities.size();
+      restart_writer.write(size);
+      for (std::vector< double >::size_type i = 0; i < size; ++i) {
+        restart_writer.write(_source_luminosities[i]);
+      }
+
+    }
     restart_writer.write(_number_of_updates);
     const bool has_output = (_output_file != nullptr);
     restart_writer.write(has_output);
@@ -652,6 +1003,8 @@ public:
       // we want to be able to continue writing from that point
       const auto filepos = _output_file->tellp();
       restart_writer.write(filepos);
+      const auto filepos2 = _output_file2->tellp();
+      restart_writer.write(filepos2);
       {
         const auto size = _source_indices.size();
         restart_writer.write(size);
@@ -668,11 +1021,8 @@ public:
    *
    * @param restart_reader Restart file to read from.
    */
-  inline DiscPatchPhotonSourceDistribution(RestartReader &restart_reader)
-      : _source_lifetime(restart_reader.read< double >()),
-        _source_luminosity(restart_reader.read< double >()),
-        _source_probability(restart_reader.read< double >()),
-        _average_number_of_sources(restart_reader.read< uint_fast32_t >()),
+  inline IMFDiscPhotonSourceDistribution(RestartReader &restart_reader)
+      : _star_formation_rate(restart_reader.read< double >()),
         _anchor_x(restart_reader.read< double >()),
         _anchor_y(restart_reader.read< double >()),
         _sides_x(restart_reader.read< double >()),
@@ -680,6 +1030,8 @@ public:
         _origin_z(restart_reader.read< double >()),
         _scaleheight_z(restart_reader.read< double >()),
         _update_interval(restart_reader.read< double >()),
+        _init_star_dens(restart_reader.read< double> ()),
+        _lum_adjust(restart_reader.read< double >()),
         _random_generator(restart_reader) {
 
     {
@@ -698,17 +1050,36 @@ public:
         _source_lifetimes[i] = restart_reader.read< double >();
       }
     }
+    {
+      const std::vector< double >::size_type size =
+          restart_reader.read< std::vector< double >::size_type >();
+      _source_luminosities.resize(size);
+      for (std::vector< double >::size_type i = 0; i < size; ++i) {
+        _source_luminosities[i] = restart_reader.read< double >();
+      }
+    }
     _number_of_updates = restart_reader.read< uint_fast32_t >();
     const bool has_output = restart_reader.read< bool >();
     if (has_output) {
       const std::streampos filepos = restart_reader.read< std::streampos >();
       // truncate the original file to the size we were at
-      if (truncate("DiscPatch_source_positions.txt", filepos) != 0) {
+      if (truncate("IMFDisc_source_positions.txt", filepos) != 0) {
         cmac_error("Error while truncating output file!");
       }
       // now open the file in append mode
-      _output_file = new std::ofstream("DiscPatch_source_positions.txt",
+      _output_file = new std::ofstream("IMFDisc_source_positions.txt",
                                        std::ios_base::app);
+
+      const std::streampos filepos2 = restart_reader.read< std::streampos >();
+                                       // truncate the original file to the size we were at
+      if (truncate("TotalLuminosity.txt", filepos2) != 0) {
+              cmac_error("Error while truncating output file!");
+            }
+                                       // now open the file in append mode
+      _output_file2 = new std::ofstream("TotalLuminosity.txt",
+                                            std::ios_base::app);
+
+
       {
         const std::vector< uint_fast32_t >::size_type size =
             restart_reader.read< std::vector< uint_fast32_t >::size_type >();
@@ -719,7 +1090,23 @@ public:
       }
       _next_index = restart_reader.read< uint_fast32_t >();
     }
+
+
+        // form cumulative IMF
+        double imf_start = 8.0;
+        double imf_end = 120;
+
+        double full_area = integral(kroupa_imf, imf_start, imf_end, 10000);
+
+
+        uint_fast32_t range_length = 10000;
+        for (uint_fast32_t i=0; i< range_length; ++i){
+          double step = (imf_end-imf_start)/range_length;
+          _mass_range.push_back(imf_start + step*i);
+          double part_integral = integral(kroupa_imf, imf_start,imf_start + step*i,10000);
+          _cum_imf.push_back(part_integral/full_area);
+        }
   }
 };
 
-#endif // DISCPATCHPHOTONSOURCEDISTRIBUTION_HPP
+#endif // IMFDISCPHOTONSOURCEDISTRIBUTION_HPP

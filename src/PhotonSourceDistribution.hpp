@@ -29,6 +29,7 @@
 #include "CoordinateVector.hpp"
 #include "DensityGrid.hpp"
 #include "HydroDensitySubGrid.hpp"
+#include "DensitySubGridCreator.hpp"
 
 /*! @brief Size of a variable that stores the number of photon sources. */
 typedef uint_fast32_t photonsourcenumber_t;
@@ -91,6 +92,25 @@ public:
    */
   virtual bool update(const double simulation_time) { return false; }
 
+
+  virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro) {return false;}
+
+  virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) {return false;}
+
+  virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {}
+
+  virtual void accrete_gas(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro) {}
+
+  virtual std::vector<CoordinateVector<double>> get_sink_positions() {
+    std::vector<CoordinateVector<double>> vect;
+    return vect;
+  }
+
+  virtual std::vector<double> get_sink_masses() {
+    std::vector<double> vect;
+    return vect;
+  }
+
   /**
    * @brief Add stellar feedback to the given grid at the given time.
    *
@@ -101,6 +121,10 @@ public:
    */
   virtual void add_stellar_feedback(DensityGrid &grid,
                                     const double current_time) {}
+
+  virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {}
+
+  virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {}
 
   /**
    * @brief Will the distribution do stellar feedback at the given time?
@@ -124,6 +148,9 @@ public:
    * @param subgrid DensitySubGrid to operate on.
    */
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid) {}
+
+
+  virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro) {}
 
   /**
    * @brief Finalise adding stellar feedback to a distributed grid.

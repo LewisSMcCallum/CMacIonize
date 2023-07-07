@@ -132,7 +132,6 @@ void IonizationStateCalculator::calculate_ionization_state(
 
     } else {
       h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
-
     }
 #else
     const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
@@ -201,7 +200,6 @@ void IonizationStateCalculator::calculate_ionization_state(
     compute_ionization_states_metals(
         j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
         _charge_transfer_rates, _collisional_rates, ionization_variables);
-
 
 
 

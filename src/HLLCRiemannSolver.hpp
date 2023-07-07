@@ -453,11 +453,11 @@ public:
         Eflux = rhoLvL * eL + PL * vL;
 
         if (SL < 0.) {
-          const double starfac = SLmvL / (SL - Sstar) - 1.;
+          const double starfac = SLmvL / (SL - Sstar);
           const double SLrhoL = SL * rhoL;
           const double SstarmvL = Sstar - vL;
-          const double SLrhoLstarfac = SLrhoL * starfac;
-          const double SLrhoLSstarmvL = SLrhoL * SstarmvL;
+          const double SLrhoLstarfac = SLrhoL * (starfac - 1.);
+          const double SLrhoLSstarmvL = SLrhoL * SstarmvL * starfac;
           const double SLmvLinv = 1. / (SLmvL + DBL_MIN);
 
           mflux += SLrhoLstarfac;
@@ -476,11 +476,11 @@ public:
         Eflux = rhoRvR * eR + PR * vR;
 
         if (SR > 0.) {
-          const double starfac = SRmvR / (SR - Sstar) - 1.;
+          const double starfac = SRmvR / (SR - Sstar);
           const double SRrhoR = SR * rhoR;
           const double SstarmvR = Sstar - vR;
-          const double SRrhoRstarfac = SRrhoR * starfac;
-          const double SRrhoRSstarmvR = SRrhoR * SstarmvR;
+          const double SRrhoRstarfac = SRrhoR * (starfac - 1.);
+          const double SRrhoRSstarmvR = SRrhoR * SstarmvR * starfac;
           const double SRmvRinv = 1. / (SRmvR + DBL_MIN);
 
           mflux += SRrhoRstarfac;

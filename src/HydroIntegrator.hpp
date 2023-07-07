@@ -758,6 +758,8 @@ private:
     }
   }
 
+
+
 public:
   /**
    * @brief Constructor.
@@ -938,6 +940,43 @@ public:
             params.get_value< std::string >("HydroIntegrator:boundary z high",
                                             "reflective"),
             simulation_box.get_periodicity(), get_bondi_profile(params)) {}
+
+
+  inline void update_energy_variables(IonizationVariables &ionization_variables,
+                                      HydroVariables &hydro_variables,
+                                          const double inverse_volume,
+                                          const double delta_energy) const {
+
+      const double density = hydro_variables.get_primitives_density();
+      if (density == 0.) {
+          return;
+      }
+      const double inverse_density = 1. / density;
+      if (std::isinf(inverse_density)) {
+        return;
+      }
+
+      const double old_energy = hydro_variables.get_conserved_total_energy();
+      const double kinetic_energy =
+          0.5 * CoordinateVector<>::dot_product(
+                    hydro_variables.get_primitives_velocity(),
+                    hydro_variables.get_conserved_momentum());
+      const double mean_molecular_mass =
+          0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+
+      double new_energy = old_energy + delta_energy;
+
+      double new_pressure =
+          (_gamma-1.) * inverse_volume * (new_energy - kinetic_energy);
+      double new_temperature = _T_conversion_factor * mean_molecular_mass *
+                               new_pressure * inverse_density;
+
+      new_temperature = _hydro_units->convert_to_SI_units<QUANTITY_TEMPERATURE>(new_temperature);
+
+      hydro_variables.set_conserved_total_energy(new_energy);
+      hydro_variables.set_primitives_pressure(new_pressure);
+      ionization_variables.set_temperature(new_temperature);
+    }
 
   /**
    * @brief Destructor.
@@ -1286,6 +1325,28 @@ public:
     }
 
     // do radiation (if enabled)
+
+    bool _do_explicit_heating = true;
+
+    if (_do_explicit_heating) {
+      for (auto it = grid.begin(); it != grid.end(); ++it) {
+        IonizationVariables &ionization_variables = it.get_ionization_variables();
+        HydroVariables &hydro_variables = it.get_hydro_variables();
+        double heating_term = ionization_variables.get_heating(HEATINGTERM_H);
+        double dE = heating_term*timestep*ionization_variables.get_number_density()*
+               it.get_volume()/ionization_variables.get_ionic_fraction(ION_H_n);
+
+        double vol = _hydro_units->convert_to_internal_units<QUANTITY_VOLUME>(it.get_volume());
+        dE = _hydro_units->convert_to_internal_units<QUANTITY_ENERGY>(dE);
+
+        update_energy_variables(ionization_variables, hydro_variables,
+               1./vol, dE);
+
+
+
+      }
+
+    }
     if (_do_radiative_heating || _do_radiative_cooling) {
       for (auto it = grid.begin(); it != grid.end(); ++it) {
         const IonizationVariables &ionization_variables =

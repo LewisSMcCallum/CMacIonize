@@ -338,6 +338,7 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
       _total_luminosity, _abundances, _line_cooling_data, *_recombination_rates,
       _charge_transfer_rates, *_collisional_rates, _parameter_file, _log);
 
+
   // the second condition is necessary to deal with old parameter files
   if (_parameter_file.get_value< bool >(
           "TaskBasedIonizationSimulation:diffuse field", false) ||

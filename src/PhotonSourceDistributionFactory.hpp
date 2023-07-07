@@ -43,6 +43,12 @@
 #include "SingleSupernovaPhotonSourceDistribution.hpp"
 #include "UniformRandomPhotonSourceDistribution.hpp"
 #include "TextFilePhotonSourceDistribution.hpp"
+#include "IMFDiscPhotonSourceDistribution.hpp"
+#include "PeakDrivingPhotonSourceDistribution.hpp"
+#include "MixedDrivingPhotonSourceDistribution.hpp"
+#include "StellarClusterPhotonSourceDistribution.hpp"
+#include "SinkStarPhotonSourceDistribution.hpp"
+
 
 // library dependent implementations
 #ifdef HAVE_HDF5
@@ -118,13 +124,23 @@ public:
       return new DiscPatchPhotonSourceDistribution(params, log);
     } else if (type == "DwarfGalaxy") {
       return new DwarfGalaxyPhotonSourceDistribution(params, log);
+    } else if (type == "IMFDisc") {
+      return new IMFDiscPhotonSourceDistribution(params, log);
+    } else if (type == "PeakDriving") {
+      return new PeakDrivingPhotonSourceDistribution(params, log);
+    } else if (type == "MixedDriving") {
+      return new MixedDrivingPhotonSourceDistribution(params,log);
     } else if (type == "SILCC") {
       return new SILCCPhotonSourceDistribution(params, log);
     } else if (type == "SingleStar") {
       return new SingleStarPhotonSourceDistribution(params, log);
     } else if (type == "SingleSupernova") {
       return new SingleSupernovaPhotonSourceDistribution(params, log);
-    } else if (type == "TextFile") {
+    } else if (type == "SinkStar") {
+      return new SinkStarPhotonSourceDistribution(params, log);
+    } else if (type == "StellarCluster") {
+      return new StellarClusterPhotonSourceDistribution(params, log);
+    } else if (type  == "TextFile") {
       return new TextFilePhotonSourceDistribution(params,log);
     } else if (type == "UniformRandom") {
       return new UniformRandomPhotonSourceDistribution(params, log);
@@ -176,10 +192,20 @@ public:
       return new CaproniPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(DiscPatchPhotonSourceDistribution).name()) {
       return new DiscPatchPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(IMFDiscPhotonSourceDistribution).name()) {
+      return new IMFDiscPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(PeakDrivingPhotonSourceDistribution).name()) {
+      return new PeakDrivingPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(MixedDrivingPhotonSourceDistribution).name()) {
+      return new MixedDrivingPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(SingleStarPhotonSourceDistribution).name()) {
       return new SingleStarPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(SingleSupernovaPhotonSourceDistribution).name()) {
       return new SingleSupernovaPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(SinkStarPhotonSourceDistribution).name()) {
+      return new SinkStarPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(StellarClusterPhotonSourceDistribution).name()) {
+      return new StellarClusterPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(UniformRandomPhotonSourceDistribution).name()) {
       return new UniformRandomPhotonSourceDistribution(restart_reader);
     } else {

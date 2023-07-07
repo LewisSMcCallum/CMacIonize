@@ -33,9 +33,11 @@
 #include "Error.hpp"
 #include "OpenMP.hpp"
 #include "ParameterFile.hpp"
+#include "HydroDensitySubGrid.hpp"
 
 #include <cinttypes>
 #include <vector>
+#include <cmath>
 
 /**
  * @brief Class responsible for creating DensitySubGrid instances that make up
@@ -777,6 +779,73 @@ public:
   inline iterator get_subgrid(const size_t index) {
     return iterator(index, *this);
   }
+
+
+
+
+
+
+  std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(CoordinateVector<double> midpoint, double radius) {
+    std::vector<std::pair<uint_fast32_t, uint_fast32_t>> result;
+
+    // Get the grid spacing
+    double grid_spacingx = (_box.get_sides()[0])/(_subgrid_number_of_cells[0]*_number_of_subgrids[0]);
+    double grid_spacingy = (_box.get_sides()[1])/(_subgrid_number_of_cells[1]*_number_of_subgrids[1]);
+    double grid_spacingz = (_box.get_sides()[2])/(_subgrid_number_of_cells[2]*_number_of_subgrids[2]);
+
+    CoordinateVector<double> anchor = _box.get_anchor();
+
+    CoordinateVector<double> grid_spacing(grid_spacingx,grid_spacingy,grid_spacingz);
+
+
+
+
+    // Calculate the minimum and maximum indices for each axis
+    CoordinateVector<int> min_idx;
+    CoordinateVector<int> max_idx;
+
+    for (uint_fast32_t i = 0; i < 3; i++) {
+      min_idx[i] = floor((midpoint[i] - radius - anchor[i]) / grid_spacing[i]);
+      if (min_idx[i] < 0) {
+        min_idx[i] = 0;
+      }
+      max_idx[i] = ceil((midpoint[i] + radius - anchor[i]) / grid_spacing[i]);
+      if (max_idx[i] > _subgrid_number_of_cells[i]*_number_of_subgrids[i] -1) {
+        max_idx[i] = _subgrid_number_of_cells[i]*_number_of_subgrids[i] -1;
+      }
+
+    }
+
+    // Loop through the subgrids within the bounds
+    for (int x_idx = min_idx.x(); x_idx <= max_idx.x(); ++x_idx) {
+      for (int y_idx = min_idx.y(); y_idx <= max_idx.y(); ++y_idx) {
+        for (int z_idx = min_idx.z(); z_idx <= max_idx.z(); ++z_idx) {
+          CoordinateVector<double> cell_midpoint(x_idx * grid_spacing[0], y_idx * grid_spacing[1], z_idx * grid_spacing[2]);
+
+          cell_midpoint += anchor;
+          cell_midpoint[0] += grid_spacing[0]/2.;
+          cell_midpoint[1] += grid_spacing[1]/2.;
+          cell_midpoint[2] += grid_spacing[2]/2.;
+
+
+
+          // Check if the cell is within the specified radius
+          double distance = (midpoint - cell_midpoint).norm();
+          if (distance <= radius) {
+            uint_fast32_t subgrid_idx = this->get_subgrid(cell_midpoint).get_index();
+            HydroDensitySubGrid& subgrid = *this->get_subgrid(subgrid_idx);
+            uint_fast32_t cell_idx = subgrid.get_cell(cell_midpoint).get_index();
+
+            // Add the pair of indices to the result vector
+            result.emplace_back(subgrid_idx, cell_idx);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
 
   /**
    * @brief Dump the subgrids to the given restart file.
