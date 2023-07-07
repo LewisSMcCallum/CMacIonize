@@ -161,6 +161,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     const double nhepp = 0.;
 #endif
 
+   const double ne = nhp + nhep + 2.*nhepp;
+
     // get the abundances of the ions used by the line cooling computation
     double abund[LINECOOLINGDATA_NUMELEMENTS];
 
