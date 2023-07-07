@@ -47,6 +47,7 @@ enum PhotonType {
   PHOTONTYPE_DIFFUSE_HeI,
   /*! @brief Photon that was absorbed. */
   PHOTONTYPE_ABSORBED,
+  PHOTONTYPE_SCATTERED,
   // THIS ELEMENT SHOULD ALWAYS BE LAST!
   // It is used to initialize arrays that have an entry for each PhotonType.
   // By putting it last, PHOTONTYPE_NUMBER will have an integer value equal to
@@ -76,6 +77,9 @@ static inline std::string get_photontype_name(const int_fast32_t type) {
 
   case PHOTONTYPE_ABSORBED:
     return "absorbed photon";
+
+  case PHOTONTYPE_SCATTERED:
+    return "scattered photon";
 
   default:
     cmac_error("Unknown photon type: %" PRIiFAST32 "!", type);

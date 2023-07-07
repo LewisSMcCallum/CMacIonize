@@ -45,6 +45,10 @@ private:
   /*! @brief Initial hydrogen neutral fraction for the entire box. */
   const double _neutral_fraction_H;
 
+  const double _dust_to_gas;
+
+  const double _fraction_silicates;
+
 public:
   /**
    * @brief Constructor.
@@ -57,14 +61,17 @@ public:
    */
   HomogeneousDensityFunction(double density = 1., double temperature = 8000.,
                              double neutral_fraction_H = 1.e-6,
+                             double dust_to_gas = 0.0, double fraction_silicates = 0.6,
                              Log *log = nullptr)
       : _density(density), _temperature(temperature),
-        _neutral_fraction_H(neutral_fraction_H) {
+        _neutral_fraction_H(neutral_fraction_H),
+        _dust_to_gas(dust_to_gas),_fraction_silicates(fraction_silicates) {
 
     if (log) {
       log->write_status(
           "Created HomogeneousDensityFunction with constant density ", _density,
-          " m^-3 and constant temperature ", _temperature, " K.");
+          " m^-3 and constant temperature ", _temperature, " K. Dust gas ratio of ",
+           _dust_to_gas, " and fraction silicates ", _fraction_silicates);
     }
   }
 
@@ -88,6 +95,8 @@ public:
                 "DensityFunction:temperature", "8000. K"),
             params.get_value< double >("DensityFunction:neutral fraction H",
                                        1.e-6),
+            params.get_value<double>("DensityFunction:dust to gas",0.0),
+            params.get_value<double>("DensityFunction:fraction silicates",0.6),
             log) {}
 
   /**
@@ -101,6 +110,8 @@ public:
     values.set_number_density(_density);
     values.set_temperature(_temperature);
     values.set_ionic_fraction(ION_H_n, _neutral_fraction_H);
+    values.set_dust_gas_ratio(_dust_to_gas);
+    values.set_fraction_silicates(_fraction_silicates);
 #ifdef HAS_HELIUM
     values.set_ionic_fraction(ION_He_n, 1.e-6);
 #endif

@@ -104,6 +104,7 @@ enum IonName {
 #ifdef HAS_HELIUM
   /*! @brief Neutral helium. */
   ION_He_n,
+  ION_He_p1,
 #endif
 #ifdef HAS_CARBON
   /*! @brief Ionized carbon. */
@@ -124,12 +125,16 @@ enum IonName {
   ION_O_n,
   /*! @brief Ionized oxygen. */
   ION_O_p1,
+  ION_O_p2,
+  ION_O_p3,
 #endif
 #ifdef HAS_NEON
   /*! @brief Neutral neon. */
   ION_Ne_n,
   /*! @brief Ionized neon. */
   ION_Ne_p1,
+  ION_Ne_p2,
+  ION_Ne_p3,
 #endif
 #ifdef HAS_SULPHUR
   /*! @brief Ionized sulphur. */
@@ -215,6 +220,8 @@ static inline std::string get_ion_name(const int_fast32_t ion) {
 #ifdef HAS_HELIUM
   case ION_He_n:
     return "He";
+  case ION_He_p1:
+    return "He+";
 #endif
 
 #ifdef HAS_CARBON
@@ -238,6 +245,10 @@ static inline std::string get_ion_name(const int_fast32_t ion) {
     return "O";
   case ION_O_p1:
     return "O+";
+  case ION_O_p2:
+    return "O++";
+  case ION_O_p3:
+    return "O+++";
 #endif
 
 #ifdef HAS_NEON
@@ -245,6 +256,10 @@ static inline std::string get_ion_name(const int_fast32_t ion) {
     return "Ne";
   case ION_Ne_p1:
     return "Ne+";
+  case ION_Ne_p2:
+    return "Ne++";
+  case ION_Ne_p3:
+    return "Ne+++";
 #endif
 
 #ifdef HAS_SULPHUR
@@ -289,6 +304,8 @@ static inline int_fast32_t get_element(const int_fast32_t ion) {
 #ifdef HAS_HELIUM
   case ION_He_n:
     return ELEMENT_He;
+  case ION_He_p1:
+    return ELEMENT_He;
 #endif
 
 #ifdef HAS_CARBON
@@ -312,12 +329,20 @@ static inline int_fast32_t get_element(const int_fast32_t ion) {
     return ELEMENT_O;
   case ION_O_p1:
     return ELEMENT_O;
+  case ION_O_p2:
+    return ELEMENT_O;
+  case ION_O_p3:
+    return ELEMENT_O;
 #endif
 
 #ifdef HAS_NEON
   case ION_Ne_n:
     return ELEMENT_Ne;
   case ION_Ne_p1:
+    return ELEMENT_Ne;
+  case ION_Ne_p2:
+    return ELEMENT_Ne;
+  case ION_Ne_p3:
     return ELEMENT_Ne;
 #endif
 
@@ -344,6 +369,164 @@ static inline int_fast32_t get_element(const int_fast32_t ion) {
   default:
     cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
     return -1;
+  }
+}
+
+
+static inline std::string get_ion_collisional_filename(const int_fast32_t ion) {
+
+  switch (ion) {
+
+  case ION_H_n:
+    return "HI.dat";
+
+#ifdef HAS_HELIUM
+  case ION_He_n:
+    return "HeI.dat";
+  case ION_He_p1:
+    return "HeII.dat";
+#endif
+
+#ifdef HAS_CARBON
+  case ION_C_p1:
+    return "CII.dat";
+  case ION_C_p2:
+    return "CIII.dat";
+#endif
+
+#ifdef HAS_NITROGEN
+  case ION_N_n:
+    return "NI.dat";
+  case ION_N_p1:
+    return "NII.dat";
+  case ION_N_p2:
+    return "NIII.dat";
+#endif
+
+#ifdef HAS_OXYGEN
+  case ION_O_n:
+    return "OI.dat";
+  case ION_O_p1:
+    return "OII.dat";
+  case ION_O_p2:
+    return "OIII.dat";
+  case ION_O_p3:
+    return "OIV.dat";
+#endif
+
+#ifdef HAS_NEON
+  case ION_Ne_n:
+    return "NeI.dat";
+  case ION_Ne_p1:
+    return "NeII.dat";
+  case ION_Ne_p2:
+    return "NeIII.dat";
+  case ION_Ne_p3:
+    return "NeIV.dat";
+#endif
+
+#ifdef HAS_SULPHUR
+  case ION_S_p1:
+    return "SII.dat";
+  case ION_S_p2:
+    return "SIII.dat";
+  case ION_S_p3:
+    return "SIV.dat";
+#endif
+
+#ifdef HAS_ARGON
+  case ION_Ar_n:
+    return "Ar";
+  case ION_Ar_p1:
+    return "Ar+";
+  case ION_Ar_p2:
+    return "Ar++";
+  case ION_Ar_p3:
+    return "Ar+++";
+#endif
+
+  default:
+    cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
+    return "";
+  }
+}
+
+
+static inline std::string get_ion_recombination_filename(const int_fast32_t ion) {
+
+  switch (ion) {
+
+  case ION_H_n:
+    return "HI.dat";
+
+#ifdef HAS_HELIUM
+  case ION_He_n:
+    return "HeI.dat";
+  case ION_He_p1:
+    return "HeII.dat";
+#endif
+
+#ifdef HAS_CARBON
+  case ION_C_p1:
+    return "CII.dat";
+  case ION_C_p2:
+    return "CIII.dat";
+#endif
+
+#ifdef HAS_NITROGEN
+  case ION_N_n:
+    return "NI.dat";
+  case ION_N_p1:
+    return "NII.dat";
+  case ION_N_p2:
+    return "NIII.dat";
+#endif
+
+#ifdef HAS_OXYGEN
+  case ION_O_n:
+    return "OI.dat";
+  case ION_O_p1:
+    return "OII.dat";
+  case ION_O_p2:
+    return "OIII.dat";
+  case ION_O_p3:
+    return "OIV.dat";
+#endif
+
+#ifdef HAS_NEON
+  case ION_Ne_n:
+    return "NeI.dat";
+  case ION_Ne_p1:
+    return "NeII.dat";
+  case ION_Ne_p2:
+    return "NeIII.dat";
+  case ION_Ne_p3:
+    return "NeIV.dat";
+#endif
+
+#ifdef HAS_SULPHUR
+  case ION_S_p1:
+    return "SII.dat";
+  case ION_S_p2:
+    return "SIII.dat";
+  case ION_S_p3:
+    return "SIV.dat";
+#endif
+
+#ifdef HAS_ARGON
+  case ION_Ar_n:
+    return "Ar";
+  case ION_Ar_p1:
+    return "Ar+";
+  case ION_Ar_p2:
+    return "Ar++";
+  case ION_Ar_p3:
+    return "Ar+++";
+#endif
+
+  default:
+    cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
+    return "";
   }
 }
 

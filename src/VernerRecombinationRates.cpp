@@ -32,6 +32,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <iostream>
 
 /**
  * @brief Constructor.
@@ -173,14 +174,26 @@ double VernerRecombinationRates::get_recombination_rate(
 #ifdef HAS_HELIUM
   case ION_He_n: {
     // Verner & Ferland (1996) formula (4) with values from Table 1 (HeIa).
-    // Note that we use the first version, which is only valid in the range
-    // [3 K, 10^6 K].
-    const double T1 = temperature / 15.54;
-    const double T2 = temperature / 3.676e7;
-    rate = 3.294e-11 / (std::sqrt(T1) * std::pow(1. + std::sqrt(T1), 0.309) *
-                        std::pow(1. + std::sqrt(T2), 1.691));
+    // Note that we use the second version, which is valid in the range
+    // [3 K, 10^10 K].
+    const double T1 = temperature / 4.266e-2;
+    const double T2 = temperature / 4.677e6;
+    rate = 9.356e-10 / (std::sqrt(T1) * std::pow(1. + std::sqrt(T1), 0.2108) *
+                        std::pow(1. + std::sqrt(T2), 1.7892));
     break;
   }
+
+  case ION_He_p1: {
+    // Verner & Ferland (1996) formula (4) with values from Table 1 (HeII).
+    // Note that we use the first version, which is only valid in the range
+    // [3 K, 10^9 K].
+    const double T1 = temperature / 0.937;
+    const double T2 = temperature / 2.774e6;
+    rate = 1.891e-10 / (std::sqrt(T1) * std::pow(1. + std::sqrt(T1), 0.2476) *
+                        std::pow(1. + std::sqrt(T2), 1.7524));
+    break;
+  }
+
 #endif
 
 #ifdef HAS_CARBON
@@ -265,6 +278,35 @@ double VernerRecombinationRates::get_recombination_rate(
                std::pow(T4, -1.5) * std::exp(-0.2769 * T4_inv);
     break;
   }
+  case ION_O_p2: {
+    // Nussbaumer & Storey (1983) formula (19) with values from Table 1 (O3+).
+    // valid in the range [1,000 K; 60,000 K]
+    const double T4 = temperature * 1.e-4;
+    const double T4_inv = 1. / T4;
+    rate = get_recombination_rate_verner(8, 6, temperature) +
+           1.e-12 *
+               (0.0 * T4_inv + 21.879 + 16.273 * T4 - 0.702 * T4 * T4) *
+               std::pow(T4, -1.5) * std::exp(-1.1899 * T4_inv);
+    break;
+  }
+  case ION_O_p3: {
+    const double T4 = temperature * 1.e-4;
+    const double T4_inv = 1. / T4;
+    if (temperature < 20000) {
+      rate = get_recombination_rate_verner(8, 5, temperature) +
+             1.e-12 *
+                 (-0.3648 * T4_inv + 7.2698 + 17.2187 * T4 + 9.8335 * T4 * T4) *
+                 std::pow(T4, -1.5) * std::exp(0.0166 * T4_inv);
+      break;
+
+    } else {
+      rate = get_recombination_rate_verner(8, 5, temperature) +
+             1.e-12 *
+                 (0-2.5053 * T4_inv + 3.4903 + 67.4128 * T4 - 3.445 * T4 * T4) *
+                 std::pow(T4, -1.5) * std::exp(-0.8501 * T4_inv);
+      break;
+    }
+  }
 #endif
 
 #ifdef HAS_NEON
@@ -283,8 +325,33 @@ double VernerRecombinationRates::get_recombination_rate(
     rate = get_recombination_rate_verner(10, 9, temperature) +
            1.e-12 *
                (0.0129 * T4_inv - 0.1779 + 0.9353 * T4 - 0.0682 * T4 * T4) *
-               std::pow(T4, -1.5) * std::exp(-0.4156 * T4_inv);
+               std::pow(T4, -1.5) * std::exp(-0.4516 * T4_inv);
     break;
+  }
+  case ION_Ne_p2: {
+    // Nussbaumer & Storey (1987) formula (7) with values from Table III(b)
+    // (Total)
+    // valid in the range [1,000 K; 60,000 K]
+    const double T4 = temperature * 1.e-4;
+    const double T4_inv = 1. / T4;
+    rate = get_recombination_rate_verner(10, 8, temperature) +
+           1.e-12 *
+               (3.6781 * T4_inv + 14.1481 + 17.1175 * T4 - 0.5017 * T4 * T4) *
+               std::pow(T4, -1.5) * std::exp(-0.2313 * T4_inv);
+    break;
+  }
+  case ION_Ne_p3: {
+    // Nussbaumer & Storey (1987) formula (7) with values from Table IV(b)
+    // (Total)
+    // valid in the range [1,000 K; 60,000 K]
+    const double T4 = temperature * 1.e-4;
+    const double T4_inv = 1. / T4;
+    rate = get_recombination_rate_verner(10, 7, temperature) +
+           1.e-12 *
+               (-0.0254 * T4_inv + 5.5365 + 17.0727 * T4 - 0.7225 * T4 * T4) *
+               std::pow(T4, -1.5) * std::exp(-0.1702 * T4_inv);
+    break;
+
   }
 #endif
 

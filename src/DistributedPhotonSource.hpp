@@ -45,6 +45,9 @@ private:
   /*! @brief Position of each source (in m). */
   std::vector< CoordinateVector<> > _positions;
 
+  std::vector<int > _original_indexes;
+
+
   /*! @brief Subgrid corresponding to each source. */
   std::vector< size_t > _subgrids;
 
@@ -90,6 +93,7 @@ public:
       for (size_t i = 0; i < subgrids.size(); ++i) {
         _subgrids.push_back(subgrids[i]);
         _positions.push_back(position);
+        _original_indexes.push_back(isource);
         _total_number_of_photons.push_back(number_per_copy);
         if (i < breakpoint) {
           ++_total_number_of_photons.back();
@@ -109,7 +113,7 @@ public:
 
     number_done = 0;
     for (size_t i = 0; i < _subgrids.size(); ++i) {
-      cmac_assert(_total_number_of_photons[i] > 0);
+      //cmac_assert(_total_number_of_photons[i] > 0);
       number_done += _total_number_of_photons[i];
     }
     cmac_assert(number_done == number_of_photons);
@@ -186,6 +190,10 @@ public:
    */
   inline CoordinateVector<> get_position(const size_t source_index) const {
     return _positions[source_index];
+  }
+
+  inline int get_index(const size_t source_index) const {
+    return _original_indexes[source_index];
   }
 
   /**

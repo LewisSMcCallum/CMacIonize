@@ -48,10 +48,12 @@
 // HDF5 dependent implementations
 #ifdef HAVE_HDF5
 #include "AmunSnapshotDensityFunction.hpp"
+#include "ArepoSnapshotDensityFunction.hpp"
 #include "BufferedCMacIonizeSnapshotDensityFunction.hpp"
 #include "CMacIonizeSnapshotDensityFunction.hpp"
 #include "FLASHSnapshotDensityFunction.hpp"
 #include "GadgetSnapshotDensityFunction.hpp"
+#include "HDF5DensityFunction.hpp"
 #endif
 
 #include <string>
@@ -71,7 +73,7 @@ public:
   static void check_hdf5(std::string type, Log *log = nullptr) {
     if (type == "AmunSnapshot" || type == "BufferedCMacIonizeSnapshot" ||
         type == "CMacIonizeSnapshot" || type == "FLASHSnapshot" ||
-        type == "GadgetSnapshot") {
+        type == "GadgetSnapshot" || type == "HDF5" || type == "ArepoSnapshot") {
       if (log) {
         log->write_error("Cannot create an instance of ", type,
                          "DensityFunction, since the code was "
@@ -149,6 +151,8 @@ public:
       return new DiscPatchDensityFunction(params);
     } else if (type == "Homogeneous") {
       return new HomogeneousDensityFunction(params, log);
+    } else if (type == "HDF5") {
+      return new HDF5DensityFunction(params, log);
     } else if (type == "Interpolated") {
       return new InterpolatedDensityFunction(params, log);
     } else if (type == "PhantomSnapshot") {
@@ -160,6 +164,8 @@ public:
 #ifdef HAVE_HDF5
     } else if (type == "AmunSnapshot") {
       return new AmunSnapshotDensityFunction(params, log);
+    } else if (type == "ArepoSnapshot") {
+      return new ArepoSnapshotDensityFunction(params, log);
     } else if (type == "BufferedCMacIonizeSnapshot") {
       return new BufferedCMacIonizeSnapshotDensityFunction(params, log);
     } else if (type == "CMacIonizeSnapshot") {

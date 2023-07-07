@@ -51,6 +51,10 @@ private:
   /*! @brief Initial value for the neutral fractions (if not present). */
   const double _initial_neutral_fraction;
 
+  const double _dust_gas_ratio;
+
+  const double _fraction_silicates;
+
   /*! @brief Log to write logging info to. */
   Log *_log;
 
@@ -110,6 +114,8 @@ public:
                                     const bool use_density,
                                     const bool use_pressure,
                                     const double initial_neutral_fraction,
+                                    const double dust_gas_ratio,
+                                    const double fraction_silicates,
                                     Log *log = nullptr);
 
   CMacIonizeSnapshotDensityFunction(ParameterFile &params, Log *log = nullptr);

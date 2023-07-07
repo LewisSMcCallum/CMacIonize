@@ -92,8 +92,20 @@ private:
    *  fit to use. */
   std::vector< std::vector< double > > _data_C;
 
+
+  double _draine_freq[241];
+  double _draine_kappa_si[241];
+  double _draine_kappa_gr[241];
+  uint_fast32_t _num_dust_vals = 241;
+
+  double _min_logE;
+  double _inverse_avg_dlogE;
+
 public:
   VernerCrossSections();
+
+
+  double get_dust_opacity(const double energy, const bool silicate) const;
 
   double get_cross_section_verner(const uint_fast8_t nz, const uint_fast8_t ne,
                                   const uint_fast8_t is, const double e) const;

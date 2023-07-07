@@ -32,6 +32,8 @@
 // implementations
 #include "FixedValueRecombinationRates.hpp"
 #include "VernerRecombinationRates.hpp"
+#include "BenjaminRecombinationRates.hpp"
+
 
 /**
  * @brief Factory for RecombinationRates instances.
@@ -66,6 +68,8 @@ public:
       return new FixedValueRecombinationRates(params);
     } else if (type == "Verner") {
       return new VernerRecombinationRates();
+    } else if (type == "Benjamin") {
+      return new BenjaminRecombinationRates();
     } else {
       cmac_error("Unknown RecombinationRates type: \"%s\"!", type.c_str());
       return nullptr;

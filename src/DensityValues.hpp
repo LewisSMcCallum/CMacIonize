@@ -37,6 +37,9 @@ private:
   /*! @brief Number density of hydrogen (in m^-3). */
   double _number_density;
 
+
+
+
   /*! @brief Ionic fractions. For hydrogen and helium, these are the neutral
    *  fractions. For other elements, they are the fraction of the end product
    *  of ionization (e.g. _ionic_fraction[ION_C_p1] is the fraction of C that
@@ -58,13 +61,18 @@ private:
   /*! @brief Cosmic ray heating factor (in kg m A^-1 s^-4). */
   double _cosmic_ray_factor;
 
+  double _fraction_silicates;
+
+  double _dust_gas_ratio;
+
 public:
   /**
    * @brief Empty constructor.
    */
   inline DensityValues()
       : _number_density(0.), _temperature(0.), _cosmic_ray_energy(0.),
-        _cosmic_ray_factor(-1.) {
+        _cosmic_ray_factor(-1.), _fraction_silicates(0.5),
+        _dust_gas_ratio(0.0) {
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fraction[i] = 0.;
     }
@@ -77,6 +85,14 @@ public:
    */
   inline void set_number_density(double number_density) {
     _number_density = number_density;
+  }
+
+  inline void set_dust_gas_ratio(double dust_gas_ratio) {
+    _dust_gas_ratio = dust_gas_ratio;
+  }
+
+  inline void set_fraction_silicates(double fraction_silicates) {
+    _fraction_silicates = fraction_silicates;
   }
 
   /**
@@ -140,6 +156,10 @@ public:
    * @return Number density (in m^-3).
    */
   inline double get_number_density() const { return _number_density; }
+
+  inline double get_dust_gas_ratio() const { return _dust_gas_ratio; }
+
+  inline double get_fraction_silicates() const { return _fraction_silicates; }
 
   /**
    * @brief Get the ionic fraction of the given ion.

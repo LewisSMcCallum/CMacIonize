@@ -27,6 +27,7 @@
 #include "Abundances.hpp"
 #include "Box.hpp"
 #include "ChargeTransferRates.hpp"
+#include "CollisionalRates.hpp"
 #include "CommandLineOption.hpp"
 #include "CommandLineParser.hpp"
 #include "CompilerInfo.hpp"
@@ -103,6 +104,133 @@ void RadiationHydrodynamicsSimulation::add_command_line_parameters(
   //  parser.add_option("restart", 0,
   //                    "Restart from the restart file stored in the given
   //                    folder.", COMMANDLINEOPTION_STRINGARGUMENT, ".");
+}
+
+
+inline static void do_cooling(IonizationVariables &ionization_variables,
+                              HydroVariables &hydro_variables,
+                              const double inverse_volume, const double nH2V,
+                              const double total_dt,
+                              DeRijckeRadiativeCooling &radiative_cooling,
+                              double _cooling_temp_floor, HydroIntegrator &hydro_integrator) {
+
+
+  double k= 1.38e-23;
+  double mh = 1.67e-27;
+
+  double rho = ionization_variables.get_number_density()*mh;
+  double xh = ionization_variables.get_ionic_fraction(ION_H_n);
+  double volume = 1./inverse_volume;
+  double gamma_minus_one = 0.66666;
+  double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
+  double t_start = ionization_variables.get_temperature();
+  double temperature = t_start;
+  double current_energy = t_start*e_factor;
+  double calced_e = current_energy;
+
+  double kinetic_energy =
+        0.5*CoordinateVector<>::dot_product(
+                   hydro_variables.get_primitives_velocity(),
+                   hydro_variables.get_conserved_momentum());
+
+  kinetic_energy = hydro_integrator.get_internal_units()->convert_to_SI_units<QUANTITY_ENERGY>(kinetic_energy);
+
+  //hydro_variables.set_conserved_total_energy(kinetic_energy+calced_e);
+
+
+  current_energy = std::min(calced_e, calced_e);
+
+
+
+
+  if (current_energy == 0. || hydro_variables.get_conserved_total_energy() == 0. ||
+    hydro_variables.get_conserved_total_energy() - kinetic_energy <= 0) {
+    // don't cool gas that has no thermal energy
+    return;
+  }
+
+  if (t_start <= _cooling_temp_floor) {
+    return;
+  }
+
+  double cooling = radiative_cooling.get_cooling_rate(t_start) * nH2V;
+
+
+  double cool_limit = 0.01;
+  double clock = 0.;
+  double tstep = total_dt;
+  double e_lost = 0.0;
+
+
+
+  while (clock < total_dt) {
+
+    tstep = total_dt - clock;
+    if (cooling*tstep > cool_limit*current_energy) {
+
+      tstep = cool_limit * current_energy/cooling;
+
+    //  if (tstep < total_dt/1.e6) {
+    //    tstep = total_dt/1.e6;
+    //  }
+
+      double dE = tstep*cooling;
+
+      if (current_energy < dE) {
+        break;
+      }
+
+
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
+      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
+    } else {
+
+      double dE = tstep*cooling;
+
+      if (current_energy < dE) {
+        break;
+      }
+
+
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
+      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+
+    }
+
+
+
+  }
+
+
+  double pressure = gamma_minus_one*inverse_volume*(current_energy);
+
+
+
+
+  double en = hydro_integrator.get_internal_units()->convert_to_internal_units<QUANTITY_ENERGY>(current_energy+kinetic_energy);
+  pressure = hydro_integrator.get_internal_units()->convert_to_internal_units<QUANTITY_PRESSURE>(pressure);
+  hydro_variables.set_conserved_total_energy(en);
+  hydro_variables.set_primitives_pressure(pressure);
+  ionization_variables.set_temperature(temperature);
+
+
 }
 
 /**
@@ -323,11 +451,13 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
       numphoton);
 
   ChargeTransferRates charge_transfer_rates;
+  CollisionalRates collisional_rates;
 
   // used to calculate both the ionization state and the temperature
   TemperatureCalculator *temperature_calculator = new TemperatureCalculator(
       source.get_total_luminosity(), abundances, line_cooling_data,
-      *recombination_rates, charge_transfer_rates, *params, log);
+      *recombination_rates, charge_transfer_rates, collisional_rates,
+      *params, log);
 
   // optional mask to fix the hydrodynamics in some parts of the box
   HydroMask *mask = nullptr;
@@ -361,6 +491,7 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
                                 false)) {
     cooling_function = new DeRijckeRadiativeCooling();
   }
+  double _cooling_temp_floor = 100.0;
 
   const bool do_stellar_feedback = params->get_value< bool >(
       "RadiationHydrodynamicsSimulation:use stellar feedback", false);
@@ -645,11 +776,10 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
       for (auto it = grid->begin(); it != grid->end(); ++it) {
         const double nH = it.get_ionization_variables().get_number_density();
         const double nH2 = nH * nH;
-        const double cooling_rate =
-            cooling_function->get_cooling_rate(
-                it.get_ionization_variables().get_temperature()) *
-            nH2 * it.get_volume();
-        it.get_hydro_variables().set_energy_rate_term(-cooling_rate);
+        do_cooling(it.get_ionization_variables(), it.get_hydro_variables(),
+                   1. / it.get_volume(), nH2 * it.get_volume(),
+                   actual_timestep, *cooling_function, _cooling_temp_floor,
+                  *hydro_integrator);
       }
     }
 

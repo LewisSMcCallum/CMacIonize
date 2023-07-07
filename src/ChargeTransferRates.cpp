@@ -57,9 +57,13 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // valid in the range [6,000 K; 100,000 K]
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.6);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     safe_temperature = std::min(safe_temperature, 10.);
     return 7.47e-21 * std::pow(safe_temperature, 2.06) *
            (1. + 9.93 * std::exp(-3.89 * safe_temperature));
+      }
   }
 #endif
 
@@ -70,8 +74,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.5);
     safe_temperature = std::min(safe_temperature, 5.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 1.67e-19 * std::pow(safe_temperature, 2.79) *
            (1. + 304.74 * std::exp(-4.07 * safe_temperature));
+        }
   }
   case ION_C_p2: {
     // Kingdon & Ferland (1996), table 1
@@ -79,8 +87,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 3.25e-15 * std::pow(safe_temperature, 0.21) *
            (1. + 0.19 * std::exp(-3.29 * safe_temperature));
+      }
   }
 #endif
 
@@ -91,8 +103,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.01);
     safe_temperature = std::min(safe_temperature, 5.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 1.01e-18 * std::pow(safe_temperature, -0.29) *
            (1. - 0.92 * std::exp(-8.38 * safe_temperature));
+        }
   }
   case ION_N_p1: {
     // Kingdon & Ferland (1996), table 1
@@ -100,8 +116,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 3.05e-16 * std::pow(safe_temperature, 0.6) *
            (1. + 2.65 * std::exp(-0.93 * safe_temperature));
+        }
   }
   case ION_N_p2: {
     // Kingdon & Ferland (1996), table 1
@@ -109,8 +129,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.001);
     safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 4.54e-15 * std::pow(safe_temperature, 0.57) *
            (1. - 0.65 * std::exp(-0.89 * safe_temperature));
+        }
   }
 #endif
 
@@ -121,8 +145,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.001);
     safe_temperature = std::min(safe_temperature, 1.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 1.04e-15 * std::pow(safe_temperature, 3.15e-2) *
            (1. - 0.61 * std::exp(-9.73 * safe_temperature));
+        }
   }
   case ION_O_p1: {
     // Kingdon & Ferland (1996), table 1
@@ -130,8 +158,38 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.01);
     safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 1.04e-15 * std::pow(safe_temperature, 0.27) *
            (1. + 2.02 * std::exp(-5.92 * safe_temperature));
+      }
+  }
+  case ION_O_p2: {
+    // Kingdon & Ferland (1996), table 1
+    // valid in the range [100 K; 100,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.01);
+    safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 3.98e-15 * std::pow(safe_temperature, 0.26) *
+           (1. + 0.56 * std::exp(-2.62 * safe_temperature));
+        }
+  }
+  case ION_O_p3: {
+    // Kingdon & Ferland (1996), table 1
+    // valid in the range [100 K; 100,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.01);
+    safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else{
+    return 2.52e-16 * std::pow(safe_temperature, 0.63) *
+           (1. + 2.08 * std::exp(-4.16 * safe_temperature));
+        }
   }
 #endif
 
@@ -143,7 +201,24 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // Kingdon & Ferland (1996), table 1
     // valid in the range [5,000 K; 50,000 K]
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    if (temperature > 50000) {
+      return 0.0;
+    } else {
     return 1.e-20;
+     }
+  }
+  case ION_Ne_p2: {
+    // Kingdon & Ferland (1996), table 1
+    // valid in the range [100 K; 100,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.01);
+    safe_temperature = std::min(safe_temperature, 10.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 1.473e-14 * std::pow(safe_temperature, 4.52e-2) *
+           (1. - 0.84 * std::exp(-0.31 * safe_temperature));
+        }
   }
 #endif
 
@@ -152,7 +227,11 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // Kingdon & Ferland (1996), table 1
     // valid in the range [1,000 K; 30,000 K]
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
-    return 1.e-20;
+    if (temperature > 30000) {
+      return 0.0;
+    } else {
+      return 1.e-20;
+      }
   }
   case ION_S_p2: {
     // Kingdon & Ferland (1996), table 1
@@ -160,8 +239,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 2.29e-15 * std::pow(safe_temperature, 4.02e-2) *
            (1. + 1.59 * std::exp(-6.06 * safe_temperature));
+        }
   }
   case ION_S_p3: {
     // Kingdon & Ferland (1996), table 1
@@ -169,8 +252,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 6.44e-15 * std::pow(safe_temperature, 0.13) *
            (1. + 2.69 * std::exp(-5.69 * safe_temperature));
+    }
   }
 #endif
 
@@ -220,9 +307,13 @@ double ChargeTransferRates::get_charge_transfer_ionization_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.01);
     safe_temperature = std::min(safe_temperature, 5.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 4.55e-18 * std::pow(safe_temperature, -0.29) *
            (1. - 0.92 * std::exp(-8.38 * safe_temperature)) *
            std::exp(-1.086 / safe_temperature);
+    }
   }
   case ION_N_p1:
     // no rate given in Kingdon & Ferland (1996)
@@ -239,9 +330,13 @@ double ChargeTransferRates::get_charge_transfer_ionization_rate_H(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.001);
     safe_temperature = std::min(safe_temperature, 1.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 7.4e-17 * std::pow(safe_temperature, 0.47) *
            (1. + 24.37 * std::exp(-0.74 * safe_temperature)) *
            std::exp(-0.023 / safe_temperature);
+    }
   }
   case ION_O_p1:
     // no rate given in Kingdon & Ferland (1996)
@@ -312,7 +407,11 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 4.6e-17 * safe_temperature * safe_temperature;
+    }
   }
 #endif
 
@@ -328,14 +427,22 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // multiplication
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 3.3e-16 * std::pow(safe_temperature, 0.29) *
            (1. + 1.3 * std::exp(-4.5 * safe_temperature));
+      }
   }
   case ION_N_p2: {
     // Arnaud & Rothenflug (1985), table III
     // valid in the range [1,000 K; 30,000 K]
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
-    return 1.5e-16;
+    if (temperature > 30000) {
+      return 0.0;
+    } else {
+      return 1.5e-16;
+    }
   }
 #endif
 
@@ -349,7 +456,35 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.5);
     safe_temperature = std::min(safe_temperature, 5.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 2.e-16 * std::pow(safe_temperature, 0.95);
+   }
+  }
+  case ION_O_p2: {
+    // Arnaud & Rothenflug (1985), table III
+    // valid in the range [5,000 K; 50,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.1);
+    safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 1.e-15 * std::pow(safe_temperature, 0.0)*(1.0 + 1.25*std::exp(-5.8*safe_temperature));
+    }
+  }
+  case ION_O_p3: {
+    // Arnaud & Rothenflug (1985), table III
+    // valid in the range [5,000 K; 50,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.1);
+    safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 6.4e-16 * std::pow(safe_temperature, 0.0)*(1.0 + 2.0*std::exp(-5.5*safe_temperature));
+    }
   }
 #endif
 
@@ -361,7 +496,23 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // Arnaud & Rothenflug (1985), table III
     // valid in the range [1,000 K; 30,000 K]
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
-    return 1.e-20;
+    if (temperature > 30000) {
+      return 0.0;
+    } else {
+     return 1.e-20;
+    }
+  }
+  case ION_Ne_p2: {
+    // Arnaud & Rothenflug (1985), table III
+    // valid in the range [5,000 K; 50,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.5);
+    safe_temperature = std::min(safe_temperature, 5.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 1.e-20 * std::pow(safe_temperature, 0.51);
+  }
   }
 #endif
 
@@ -375,7 +526,11 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 1.1e-15 * std::pow(safe_temperature, 0.56);
+  }
   }
   case ION_S_p3: {
     // Arnaud & Rothenflug (1985), table III
@@ -383,8 +538,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
     // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
     double safe_temperature = std::max(temperature, 0.1);
     safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
     return 7.6e-19 * std::pow(safe_temperature, 0.32) *
            (1. + 3.4 * std::exp(-5.25 * safe_temperature));
+         }
   }
 #endif
 

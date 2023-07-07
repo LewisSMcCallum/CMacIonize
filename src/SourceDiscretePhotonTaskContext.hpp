@@ -29,6 +29,7 @@
 
 #include "CrossSections.hpp"
 #include "DistributedPhotonSource.hpp"
+#include "PhotonSourceDistribution.hpp"
 #include "MemorySpace.hpp"
 #include "PhotonSourceSpectrum.hpp"
 #include "Task.hpp"
@@ -43,6 +44,8 @@ class SourceDiscretePhotonTaskContext : public TaskContext {
 private:
   /*! @brief Discrete photon source. */
   DistributedPhotonSource< _subgrid_type_ > &_photon_source;
+
+
 
   /*! @brief Photon buffer array. */
   MemorySpace &_buffers;
@@ -68,6 +71,8 @@ private:
   /*! @brief Task space. */
   ThreadSafeVector< Task > &_tasks;
 
+  PhotonSourceDistribution &_photon_source_distribution;
+
 public:
   /**
    * @brief Constructor.
@@ -90,13 +95,15 @@ public:
       PhotonSourceSpectrum &photon_source_spectrum,
       const Abundances &abundances, CrossSections &cross_sections,
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
-      ThreadSafeVector< Task > &tasks)
+      ThreadSafeVector< Task > &tasks,
+      PhotonSourceDistribution &photon_source_distribution)
       : _photon_source(photon_source), _buffers(buffers),
         _random_generators(random_generators),
         _discrete_photon_weight(discrete_photon_weight),
         _photon_source_spectrum(photon_source_spectrum),
         _abundances(abundances), _cross_sections(cross_sections),
-        _grid_creator(grid_creator), _tasks(tasks) {}
+        _grid_creator(grid_creator), _tasks(tasks),
+        _photon_source_distribution(photon_source_distribution) {}
 
   /**
    * @brief Execute a discrete photon source task.
@@ -159,15 +166,33 @@ public:
 
       photon.set_direction(direction);
 
-      // we currently assume equal weight for all photons
-      photon.set_weight(_discrete_photon_weight);
+
 
       // target optical depth (exponential distribution)
       photon.set_target_optical_depth(
           -std::log(_random_generators[thread_id].get_uniform_random_double()));
 
-      const double frequency = _photon_source_spectrum.get_random_frequency(
-          _random_generators[thread_id]);
+      double frequency;
+
+
+      if (typeid(TextFilePhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ||
+          typeid(ArepoSnapshotPhotonSourceDistribution).name() == typeid(_photon_source_distribution).name()) {
+        frequency = _photon_source_distribution.get_photon_frequency(
+          _random_generators[thread_id], _photon_source.get_index(source_index));
+        //photon.set_weight(_photon_source_distribution.get_photon_weighting(_photon_source.get_index(source_index)));
+        photon.set_weight(_discrete_photon_weight);
+      } else {
+        frequency = _photon_source_spectrum.get_random_frequency(
+            _random_generators[thread_id]);
+        // we currently assume equal weight for all photons
+        photon.set_weight(_discrete_photon_weight);
+      }
+
+
+
+
+
+
       photon.set_energy(frequency);
       for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
         double sigma = _cross_sections.get_cross_section(ion, frequency);
@@ -177,6 +202,9 @@ public:
         }
 #endif
         photon.set_photoionization_cross_section(ion, sigma);
+        photon.set_si_opacity(_cross_sections.get_dust_opacity(frequency,true));
+        photon.set_gr_opacity(_cross_sections.get_dust_opacity(frequency,false));
+
       }
     }
 

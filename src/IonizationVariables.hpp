@@ -57,6 +57,8 @@ enum ReemissionProbabilityName {
   REEMISSIONPROBABILITY_HELIUM_TPC,
   /*! @brief Probability for reemission as helium Lyman alpha radiation. */
   REEMISSIONPROBABILITY_HELIUM_LYA,
+  /*! Dust albedo hack in as reemission Probability */
+  REEMISSIONPROBABILITY_DUST_ALBEDO,
   /*! @brief Counter. Should always be the last element! */
   NUMBER_OF_REEMISSIONPROBABILITIES
 };
@@ -85,6 +87,10 @@ private:
 
   /*! @brief Temperature (in K). */
   double _temperature;
+
+  double _dust_density;
+
+  double _fraction_silicon;
 
   /*! @brief Ionic fractions. For hydrogen and helium, these are the neutral
    *  fractions. For other elements, they are the fraction of the end product
@@ -152,6 +158,8 @@ public:
 
     // single variables
     _number_density = other._number_density;
+    _dust_density = other._dust_density;
+    _fraction_silicon = other._fraction_silicon;
     _temperature = other._temperature;
     _cosmic_ray_factor = other._cosmic_ray_factor;
 #ifdef VARIABLE_ABUNDANCES
@@ -232,7 +240,22 @@ public:
    */
   inline void set_number_density(const double number_density) {
     _number_density = number_density;
+  
   }
+
+  inline void set_dust_density(const double dust_gas_ratio) {
+    _dust_density = _number_density*1.672621898e-27*dust_gas_ratio;
+  }
+
+  inline void set_fraction_silicon(const double fraction_silicon) {
+    _fraction_silicon = fraction_silicon;
+  }
+
+
+  inline double get_dust_density() const {return _dust_density;}
+
+
+  inline double get_fraction_silicon() const {return _fraction_silicon;}
 
   /**
    * @brief Get the temperature.

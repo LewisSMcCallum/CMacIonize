@@ -26,6 +26,7 @@
 #ifndef PHYSICALDIFFUSEREEMISSIONHANDLER_HPP
 #define PHYSICALDIFFUSEREEMISSIONHANDLER_HPP
 
+#include "AtomicValue.hpp"
 #include "DensityGrid.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "DiffuseReemissionHandler.hpp"
@@ -55,8 +56,14 @@ private:
   /*! @brief Helium 2-photon continuum spectrum. */
   const HeliumTwoPhotonContinuumSpectrum _He2pc_spectrum;
 
+
+
+
 public:
   PhysicalDiffuseReemissionHandler(const CrossSections &cross_sections);
+
+
+
 
   /**
    * @brief Set the re-emission probabilities for the given cell.
@@ -102,18 +109,26 @@ public:
         REEMISSIONPROBABILITY_HELIUM_TPC, He_TPC);
     ionization_variables.set_reemission_probability(
         REEMISSIONPROBABILITY_HELIUM_LYA, He_LyA);
+
+
+    // put in dust abedo as 0.5 for now, will make parameter later
+
+    ionization_variables.set_reemission_probability(
+        REEMISSIONPROBABILITY_DUST_ALBEDO,0.35);
   }
 
   virtual double reemit(const Photon &photon, double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const;
+                        PhotonType &type, AtomicValue<uint_fast32_t> &num_abs_gas,
+                        AtomicValue<uint_fast32_t> &num_abs_dust) const;
 
   virtual double reemit(const PhotonPacket &photon,
                         const double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type) const;
+                        PhotonType &type, AtomicValue<uint_fast32_t> &num_abs_gas,
+                        AtomicValue<uint_fast32_t> &num_abs_dust) const;
 };
 
 #endif // PHYSICALDIFFUSEREEMISSIONHANDLER_HPP

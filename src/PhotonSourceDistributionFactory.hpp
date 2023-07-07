@@ -42,10 +42,13 @@
 #include "SingleStarPhotonSourceDistribution.hpp"
 #include "SingleSupernovaPhotonSourceDistribution.hpp"
 #include "UniformRandomPhotonSourceDistribution.hpp"
+#include "TextFilePhotonSourceDistribution.hpp"
 
 // library dependent implementations
 #ifdef HAVE_HDF5
 #include "GadgetSnapshotPhotonSourceDistribution.hpp"
+#include "HDF5PhotonSourceDistribution.hpp"
+#include "ArepoSnapshotPhotonSourceDistribution.hpp"
 #endif
 
 #include <string>
@@ -64,7 +67,7 @@ public:
    * @param log Log to write logging info to.
    */
   static void check_hdf5(std::string type, Log *log = nullptr) {
-    if (type == "GadgetSnapshot") {
+    if (type == "GadgetSnapshot" || type == "HDF5" || type == "ArepoSnapshot") {
       if (log) {
         log->write_error("Cannot create an instance of ", type,
                          "PhotonSourceDistribution, since the code was "
@@ -121,11 +124,17 @@ public:
       return new SingleStarPhotonSourceDistribution(params, log);
     } else if (type == "SingleSupernova") {
       return new SingleSupernovaPhotonSourceDistribution(params, log);
+    } else if (type == "TextFile") {
+      return new TextFilePhotonSourceDistribution(params,log);
     } else if (type == "UniformRandom") {
       return new UniformRandomPhotonSourceDistribution(params, log);
 #ifdef HAVE_HDF5
     } else if (type == "GadgetSnapshot") {
       return new GadgetSnapshotPhotonSourceDistribution(params, log);
+    } else if (type == "HDF5") {
+      return new HDF5PhotonSourceDistribution(params, log);
+    } else if (type == "ArepoSnapshot") {
+      return new ArepoSnapshotPhotonSourceDistribution(params, log);
 #endif
     } else {
       cmac_error("Unknown PhotonSourceDistribution type: \"%s\".",

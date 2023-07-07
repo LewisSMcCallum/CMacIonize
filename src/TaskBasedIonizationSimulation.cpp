@@ -28,6 +28,7 @@
 #include "AbundanceModelFactory.hpp"
 #include "ContinuousPhotonSourceFactory.hpp"
 #include "CrossSectionsFactory.hpp"
+#include "CollisionalRates.hpp"
 #include "DensityFunctionFactory.hpp"
 #include "DensityGridWriterFactory.hpp"
 #include "DensitySubGrid.hpp"
@@ -330,10 +331,12 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
     }
     cmac_error("No luminosity!");
   }
+
+  CollisionalRates* _collisional_rates = new CollisionalRates;
   // used to calculate both the ionization state and the temperature
   _temperature_calculator = new TemperatureCalculator(
       _total_luminosity, _abundances, _line_cooling_data, *_recombination_rates,
-      _charge_transfer_rates, _parameter_file, _log);
+      _charge_transfer_rates, *_collisional_rates, _parameter_file, _log);
 
   // the second condition is necessary to deal with old parameter files
   if (_parameter_file.get_value< bool >(
@@ -677,6 +680,7 @@ void TaskBasedIonizationSimulation::run(
 
     // reset mean intensity counters
     {
+
       AtomicValue< size_t > igrid(0);
       start_parallel_timing_block();
 #ifdef HAVE_OPENMP
@@ -778,6 +782,10 @@ void TaskBasedIonizationSimulation::run(
     bool global_run_flag = true;
     AtomicValue< uint_fast32_t > num_photon_done(0);
 
+    AtomicValue<uint_fast32_t> num_abs_gas(0);
+    AtomicValue<uint_fast32_t> num_abs_dust(0);
+
+
     // create task contexts
     TaskContext *task_contexts[TASKTYPE_NUMBER] = {nullptr};
 
@@ -786,8 +794,10 @@ void TaskBasedIonizationSimulation::run(
           new SourceDiscretePhotonTaskContext< DensitySubGrid >(
               *photon_source, *_buffers, _random_generators,
               discrete_photon_weight, *_photon_source_spectrum, _abundances,
-              *_cross_sections, *_grid_creator, *_tasks);
+              *_cross_sections, *_grid_creator, *_tasks,*_photon_source_distribution);
     }
+
+
 
     if (_continuous_photon_source) {
       task_contexts[TASKTYPE_SOURCE_CONTINUOUS_PHOTON] =
@@ -806,8 +816,10 @@ void TaskBasedIonizationSimulation::run(
       task_contexts[TASKTYPE_PHOTON_REEMIT] =
           new PhotonReemitTaskContext< DensitySubGrid >(
               *_buffers, _random_generators, *_reemission_handler, _abundances,
-              *_cross_sections, *_grid_creator, *_tasks, num_photon_done);
+              *_cross_sections, *_grid_creator, *_tasks, num_photon_done,num_abs_gas,num_abs_dust);
     }
+
+
 
     task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =
         new PhotonTraversalTaskContext< DensitySubGrid >(
@@ -836,6 +848,7 @@ void TaskBasedIonizationSimulation::run(
       // actual run flag
       uint_fast32_t current_index = _shared_queue->get_task(*_tasks);
       while (global_run_flag) {
+
 
         if (current_index == NO_TASK) {
           premature_launch.execute();
@@ -949,8 +962,11 @@ void TaskBasedIonizationSimulation::run(
 #endif
           }
 #endif
+
           _temperature_calculator->calculate_temperature(
               iloop, _number_of_photons, *gridit);
+
+
           task.stop();
           thread_stats[get_thread_index()].stop(TASKTYPE_TEMPERATURE_STATE);
 
@@ -1069,6 +1085,11 @@ void TaskBasedIonizationSimulation::run(
     for (int_fast32_t itask = 0; itask < TASKTYPE_NUMBER; ++itask) {
       delete task_contexts[itask];
     }
+    std::cout << "Number of photons absorbed (dust) = " << num_abs_dust.value() << std::endl;
+    std::cout << "Number of photons absorbed (gas) = " << num_abs_gas.value() << std::endl;
+
+    std::cout << "Number of photons escaped = " << statistics.get_num_escaped() << std::endl;
+    //std::cout << "Number of photons absorbed = " << statistics.get_num_absorbed() << std::endl;
 
   } // photoionization loop
   _time_log.end("photoionization loop");

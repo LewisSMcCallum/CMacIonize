@@ -33,6 +33,7 @@ class Abundances;
 class ChargeTransferRates;
 class DensitySubGrid;
 class RecombinationRates;
+class CollisionalRates;
 
 /**
  * @brief Class that calculates the ionization state on a grid after the photon
@@ -60,11 +61,14 @@ private:
    *  calculation for coolants. */
   const ChargeTransferRates &_charge_transfer_rates;
 
+  const CollisionalRates &_collisional_rates;
+
 public:
   IonizationStateCalculator(const double luminosity,
                             const Abundances &abundances,
                             const RecombinationRates &recombination_rates,
-                            const ChargeTransferRates &charge_transfer_rates);
+                            const ChargeTransferRates &charge_transfer_rates,
+                            const CollisionalRates &collisional_rates);
 
   void
   calculate_ionization_state(const double jfac, const double hfac,
@@ -84,16 +88,18 @@ public:
       const double nh0, const double nhe0, const double nhp,
       const RecombinationRates &recombination_rates,
       const ChargeTransferRates &charge_transfer_rates,
+      const CollisionalRates &collisional_rates,
       IonizationVariables &ionization_variables);
 
   static void compute_ionization_states_hydrogen_helium(
-      const double alphaH, const double alphaHe, const double jH,
+      const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
       const double jHe, const double nH, const double AHe, const double T,
-      double &h0, double &he0);
+      double &h0, double &he0, double &hep, double gammaH, double gammaHe1, double gammaHe2);
 
   static double compute_ionization_state_hydrogen(const double alphaH,
                                                   const double jH,
-                                                  const double nH);
+                                                  const double nH,
+                                                  const double gammaH);
 
   /**
    * @brief Functor used to calculate the ionization state of a single cell.
