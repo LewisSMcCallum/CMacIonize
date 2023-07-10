@@ -34,6 +34,7 @@
 
 class Log;
 class ParameterFile;
+class PhotonSourceSpectrum;
 
 
 /**
@@ -47,6 +48,10 @@ private:
 
   /*! @brief UV luminosities of the sources in the snapshot file (in s^-1). */
   std::vector< double > _luminosities;
+
+  std::vector<PhotonSourceSpectrum*> _all_spectra;
+
+  std::vector<int> _spectrum_index;
 
 
 
@@ -67,6 +72,7 @@ public:
   virtual CoordinateVector<> get_position(photonsourcenumber_t index);
   virtual double get_weight(photonsourcenumber_t index) const;
   virtual double get_total_luminosity() const;
+  virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index);
 };
 
 #endif // HDF5PHOTONSOURCEDISTRIBUTION_HPP

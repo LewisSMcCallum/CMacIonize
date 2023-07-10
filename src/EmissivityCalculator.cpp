@@ -129,7 +129,7 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     const Abundances &abundances,
     const LineCoolingData &line_cooling_data) const {
 
-  const double h0max = 1.0;
+  const double h0max = 0.5;
   const double tmin = 1.e3;
   const double tmax = 1.e5;
 
@@ -146,7 +146,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
 
   if (ionization_variables.get_ionic_fraction(ION_H_n) < h0max &&
       ionization_variables.get_temperature() > tmin &&
-      ionization_variables.get_temperature() < tmax) {
+      ionization_variables.get_temperature() < tmax &&
+       ionization_variables.get_number_density() > 0.0) {
     const double ntot = ionization_variables.get_number_density();
     const double nhp =
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));

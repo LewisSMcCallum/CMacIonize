@@ -29,6 +29,8 @@
 #include "ParameterFile.hpp"
 #include "UVLuminosityFunctionFactory.hpp"
 #include "UnitConverter.hpp"
+#include "WMBasicPhotonSourceSpectrum.hpp"
+#include "Pegase3PhotonSourceSpectrum.hpp"
 
 /**
  * @brief Constructor.
@@ -64,6 +66,11 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
     Log *log)
     : _log(log) {
 
+
+
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+    _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+
   // turn off default HDF5 error handling: we catch errors ourselves
   HDF5Tools::initialize();
 
@@ -89,6 +96,10 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
 
    std::vector< double > read_lums =
        HDF5Tools::read_dataset< double > (maingroup, "SourceLuminosities");
+
+
+
+  _spectrum_index = HDF5Tools::read_dataset<int> (maingroup, "spec_index");
 
 
   // close the group
@@ -208,4 +219,13 @@ double HDF5PhotonSourceDistribution::get_weight(
  */
 double HDF5PhotonSourceDistribution::get_total_luminosity() const {
   return _total_luminosity;
+}
+
+
+
+double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &random_generator,
+  photonsourcenumber_t index) {
+
+  return _all_spectra[_spectrum_index[index]]->get_random_frequency(random_generator,0.0);
+
 }

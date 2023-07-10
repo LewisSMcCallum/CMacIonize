@@ -129,8 +129,6 @@ private:
   /*! @brief Charge transfer rates. */
   const ChargeTransferRates _charge_transfer_rates;
 
-  const CollisionalRates _collisional_rates;
-
   /*! @brief Abundance model. */
   const AbundanceModel *_abundance_model;
 
