@@ -137,8 +137,8 @@ public:
   static void compute_cooling_and_heating_balance(
       double &h0, double &he0, double &gain, double &loss, double T,
       IonizationVariables &ionization_variables,
-      const CoordinateVector<> cell_midpoint,
-      const double j[NUMBER_OF_IONNAMES], const Abundances &abundances,
+      const CoordinateVector<> cell_midpoint, const double jH, const double jHe,
+      const double* j, const Abundances &abundances,
       const double h[NUMBER_OF_HEATINGTERMS], double pahfac, double crfac,
       double crscale, const LineCoolingData &line_cooling_data,
       const RecombinationRates &recombination_rates,

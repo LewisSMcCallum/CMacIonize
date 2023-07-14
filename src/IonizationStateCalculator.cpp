@@ -155,35 +155,35 @@ void IonizationStateCalculator::calculate_ionization_state(
 
     const double j_metals[12] = {
 #ifdef HAS_CARBON
-        ionization_variables.get_mean_intensity(ION_C_p1),
-        ionization_variables.get_mean_intensity(ION_C_p2),
+        jfac*ionization_variables.get_mean_intensity(ION_C_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_C_p2),
 #else
         0., 0.,
 #endif
 #ifdef HAS_NITROGEN
-        ionization_variables.get_mean_intensity(ION_N_n),
-        ionization_variables.get_mean_intensity(ION_N_p1),
-        ionization_variables.get_mean_intensity(ION_N_p2),
+        jfac*ionization_variables.get_mean_intensity(ION_N_n),
+        jfac*ionization_variables.get_mean_intensity(ION_N_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_N_p2),
 #else
         0., 0.,
         0.,
 #endif
 #ifdef HAS_OXYGEN
-        ionization_variables.get_mean_intensity(ION_O_n),
-        ionization_variables.get_mean_intensity(ION_O_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_O_n),
+        jfac*ionization_variables.get_mean_intensity(ION_O_p1),
 #else
         0., 0.,
 #endif
 #ifdef HAS_NEON
-        ionization_variables.get_mean_intensity(ION_Ne_n),
-        ionization_variables.get_mean_intensity(ION_Ne_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_Ne_n),
+        jfac*ionization_variables.get_mean_intensity(ION_Ne_p1),
 #else
         0., 0.,
 #endif
 #ifdef HAS_SULPHUR
-        ionization_variables.get_mean_intensity(ION_S_p1),
-        ionization_variables.get_mean_intensity(ION_S_p2),
-        ionization_variables.get_mean_intensity(ION_S_p3)
+        jfac*ionization_variables.get_mean_intensity(ION_S_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_S_p2),
+        jfac*ionization_variables.get_mean_intensity(ION_S_p3)
 #else
         0., 0.,
         0.
@@ -739,6 +739,10 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
   // initial guesses for the neutral fractions
   double h0old = 0.99*(1. - std::exp(-1.*(jH+nH*gammaH)/(2.*alphaH*nH)));
 
+  if (h0old != h0old) {
+    h0old = 0.9;
+  }
+
   cmac_assert(h0old >= 0. && h0old <= 1.);
 
   // by enforcing a relative difference of 10%, we make sure we have at least
@@ -747,6 +751,10 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
 
   double he0old = 0.5/(alphaHe*nH/(gammaHe1*nH + jHe));
   he0old = std::min(he0old, 1.);
+
+  if (he0old != he0old) {
+    he0old = 0.9;
+  }
 
   // again, by using this value we make sure we have at least one iteration
   he0 = 0.9*he0old;

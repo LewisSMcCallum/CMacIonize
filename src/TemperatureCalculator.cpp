@@ -215,7 +215,7 @@ TemperatureCalculator::TemperatureCalculator(
 void TemperatureCalculator::compute_cooling_and_heating_balance(
     double &h0, double &he0, double &gain, double &loss, double T,
     IonizationVariables &ionization_variables,
-    const CoordinateVector<> cell_midpoint, const double j[NUMBER_OF_IONNAMES],
+    const CoordinateVector<> cell_midpoint, const double jH, const double jHe, const double* j,
     const Abundances &input_abundances, const double h[NUMBER_OF_HEATINGTERMS],
     double pahfac, double crfac, double crscale,
     const LineCoolingData &line_cooling_data,
@@ -244,13 +244,7 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   const double alphaHe2 = 0.0;
 #endif
 
-  // mean intensity integrals
-  const double jH = j[ION_H_n];
-#ifdef HAS_HELIUM
-  const double jHe = j[ION_He_n];
-#else
-  const double jHe = 0.;
-#endif
+
 
   // heating integrals
   const double hH = h[HEATINGTERM_H];
@@ -288,6 +282,14 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   double hep;
   IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
       alphaH, alphaHe, alphaHe2, jH, jHe, n, AHe, T, h0, he0,hep,gammaH,gammaHe1,gammaHe2);
+
+  //set hydrogen ionic fraction
+  ionization_variables.set_ionic_fraction(ION_H_n,h0);
+
+#ifdef HAS_HELIUM
+  ionization_variables.set_ionic_fraction(ION_He_n, he0);
+  ionization_variables.set_ionic_fraction(ION_He_p1, hep);
+#endif
 
   // the ionization equilibrium gives us the electron density (we neglect free
   // electrons coming from ionization of coolants)
@@ -360,7 +362,7 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   const double nhe0 = n * he0 * AHe;
 
   IonizationStateCalculator::compute_ionization_states_metals(
-      &j[2], ne, T, T4, nh0, nhe0, nhp, recombination_rates,
+      j, ne, T, T4, nh0, nhe0, nhp, recombination_rates,
       charge_transfer_rates, collisional_rates,ionization_variables);
 
   /// step 4: cooling
@@ -724,11 +726,48 @@ void TemperatureCalculator::calculate_temperature(
     T0 = 8000.;
   }
 
-  // normalize the mean intensity integrals
-  double j[NUMBER_OF_IONNAMES];
-  for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
-    j[ion] = jfac * ionization_variables.get_mean_intensity(ion);
-  }
+ // // normalize the mean intensity integrals
+ // double j[NUMBER_OF_IONNAMES];
+ // for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+ //   j[ion] = jfac * ionization_variables.get_mean_intensity(ion);
+ // }
+
+  double j[12] = {
+#ifdef HAS_CARBON
+        jfac*ionization_variables.get_mean_intensity(ION_C_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_C_p2),
+#else
+        0., 0.,
+#endif
+#ifdef HAS_NITROGEN
+        jfac*ionization_variables.get_mean_intensity(ION_N_n),
+        jfac*ionization_variables.get_mean_intensity(ION_N_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_N_p2),
+#else
+        0., 0.,
+        0.,
+#endif
+#ifdef HAS_OXYGEN
+        jfac*ionization_variables.get_mean_intensity(ION_O_n),
+        jfac*ionization_variables.get_mean_intensity(ION_O_p1),
+#else
+        0., 0.,
+#endif
+#ifdef HAS_NEON
+        jfac*ionization_variables.get_mean_intensity(ION_Ne_n),
+        jfac*ionization_variables.get_mean_intensity(ION_Ne_p1),
+#else
+        0., 0.,
+#endif
+#ifdef HAS_SULPHUR
+        jfac*ionization_variables.get_mean_intensity(ION_S_p1),
+        jfac*ionization_variables.get_mean_intensity(ION_S_p2),
+        jfac*ionization_variables.get_mean_intensity(ION_S_p3)
+#else
+        0., 0.,
+        0.
+#endif
+    };
 
   // normalize the heating integrals
   double h[NUMBER_OF_HEATINGTERMS];
@@ -755,7 +794,7 @@ void TemperatureCalculator::calculate_temperature(
     // ioneng
     double h01, he01, gain1, loss1;
     compute_cooling_and_heating_balance(
-        h01, he01, gain1, loss1, T1, ionization_variables, cell_midpoint, j,
+        h01, he01, gain1, loss1, T1, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
         _recombination_rates, _charge_transfer_rates, _collisional_rates);
 
@@ -763,13 +802,13 @@ void TemperatureCalculator::calculate_temperature(
     // ioneng
     double h02, he02, gain2, loss2;
     compute_cooling_and_heating_balance(
-        h02, he02, gain2, loss2, T2, ionization_variables, cell_midpoint, j,
+        h02, he02, gain2, loss2, T2, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
         _recombination_rates, _charge_transfer_rates, _collisional_rates);
 
     // ioneng - this one sets h0, he0, gain0 and loss0
     compute_cooling_and_heating_balance(
-        h0, he0, gain0, loss0, T0, ionization_variables, cell_midpoint, j,
+        h0, he0, gain0, loss0, T0, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
         _recombination_rates, _charge_transfer_rates, _collisional_rates);
 
@@ -812,8 +851,19 @@ void TemperatureCalculator::calculate_temperature(
       }
     }
     const double expdiff = expgain - exploss;
+  //  if (T0*std::pow(loss0 / gain0, logtt / expdiff)> 1e8) {
+  //    std::cout << "T0 loss0 gain0 = " << T0 << " " << loss0 << " " << gain0 << " " << std::endl;
+  //    std::cout << "logtt expdiff = " << logtt << " " << expdiff << std::endl;
+  //    cmac_error("BIG TEMPIES COMING");
+  //  }
+
+
     if (gain0 > 0. && expdiff != 0.) {
-      T0 *= std::pow(loss0 / gain0, logtt / expdiff);
+      if (std::pow(loss0 / gain0, logtt / expdiff) > 5) {
+        T0*= 5;
+      } else {
+        T0 *= std::pow(loss0 / gain0, logtt / expdiff);
+      }
     } else {
       // cooling and heating are behaving very weirdly
       // try again with a different temperature
@@ -851,7 +901,7 @@ void TemperatureCalculator::calculate_temperature(
 
   // cap the temperature at 30,000 K, since helium charge transfer rates are
   // only valid until 30,000 K
-  T0 = std::min(30000., T0);
+  //T0 = std::min(30000., T0);
 
   // update the ionic fractions and temperature
   ionization_variables.set_temperature(T0);
