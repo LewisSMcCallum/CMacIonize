@@ -725,6 +725,10 @@ void TemperatureCalculator::calculate_temperature(
   if (ionization_variables.get_temperature() <= 4000.) {
     T0 = 8000.;
   }
+  
+  if (ionization_variables.get_temperature() > 20000.) {
+    T0 = 12000.;
+  }
 
  // // normalize the mean intensity integrals
  // double j[NUMBER_OF_IONNAMES];
@@ -875,6 +879,9 @@ void TemperatureCalculator::calculate_temperature(
       T0 = 500.;
       h0 = 1.;
       he0 = 1.;
+      ionization_variables.set_ionic_fraction(ION_H_n,1.0);
+      ionization_variables.set_ionic_fraction(ION_He_n,1.0);
+      ionization_variables.set_ionic_fraction(ION_He_p1,0.0);
       // force exit out of loop
       gain0 = 1.;
       loss0 = 1.;
@@ -989,7 +996,12 @@ void TemperatureCalculator::calculate_temperature(
 
 #ifdef DO_OUTPUT_PHOTOIONIZATION_RATES
   // set the mean intensity values to the actual physical values
-  for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+    // set the mean intensity values to the values in correct physical units
+  ionization_variables.set_mean_intensity(ION_H_n, jH);
+#ifdef HAS_HELIUM
+  ionization_variables.set_mean_intensity(ION_He_n, jHe);
+#endif
+  for (int_fast32_t ion = 0; ion < 12; ++ion) {
     ionization_variables.set_mean_intensity(ion, j[ion]);
   }
 #endif

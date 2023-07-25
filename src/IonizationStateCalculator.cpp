@@ -823,7 +823,7 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     }
   }
   if (h0 != h0){
-    std::cout << alphaH << " " << alphaHe << " " << alphaHe2 << " " << gammaH << " " << gammaHe1 << " " << alphaHe2 << std::endl;
+    std::cout << alphaH << " " << alphaHe << " " << alphaHe2 << " " << gammaH << " " << gammaHe1 << " " << gammaHe2 << std::endl;
     std::cout << jH << " " << jHe << std::endl;
     std::cout << T << " " << nH << std::endl;
     std::cout << h0 << " " << he0 << std::endl;

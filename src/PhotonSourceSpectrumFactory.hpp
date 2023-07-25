@@ -39,6 +39,7 @@
 #include "PopStarPhotonSourceSpectrum.hpp"
 #include "UniformPhotonSourceSpectrum.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
+#include "PowerLawPhotonSourceSpectrum.hpp"
 
 // HDF5 dependent implementations
 #ifdef HAVE_HDF5
@@ -106,6 +107,8 @@ public:
       return new UniformPhotonSourceSpectrum();
     } else if (type == "WMBasic") {
       return new WMBasicPhotonSourceSpectrum(role, params, log);
+    } else if (type == "PowerLaw") {
+      return new PowerLawPhotonSourceSpectrum(params,log);
 #ifdef HAVE_HDF5
     } else if (type == "CastelliKurucz") {
       return new CastelliKuruczPhotonSourceSpectrum(role, params, log);

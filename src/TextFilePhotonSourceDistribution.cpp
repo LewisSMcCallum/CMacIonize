@@ -25,7 +25,7 @@
  */
 #include "TextFilePhotonSourceDistribution.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
-#include "Pegase3PhotonSourceSpectrum.hpp"
+#include "PowerLawPhotonSourceSpectrum.hpp"
 #include "CoordinateVector.hpp"
 #include "Log.hpp"
 #include "ParameterFile.hpp"
@@ -49,7 +49,7 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
 
   _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-  _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+  _all_spectra.push_back(new PowerLawPhotonSourceSpectrum(1,log));
 
 
 
