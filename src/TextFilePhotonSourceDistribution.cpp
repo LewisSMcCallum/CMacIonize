@@ -49,7 +49,7 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
 
   _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-  _all_spectra.push_back(new PowerLawPhotonSourceSpectrum(1,log));
+  _all_spectra.push_back(new PowerLawPhotonSourceSpectrum(4,log));
 
 
 

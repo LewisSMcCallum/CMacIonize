@@ -38,6 +38,9 @@ private:
     double _alpha;
     double _v1;
     double _v2;
+    double _v1pow = std::pow(_v1,1.-_alpha);
+    double _v2pow = std::pow(_v2,1.-_alpha);
+    double bracket = _v2pow - _v1pow;
 public:
     PowerLawPhotonSourceSpectrum(double alpha, Log *log = nullptr):
     _alpha(alpha),_v1(13.6),_v2(54.0) {
@@ -68,7 +71,7 @@ public:
   virtual double get_random_frequency(RandomGenerator &random_generator,
                                       double temperature = 0.) const {
        double ep = random_generator.get_uniform_random_double();
-       double vr = std::pow(_v1,1.0-_alpha) + ep*(std::pow(_v2,1.0-_alpha) - std::pow(_v1,1.0-_alpha));
+       double vr = _v1pow + ep*bracket;
        vr = std::pow(vr,1./(1.-_alpha));
     return vr*3.289e15;
   }
