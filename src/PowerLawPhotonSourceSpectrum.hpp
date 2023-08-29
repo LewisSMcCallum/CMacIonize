@@ -38,9 +38,9 @@ private:
     double _alpha;
     double _v1;
     double _v2;
-    double _v1pow = std::pow(_v1,1.-_alpha);
-    double _v2pow = std::pow(_v2,1.-_alpha);
-    double bracket = _v2pow - _v1pow;
+    double _v1pow;
+    double _v2pow;
+    double bracket;
 public:
     PowerLawPhotonSourceSpectrum(double alpha, Log *log = nullptr):
     _alpha(alpha),_v1(13.6),_v2(54.0) {
@@ -49,11 +49,15 @@ public:
         if (_alpha == 1.0) {
             cmac_error("Choose a slightly different alpha for power law spectrum. 0 breaks the formula.")
         }
+        _v1pow = std::pow(_v1,1.-_alpha);
+        _v2pow = std::pow(_v2,1.-_alpha);
+        bracket = _v2pow - _v1pow;
     }
 
-    PowerLawPhotonSourceSpectrum(ParameterFile &params, Log *log = nullptr):
+
+      PowerLawPhotonSourceSpectrum(std::string role, ParameterFile &params, Log *log = nullptr):
         PowerLawPhotonSourceSpectrum(
-            params.get_value<double>("PhotonSourceSpectrum:alpha",2.0), log) {} 
+            params.get_value<double>(role+":alpha",2.0), log) {} 
 
 
    /**
@@ -73,7 +77,7 @@ public:
        double ep = random_generator.get_uniform_random_double();
        double vr = _v1pow + ep*bracket;
        vr = std::pow(vr,1./(1.-_alpha));
-    return vr*3.289e15;
+    return vr*2.42e14;
   }
 
   /**

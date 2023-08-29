@@ -108,7 +108,7 @@ public:
     } else if (type == "WMBasic") {
       return new WMBasicPhotonSourceSpectrum(role, params, log);
     } else if (type == "PowerLaw") {
-      return new PowerLawPhotonSourceSpectrum(params,log);
+      return new PowerLawPhotonSourceSpectrum(role, params,log);
 #ifdef HAVE_HDF5
     } else if (type == "CastelliKurucz") {
       return new CastelliKuruczPhotonSourceSpectrum(role, params, log);
