@@ -208,6 +208,10 @@ public:
       return new StellarClusterPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(UniformRandomPhotonSourceDistribution).name()) {
       return new UniformRandomPhotonSourceDistribution(restart_reader);
+#ifdef HAVE_HDF5
+    } else if (tag == typeid(HDF5PhotonSourceDistribution).name()) {
+      return new HDF5PhotonSourceDistribution(restart_reader);
+#endif
     } else {
       cmac_error("Restarting is not supported for distribution type: \"%s\".",
                  tag.c_str());

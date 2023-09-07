@@ -29,12 +29,15 @@
 
 #include "PhotonSourceDistribution.hpp"
 
+
 #include <string>
 #include <vector>
 
 class Log;
 class ParameterFile;
 class PhotonSourceSpectrum;
+class RestartWriter;
+class RestartReader;
 
 
 /**
@@ -68,11 +71,15 @@ public:
   HDF5PhotonSourceDistribution(ParameterFile &params,
                                          Log *log = nullptr);
 
+  HDF5PhotonSourceDistribution(RestartReader &restart_reader);
+
   virtual photonsourcenumber_t get_number_of_sources() const;
   virtual CoordinateVector<> get_position(photonsourcenumber_t index);
   virtual double get_weight(photonsourcenumber_t index) const;
   virtual double get_total_luminosity() const;
   virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index);
+  virtual void write_restart_file(RestartWriter &restart_writer) const;
+  
 };
 
 #endif // HDF5PHOTONSOURCEDISTRIBUTION_HPP

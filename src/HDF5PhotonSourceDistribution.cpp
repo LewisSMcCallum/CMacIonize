@@ -31,6 +31,8 @@
 #include "UnitConverter.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
 #include "Pegase3PhotonSourceSpectrum.hpp"
+#include "RestartReader.hpp"
+#include "RestartWriter.hpp"
 
 /**
  * @brief Constructor.
@@ -229,3 +231,44 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
   return _all_spectra[_spectrum_index[index]]->get_random_frequency(random_generator,0.0);
 
 }
+
+
+  /**
+   * @brief Write the distribution to the given restart file.
+   *
+   * @param restart_writer RestartWriter to use.
+   */
+  void HDF5PhotonSourceDistribution::write_restart_file(RestartWriter &restart_writer) const {
+
+    const size_t number_of_sources = _positions.size();
+    restart_writer.write(number_of_sources);
+    for (size_t i = 0; i < number_of_sources; ++i) {
+      _positions[i].write_restart_file(restart_writer);
+      restart_writer.write(_luminosities[i]);
+      restart_writer.write(_spectrum_index[i]);
+    }
+    restart_writer.write(_total_luminosity);
+  }
+
+  /**
+   * @brief Restart constructor.
+   *
+   * @param restart_reader Restart file to read from.
+   */
+  HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(RestartReader &restart_reader) {
+
+    const size_t number_of_sources = restart_reader.read< size_t >();
+    _positions.resize(number_of_sources);
+    _luminosities.resize(number_of_sources);
+    for (size_t i = 0; i < number_of_sources; ++i) {
+      _positions[i] = CoordinateVector<>(restart_reader);
+      _luminosities[i] = restart_reader.read< double >();
+      _spectrum_index[i] = restart_reader.read<int>();
+    }
+    _total_luminosity = restart_reader.read< double >();
+    
+   
+
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,nullptr));
+    _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,nullptr));
+  }
