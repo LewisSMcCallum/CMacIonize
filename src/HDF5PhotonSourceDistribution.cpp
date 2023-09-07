@@ -72,6 +72,7 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
 
 
    _has_exploded=false;
+   _number_of_updates = 0;
 
 
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
@@ -469,6 +470,8 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
       _to_do_feedback.push_back(CoordinateVector<double>(1.37e18,3.75e18,-5.86e17));
 
     }
+
+    _number_of_updates += 1;
 
 
     return false;
