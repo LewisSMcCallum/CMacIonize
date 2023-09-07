@@ -880,8 +880,10 @@ void TemperatureCalculator::calculate_temperature(
       h0 = 1.;
       he0 = 1.;
       ionization_variables.set_ionic_fraction(ION_H_n,1.0);
+#ifdef HAS_HELIUM
       ionization_variables.set_ionic_fraction(ION_He_n,1.0);
       ionization_variables.set_ionic_fraction(ION_He_p1,0.0);
+#endif
       // force exit out of loop
       gain0 = 1.;
       loss0 = 1.;
