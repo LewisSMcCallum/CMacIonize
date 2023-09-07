@@ -466,7 +466,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
     double total_time = _number_of_updates*_update_interval;
 
-    if (total_time > 6.31152e+13 && _has_exploded == false) {
+    if (total_time > 3.15576e+14 && _has_exploded == false) {
       _to_do_feedback.push_back(CoordinateVector<double>(1.37e18,3.75e18,-5.86e17));
 
     }
