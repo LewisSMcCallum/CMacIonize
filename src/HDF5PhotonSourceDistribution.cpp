@@ -470,7 +470,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
   bool HDF5PhotonSourceDistribution::update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) {
 
-
+    bool changed = false;
 
 
     // clear out sources which no longer exist and add them to SNe todo list
@@ -485,7 +485,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
         _luminosities.erase(_luminosities.begin() + i);
         _spectrum_index.erase(_spectrum_index.begin() + i);
 
-
+        changed = true;
 
       } else {
         // check the next element
@@ -496,6 +496,6 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
     _number_of_updates += 1;
 
 
-    return false;
+    return changed;
   }
 
