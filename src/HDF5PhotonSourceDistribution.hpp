@@ -61,11 +61,15 @@ private:
 
 
   bool _has_exploded;
+  const bool _has_lifetimes;
   /*! @brief Positions of the sources in the snapshot file (in m). */
   std::vector< CoordinateVector<> > _positions;
 
   /*! @brief UV luminosities of the sources in the snapshot file (in s^-1). */
   std::vector< double > _luminosities;
+
+
+  std::vector< double > _source_lifetimes;
 
   std::vector<PhotonSourceSpectrum*> _all_spectra;
 
@@ -80,7 +84,7 @@ private:
 
 public:
   HDF5PhotonSourceDistribution(
-      std::string filename, const Box<> box, const double update_interval,
+      std::string filename, const Box<> box, const double update_interval, const bool has_lifetimes,
       Log *log = nullptr);
   HDF5PhotonSourceDistribution(ParameterFile &params,
                                          Log *log = nullptr);

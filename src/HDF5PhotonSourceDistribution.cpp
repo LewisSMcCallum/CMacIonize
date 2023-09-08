@@ -65,9 +65,9 @@
  * @param log Log to write logging information to.
  */
 HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
-    std::string filename, const Box<> box, const double update_interval,
+    std::string filename, const Box<> box, const double update_interval, const bool has_lifetimes,
     Log *log)
-    : _log(log),_update_interval(update_interval) {
+    : _log(log),_update_interval(update_interval),_has_lifetimes(has_lifetimes) {
 
 
 
@@ -107,6 +107,11 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
 
 
   _spectrum_index = HDF5Tools::read_dataset<int> (maingroup, "spec_index");
+
+  if (_has_lifetimes) {
+    _source_lifetimes = HDF5Tools::read_dataset<double> (maingroup, "Lifetimes");
+  }
+  
 
 
   // close the group
@@ -178,6 +183,7 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
                 params.get_physical_vector< QUANTITY_LENGTH >(
                     "SimulationBox:sides")),
           params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:update interval", "0.05 Myr"),
+          params.get_value<bool>("PhotonSourceDistribution:has lifetimes", false),
           log) {}
 
 /**
@@ -247,6 +253,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
   void HDF5PhotonSourceDistribution::write_restart_file(RestartWriter &restart_writer) const {
 
     restart_writer.write(_update_interval);
+    restart_writer.write(_has_lifetimes);
     const size_t number_of_sources = _positions.size();
     restart_writer.write(number_of_sources);
     for (size_t i = 0; i < number_of_sources; ++i) {
@@ -263,7 +270,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
    * @param restart_reader Restart file to read from.
    */
   HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(RestartReader &restart_reader):
-  _update_interval(restart_reader.read< double >()) {
+  _update_interval(restart_reader.read< double >()),_has_lifetimes(restart_reader.read< bool >()) {
 
     const size_t number_of_sources = restart_reader.read< size_t >();
     _positions.resize(number_of_sources);
@@ -399,7 +406,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
 
              double dx = std::pow(cellit.get_volume(),1./3.);
-             if (_r_st[i] < 4.*dx && false) {
+             if (_r_st[i] < 4.*dx) {
 
 
               CoordinateVector<> vel_prior =
@@ -464,11 +471,26 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
   bool HDF5PhotonSourceDistribution::update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) {
 
 
-    double total_time = _number_of_updates*_update_interval;
 
-    if (total_time > 3.15576e+14 && _has_exploded == false) {
-      _to_do_feedback.push_back(CoordinateVector<double>(1.37e18,3.75e18,-5.86e17));
 
+    // clear out sources which no longer exist and add them to SNe todo list
+    size_t i = 0;
+    while (i < _source_lifetimes.size()) {
+      _source_lifetimes[i] -= _update_interval;
+      if (_source_lifetimes[i] <= 0.) {
+        // remove the element
+        _to_do_feedback.push_back(_positions[i]);
+        _positions.erase(_positions.begin() + i);
+        _source_lifetimes.erase(_source_lifetimes.begin() + i);
+        _luminosities.erase(_luminosities.begin() + i);
+        _spectrum_index.erase(_spectrum_index.begin() + i);
+
+
+
+      } else {
+        // check the next element
+        ++i;
+      }
     }
 
     _number_of_updates += 1;
