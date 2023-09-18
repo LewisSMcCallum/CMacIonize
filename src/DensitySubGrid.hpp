@@ -558,7 +558,7 @@ protected:
                                   const double distance,
                                   const PhotonPacket &photon) const {
 
-    bool destroy_carbon = true;
+    bool destroy_carbon = false;
 
     double dust_opacity_si = photon.get_si_opacity();
     double dust_opacity_c = photon.get_c_opacity();

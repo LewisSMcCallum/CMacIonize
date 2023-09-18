@@ -108,7 +108,7 @@ private:
   /*! @brief Pseudo-random number generator. */
 
   double init_running_mass;
-  uint_fast32_t _num_sne;
+  uint_fast32_t _num_sne = 0;
 
   double _holmes_time;
   double _holmes_sh;
