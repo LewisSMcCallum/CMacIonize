@@ -243,8 +243,8 @@ public:
   
   }
 
-  inline void set_dust_density(const double dust_gas_ratio) {
-    _dust_density = _number_density*1.672621898e-27*dust_gas_ratio;
+  inline void set_dust_density(const double dust_density) {
+    _dust_density = dust_density;
   }
 
   inline void set_fraction_silicon(const double fraction_silicon) {

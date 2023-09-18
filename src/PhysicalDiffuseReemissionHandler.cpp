@@ -100,10 +100,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
     const double pDustabs = ndustdust / (nH0anuH0 + nHe0anuHe0 + ndustdust);
 
-    std::cout << "DUST NUMS " <<  ndustdust << ionization_variables.get_dust_density() << dust_opacity_si << dust_opacity_c << std::endl;
-    std::cout << "H NUMS " <<  nH0anuH0 << ionization_variables.get_number_density() << photon.get_photoionization_cross_section(ION_H_n) << std::endl;
-
-
+   
 
 
     double x = random_generator.get_uniform_random_double();
