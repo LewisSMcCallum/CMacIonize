@@ -63,7 +63,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
     AtomicValue<uint_fast32_t> &num_abs_dust) const {
 
       
-
+  const bool destroy_carbon = false;
   double new_frequency = 0.;
 
   // Wood, Mathis & Ercolano (2004), section 3.3
@@ -88,12 +88,20 @@ double PhysicalDiffuseReemissionHandler::reemit(
     double ndustdust = fraction_silicon
           * dust_opacity_si * ionization_variables.get_dust_density();
 
-    ndustdust += (1.-fraction_silicon) * dust_opacity_c
+   if (destroy_carbon) {
+      ndustdust += (1.-fraction_silicon) * dust_opacity_c
              *ionization_variables.get_dust_density()
              *ionization_variables.get_ionic_fraction(ION_H_n);
+   } else {
+      ndustdust += (1.-fraction_silicon) * dust_opacity_c
+             *ionization_variables.get_dust_density();
+   }
+  
 
     const double pDustabs = ndustdust / (nH0anuH0 + nHe0anuHe0 + ndustdust);
 
+    std::cout << "DUST NUMS " <<  ndustdust << ionization_variables.get_dust_density() << dust_opacity_si << dust_opacity_c << std::endl;
+    std::cout << "H NUMS " <<  nH0anuH0 << ionization_variables.get_number_density() << photon.get_photoionization_cross_section(ION_H_n) << std::endl;
 
 
 
