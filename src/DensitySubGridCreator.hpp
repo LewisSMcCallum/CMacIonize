@@ -419,7 +419,7 @@ public:
           it.get_ionization_variables().set_number_density(
               values.get_number_density());
           it.get_ionization_variables().set_dust_density(
-              values.get_dust_gas_ratio());
+              values.get_dust_gas_ratio()*values.get_number_density()*1.67e-27);
           it.get_ionization_variables().set_fraction_silicon(
               values.get_fraction_silicates());
 
