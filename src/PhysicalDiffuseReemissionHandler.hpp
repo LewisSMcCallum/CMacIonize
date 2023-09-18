@@ -114,7 +114,7 @@ public:
     // put in dust abedo as 0.5 for now, will make parameter later
 
     ionization_variables.set_reemission_probability(
-        REEMISSIONPROBABILITY_DUST_ALBEDO,0.35);
+        REEMISSIONPROBABILITY_DUST_ALBEDO,0.0);
   }
 
   virtual double reemit(const Photon &photon, double helium_abundance,
