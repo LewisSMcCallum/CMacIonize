@@ -889,15 +889,6 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     max_xn = old_xn + alphaH*ts*nH*(std::pow(1.- old_xn,2.0));
   }
 
-  std::cout << "SHOULD BE PRINTING" << std::endl;
-
-
-  std::cout << "TS " << ts << std::endl;
-
-  std::cout << "xnold = " << old_xn << std::endl;
-
-
-
 
   if (jH ==0 && nH > 0) {
     xn = alphaH/(alphaH+gammaH);
