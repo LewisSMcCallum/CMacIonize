@@ -898,7 +898,6 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
 
 
 
-  std::cout << 
 
   if (jH ==0 && nH > 0) {
     xn = alphaH/(alphaH+gammaH);
