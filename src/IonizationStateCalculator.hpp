@@ -72,7 +72,7 @@ public:
 
   void
   calculate_ionization_state(const double jfac, const double hfac,
-                             IonizationVariables &ionization_variables) const;
+                             IonizationVariables &ionization_variables, double timestep) const;
 
   /**
    * @brief Update the total luminosity of the sources.
@@ -99,7 +99,9 @@ public:
   static double compute_ionization_state_hydrogen(const double alphaH,
                                                   const double jH,
                                                   const double nH,
-                                                  const double gammaH);
+                                                  const double gammaH,
+                                                  const double old_xn,
+                                                  double ts);
 
   /**
    * @brief Functor used to calculate the ionization state of a single cell.
@@ -117,6 +119,9 @@ public:
      */
     const double _hfac;
 
+
+    double _timestep;
+
   public:
     /**
      * @brief Constructor.
@@ -130,8 +135,8 @@ public:
      */
     IonizationStateCalculatorFunction(
         const IonizationStateCalculator &calculator, const double jfac,
-        const double hfac)
-        : _calculator(calculator), _jfac(jfac), _hfac(hfac) {}
+        const double hfac, double timestep)
+        : _calculator(calculator), _jfac(jfac), _hfac(hfac),_timestep(timestep) {}
 
     /**
      * @brief Do the ionization state calculation for a single cell.
@@ -141,16 +146,16 @@ public:
     inline void operator()(DensityGrid::iterator &cell) {
       _calculator.calculate_ionization_state(_jfac / cell.get_volume(),
                                              _hfac / cell.get_volume(),
-                                             cell.get_ionization_variables());
+                                             cell.get_ionization_variables(),_timestep);
     }
   };
 
   void
   calculate_ionization_state(const double totweight, DensityGrid &grid,
-                             std::pair< cellsize_t, cellsize_t > &block) const;
+                             std::pair< cellsize_t, cellsize_t > &block, double timestep) const;
 
   void calculate_ionization_state(const double totweight,
-                                  DensitySubGrid &subgrid) const;
+                                  DensitySubGrid &subgrid, double timestep) const;
 };
 
 #endif // IONIZATIONSTATECALCULATOR_HPP

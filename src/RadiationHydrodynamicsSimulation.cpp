@@ -743,7 +743,7 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
 
       start_parallel_timing_block();
       temperature_calculator->calculate_temperature(loop, totweight, *grid,
-                                                    block);
+                                                    block, actual_timestep);
       stop_parallel_timing_block();
 
       ++loop;

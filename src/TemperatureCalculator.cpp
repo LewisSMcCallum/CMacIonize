@@ -589,7 +589,7 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
  */
 void TemperatureCalculator::calculate_temperature(
     IonizationVariables &ionization_variables, const double jfac,
-    const double hfac, const CoordinateVector<> cell_midpoint) const {
+    const double hfac, const CoordinateVector<> cell_midpoint, double timestep) const {
 
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
 #ifdef HAS_HELIUM
@@ -1028,7 +1028,7 @@ void TemperatureCalculator::calculate_temperature(
  */
 void TemperatureCalculator::calculate_temperature(
     uint_fast32_t loop, double totweight, DensityGrid &grid,
-    std::pair< cellsize_t, cellsize_t > &block) const {
+    std::pair< cellsize_t, cellsize_t > &block, double timestep) const {
 
   if (_do_temperature_computation && loop > _minimum_iteration_number) {
     // get the normalization factors for the ionizing intensity and heating
@@ -1044,13 +1044,13 @@ void TemperatureCalculator::calculate_temperature(
         DensityGridTraversalJobMarket< TemperatureCalculatorFunction >,
         DensityGridTraversalJob< TemperatureCalculatorFunction > >
         workers;
-    TemperatureCalculatorFunction do_calculation(*this, jfac, hfac);
+    TemperatureCalculatorFunction do_calculation(*this, jfac, hfac, timestep);
     DensityGridTraversalJobMarket< TemperatureCalculatorFunction > jobs(
         grid, do_calculation, block);
     workers.do_in_parallel(jobs);
   } else {
     _ionization_state_calculator.calculate_ionization_state(totweight, grid,
-                                                            block);
+                                                            block, timestep);
   }
 }
 
@@ -1064,7 +1064,7 @@ void TemperatureCalculator::calculate_temperature(
  */
 void TemperatureCalculator::calculate_temperature(
     const uint_fast32_t loop, const double totweight,
-    DensitySubGrid &subgrid) const {
+    DensitySubGrid &subgrid, double timestep) const {
 
   if (_do_temperature_computation && loop > _minimum_iteration_number) {
     // get the normalization factors for the ionizing intensity and heating
@@ -1078,9 +1078,9 @@ void TemperatureCalculator::calculate_temperature(
     for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
       calculate_temperature(
           cellit.get_ionization_variables(), jfac / cellit.get_volume(),
-          hfac / cellit.get_volume(), cellit.get_cell_midpoint());
+          hfac / cellit.get_volume(), cellit.get_cell_midpoint(), timestep);
     }
   } else {
-    _ionization_state_calculator.calculate_ionization_state(totweight, subgrid);
+    _ionization_state_calculator.calculate_ionization_state(totweight, subgrid, timestep);
   }
 }

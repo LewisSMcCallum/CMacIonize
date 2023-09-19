@@ -147,7 +147,7 @@ public:
 
   void calculate_temperature(IonizationVariables &ionization_variables,
                              const double jfac, const double hfac,
-                             const CoordinateVector<> cell_midpoint) const;
+                             const CoordinateVector<> cell_midpoint, double timestep) const;
 
   /**
    * @brief Update the total luminosity of the sources.
@@ -179,6 +179,9 @@ public:
      * call. */
     const double _hfac;
 
+
+    double _timestep;
+
   public:
     /**
      * @brief Constructor.
@@ -191,8 +194,8 @@ public:
      * call.
      */
     TemperatureCalculatorFunction(const TemperatureCalculator &calculator,
-                                  double jfac, double hfac)
-        : _calculator(calculator), _jfac(jfac), _hfac(hfac) {}
+                                  double jfac, double hfac, double timestep)
+        : _calculator(calculator), _jfac(jfac), _hfac(hfac),_timestep(timestep) {}
 
     /**
      * @brief Do the temperature calculation for a single cell.
@@ -202,16 +205,16 @@ public:
     inline void operator()(DensityGrid::iterator cell) {
       _calculator.calculate_temperature(
           cell.get_ionization_variables(), _jfac / cell.get_volume(),
-          _hfac / cell.get_volume(), cell.get_cell_midpoint());
+          _hfac / cell.get_volume(), cell.get_cell_midpoint(),_timestep);
     }
   };
 
   void calculate_temperature(uint_fast32_t loop, double totweight,
                              DensityGrid &grid,
-                             std::pair< cellsize_t, cellsize_t > &block) const;
+                             std::pair< cellsize_t, cellsize_t > &block, double timestep) const;
 
   void calculate_temperature(const uint_fast32_t loop, const double totweight,
-                             DensitySubGrid &subgrid) const;
+                             DensitySubGrid &subgrid, double timestep) const;
 };
 
 #endif // TEMPERATURECALCULATOR_HPP

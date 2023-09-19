@@ -2057,7 +2057,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 }
 #endif
                 temperature_calculator->calculate_temperature(iloop, numphoton,
-                                                              *gridit);
+                                                              *gridit, actual_timestep);
                 task.stop();
                 cpucycle_tick(task_stop);
                 active_time[get_thread_index()] += task_stop - task_start;
@@ -2095,7 +2095,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               auto gridit = grid_creator->get_subgrid(this_igrid);
               (*gridit).reset_intensities();
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit);
+                                                            *gridit,actual_timestep);
             }
           }
           stop_parallel_timing_block();
@@ -2122,7 +2122,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               auto gridit = grid_creator->get_subgrid(this_igrid);
               (*gridit).reset_intensities();
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit);
+                                                            *gridit,actual_timestep);
             }
           }
           stop_parallel_timing_block();

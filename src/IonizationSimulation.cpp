@@ -531,7 +531,7 @@ void IonizationSimulation::run(DensityGridWriter *density_grid_writer) {
 
     _cell_update_timer.start();
     _temperature_calculator->calculate_temperature(loop, totweight,
-                                                   *_density_grid, block);
+                                                   *_density_grid, block, 0.0);
     _cell_update_timer.stop();
 
     // the calculation above will have changed the ionic fractions, and might

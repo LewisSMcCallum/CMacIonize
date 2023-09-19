@@ -965,7 +965,7 @@ void TaskBasedIonizationSimulation::run(
 #endif
 
           _temperature_calculator->calculate_temperature(
-              iloop, _number_of_photons, *gridit);
+              iloop, _number_of_photons, *gridit, 0.0);
 
 
           task.stop();

@@ -73,7 +73,7 @@ IonizationStateCalculator::IonizationStateCalculator(
  */
 void IonizationStateCalculator::calculate_ionization_state(
     const double jfac, const double hfac,
-    IonizationVariables &ionization_variables) const {
+    IonizationVariables &ionization_variables, double timestep) const {
 
   // normalize the mean intensity integrals
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
@@ -131,10 +131,10 @@ void IonizationStateCalculator::calculate_ionization_state(
 
 
     } else {
-      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
+      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_ionic_fraction(ION_H_n), timestep);
     }
 #else
-    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH);
+    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_ionic_fraction(ION_H_n), timestep);
 #endif
 
     ionization_variables.set_ionic_fraction(ION_H_n, h0);
@@ -545,7 +545,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
  */
 void IonizationStateCalculator::calculate_ionization_state(
     const double totweight, DensityGrid &grid,
-    std::pair< cellsize_t, cellsize_t > &block) const {
+    std::pair< cellsize_t, cellsize_t > &block, double timestep) const {
 
   // compute the normalization factor for the mean intensity integrals, which
   // depends on the total weight of all photons, and on the volume of each cell
@@ -558,7 +558,7 @@ void IonizationStateCalculator::calculate_ionization_state(
       DensityGridTraversalJobMarket< IonizationStateCalculatorFunction >,
       DensityGridTraversalJob< IonizationStateCalculatorFunction > >
       workers;
-  IonizationStateCalculatorFunction do_calculation(*this, jfac, hfac);
+  IonizationStateCalculatorFunction do_calculation(*this, jfac, hfac, timestep);
   DensityGridTraversalJobMarket< IonizationStateCalculatorFunction > jobs(
       grid, do_calculation, block);
   workers.do_in_parallel(jobs);
@@ -571,7 +571,7 @@ void IonizationStateCalculator::calculate_ionization_state(
  * @param subgrid DensitySubGrid to work on.
  */
 void IonizationStateCalculator::calculate_ionization_state(
-    const double totweight, DensitySubGrid &subgrid) const {
+    const double totweight, DensitySubGrid &subgrid, double timestep) const {
 
 
   double jfac;
@@ -593,7 +593,7 @@ void IonizationStateCalculator::calculate_ionization_state(
   for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
     calculate_ionization_state(jfac / cellit.get_volume(),
                                hfac / cellit.get_volume(),
-                               cellit.get_ionization_variables());
+                               cellit.get_ionization_variables(),timestep);
   }
 }
 
@@ -880,12 +880,25 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
  * @return Neutral fraction of hydrogen.
  */
 double IonizationStateCalculator::compute_ionization_state_hydrogen(
-    const double alphaH, const double jH, const double nH, const double gammaH) {
+    const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
   double xn;
+  double max_xn = 1.e99;
+
+  if (ts > 0.0) {
+    max_xn = old_xn + alphaH*ts*nH*(std::pow(1.- old_xn,2.0));
+  }
+
+  std::cout << "SHOULD BE PRINTING" << std::endl;
+
+
+  std::cout << "TS " << ts << std::endl;
+
+  std::cout << "xnold = " << old_xn << std::endl;
 
 
 
+  std::cout << 
 
   if (jH ==0 && nH > 0) {
     xn = alphaH/(alphaH+gammaH);
@@ -899,6 +912,8 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   } else {
     xn = 0;
   }
+
+  xn = std::min(xn,max_xn);
 
   return std::max(1.e-14,xn);
 }
