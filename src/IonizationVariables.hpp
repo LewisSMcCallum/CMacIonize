@@ -199,7 +199,7 @@ public:
   inline void copy_ionic_fractions(const IonizationVariables &other) {
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = other._ionic_fractions[i];
-      _prev_ionic_fractions[i] = other._ionic_fraction[i];
+      _prev_ionic_fractions[i] = other._prev_ionic_fractions[i];
     }
     _temperature = other._temperature;
   }
