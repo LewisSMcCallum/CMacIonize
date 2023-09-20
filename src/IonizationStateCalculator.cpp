@@ -922,7 +922,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
       // we are ionizing 
       if ((xn - old_xn) < largest_change) {
         // we have over-ionized for this time, implement limiter
-        xn = old_xn + largest_change
+        xn = old_xn + largest_change;
       }
     }
   }
