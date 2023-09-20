@@ -883,11 +883,9 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
   double xn;
-  double max_xn = 1.e99;
 
-  if (ts > 0.0) {
-    max_xn = old_xn + alphaH*ts*nH*(std::pow(1.- old_xn,2.0));
-  }
+  
+
 
 
   if (jH ==0 && nH > 0) {
@@ -903,7 +901,33 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     xn = 0;
   }
 
-  xn = std::min(xn,max_xn);
+
+  if (ts > 0.0) {
+    double largest_change = ts*(alphaH*nH*(std::pow(1.- old_xn,2.0)) - old_xn*jH - gammaH*nH*old_xn*(1.-old_xn));
+    if (largest_change > 0 && xn < old_xn) {
+      // this is a problem...
+      cmac_error("Numerical is net recombining, but xn is lower than last step.")
+    }
+    if (largest_change < 0 && xn > old_xn) {
+      // similarly a problem, lets hope this doesnt get called?
+      cmac_error("Numerical is net ionizing but xn is increasing from last step.")
+    }
+    if (largest_change > 0) {
+      // we are recombining
+      if ((xn-old_xn) > largest_change) {
+        //we have over-recombined, add limiter by implementing numerical time dependence
+        xn = old_xn + largest_change;
+      }
+    } else if (largest_change < 0) {
+      // we are ionizing 
+      if ((xn - old_xn) < largest_change) {
+        // we have over-ionized for this time, implement limiter
+        xn = old_xn + largest_change
+      }
+    }
+  }
+
+
 
   return std::max(1.e-14,xn);
 }
