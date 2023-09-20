@@ -131,10 +131,10 @@ void IonizationStateCalculator::calculate_ionization_state(
 
 
     } else {
-      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_ionic_fraction(ION_H_n), timestep);
+      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
     }
 #else
-    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_ionic_fraction(ION_H_n), timestep);
+    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
 #endif
 
     ionization_variables.set_ionic_fraction(ION_H_n, h0);
@@ -904,8 +904,6 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
 
   if (ts > 0.0) {
     double largest_change = ts*(alphaH*nH*(std::pow(1.- old_xn,2.0)) - old_xn*jH - gammaH*nH*old_xn*(1.-old_xn));
-    std::cout << ts << " timestep " << std::endl;
-    std::cout <<  "largestchange = " << largest_change << " old_xn = " << old_xn << " new xn = " << xn <<  std::endl;
     if (largest_change > 0 && xn < old_xn) {
       // this is a problem...
       cmac_error("Numerical is net recombining, but xn is lower than last step.")

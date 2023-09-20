@@ -98,6 +98,8 @@ private:
    *  is in the form of C++). */
   double _ionic_fractions[NUMBER_OF_IONNAMES];
 
+  double _prev_ionic_fractions[NUMBER_OF_IONNAMES];
+
   /*! @brief Mean intensity integrals of ionizing radiation (without
    *  normalization factor, in m^3). */
   double _mean_intensity[NUMBER_OF_IONNAMES];
@@ -134,6 +136,7 @@ public:
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = 0.;
       _mean_intensity[i] = 0.;
+      _prev_ionic_fractions[i] = 0;
     }
     for (int_fast32_t i = 0; i < NUMBER_OF_REEMISSIONPROBABILITIES; ++i) {
       _reemission_probabilities[i] = 0.;
@@ -170,6 +173,7 @@ public:
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = other._ionic_fractions[i];
       _mean_intensity[i] = other._mean_intensity[i];
+      _prev_ionic_fractions[i] = other._prev_ionic_fractions[i];
 #ifdef DO_OUTPUT_COOLING
       _cooling[i] = other._cooling[i];
 #endif
@@ -195,6 +199,7 @@ public:
   inline void copy_ionic_fractions(const IonizationVariables &other) {
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = other._ionic_fractions[i];
+      _prev_ionic_fractions[i] = other._ionic_fraction[i];
     }
     _temperature = other._temperature;
   }
@@ -283,6 +288,11 @@ public:
     return _ionic_fractions[ion];
   }
 
+
+    inline double get_prev_ionic_fraction(const int_fast32_t ion) const {
+    return _prev_ionic_fractions[ion];
+  }
+
   /**
    * @brief Set the ionic fraction of the ion with the given name.
    *
@@ -292,6 +302,12 @@ public:
   inline void set_ionic_fraction(const int_fast32_t ion,
                                  const double ionic_fraction) {
     _ionic_fractions[ion] = ionic_fraction;
+  }
+
+
+    inline void set_prev_ionic_fraction(const int_fast32_t ion,
+                                 const double ionic_fraction) {
+    _prev_ionic_fractions[ion] = ionic_fraction;
   }
 
   /**
@@ -440,6 +456,7 @@ public:
     restart_writer.write(_temperature);
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       restart_writer.write(_ionic_fractions[i]);
+      restart_writer.write(_prev_ionic_fractions[i]);
       restart_writer.write(_mean_intensity[i]);
 #ifdef DO_OUTPUT_COOLING
       restart_writer.write(_cooling[i]);
@@ -465,6 +482,7 @@ public:
     _temperature = restart_reader.read< double >();
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = restart_reader.read< double >();
+      _prev_ionic_fractions[i] = restart_reader.read< double >();
       _mean_intensity[i] = restart_reader.read< double >();
 #ifdef DO_OUTPUT_COOLING
       _cooling[i] = restart_reader.read< double >();

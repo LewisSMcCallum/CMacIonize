@@ -1850,6 +1850,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               if (this_igrid < grid_creator->number_of_actual_subgrids()) {
                 auto gridit = grid_creator->get_subgrid(this_igrid);
                 (*gridit).reset_intensities();
+                if (iloop = 0) {
+                  // if first loop, set previous 
+                  for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
+                     ++cellit) {
+                    cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction());
+                  }
+                }
               }
             }
             stop_parallel_timing_block();
