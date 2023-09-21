@@ -916,14 +916,14 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
       // we are recombining
       if ((xn-old_xn) > largest_change) {
         //we have over-recombined, add limiter by implementing numerical time dependence
-        std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
+        //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
         xn = old_xn + largest_change;
         
       }
     } else if (largest_change < 0) {
       // we are ionizing 
       if ((xn - old_xn) < largest_change) {
-        std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
+       // std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
         // we have over-ionized for this time, implement limiter
         xn = old_xn + largest_change;
       }
