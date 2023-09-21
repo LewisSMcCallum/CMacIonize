@@ -1091,11 +1091,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   const bool _throttle_ion_state = params->get_value< bool >(
      "TaskBasedRadiationHydrodynamicsSimulation:throttle ion state", false);
+    
+  double maximum_neutral_fraction;
 
   if (_throttle_ion_state) {
-    const double maximum_neutral_fraction = -1;
+    maximum_neutral_fraction = -1;
   } else {
-      const double maximum_neutral_fraction = params->get_value< double >(
+      maximum_neutral_fraction = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
       -1.);
   }
