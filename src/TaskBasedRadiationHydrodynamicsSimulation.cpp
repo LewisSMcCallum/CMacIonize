@@ -2160,7 +2160,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
               }     
-              }
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime);
             }
