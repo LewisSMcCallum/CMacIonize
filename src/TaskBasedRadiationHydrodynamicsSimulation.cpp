@@ -1864,7 +1864,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                       if (_throttle_ion_state) {
                         cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
                       } else {
-                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.)
+                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                       }
                     
                   }
