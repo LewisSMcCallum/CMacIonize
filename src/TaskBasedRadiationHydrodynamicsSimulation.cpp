@@ -2152,11 +2152,14 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             if (this_igrid < grid_creator->number_of_original_subgrids()) {
               auto gridit = grid_creator->get_subgrid(this_igrid);
               (*gridit).reset_intensities();
+              for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
+                    ++cellit) {
               if (_throttle_ion_state) {
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
               } else {
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
+              }     
               }
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime);
