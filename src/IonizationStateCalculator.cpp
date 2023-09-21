@@ -902,7 +902,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   }
 
 
-  if (ts > 0.0) {
+  if ((ts > 0.0) & (old_xn > -0.5)) {
     double largest_change = ts*(alphaH*nH*(std::pow(1.- old_xn,2.0)) - old_xn*jH - gammaH*nH*old_xn*(1.-old_xn));
     if (largest_change > 0 && xn < old_xn) {
       // this is a problem...

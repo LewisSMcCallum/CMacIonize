@@ -1091,6 +1091,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
       -1.);
 
+  const bool _throttle_ion_state = params->get_value< bool >(
+     "TaskBasedRadiationHydrodynamicsSimulation:throttle ion state", false);
+
+  if (_throttle_ion_state) {
+    maximum_neutral_fraction = -1;
+  }
+
   const size_t number_of_buffers = params->get_value< size_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of buffers", 50000);
   const size_t queue_size_per_thread = params->get_value< size_t >(
@@ -1854,7 +1861,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   // if first loop, set previous 
                   for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
                      ++cellit) {
-                    cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+                      if (_throttle_ion_state) {
+                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+                      } else {
+                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.)
+                      }
+                    
                   }
                 }
               }
