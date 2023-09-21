@@ -1087,15 +1087,17 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     hydro_lastrad = restart_reader->read< uint_fast32_t >();
   }
 
-  const double maximum_neutral_fraction = params->get_value< double >(
-      "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
-      -1.);
+
 
   const bool _throttle_ion_state = params->get_value< bool >(
      "TaskBasedRadiationHydrodynamicsSimulation:throttle ion state", false);
 
   if (_throttle_ion_state) {
-    maximum_neutral_fraction = -1;
+    const double maximum_neutral_fraction = -1;
+  } else {
+      const double maximum_neutral_fraction = params->get_value< double >(
+      "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
+      -1.);
   }
 
   const size_t number_of_buffers = params->get_value< size_t >(
