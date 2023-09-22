@@ -710,6 +710,24 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
   }
 
 
+  if ((jH > 0 ) && (jHe ==0) && (gammaHe1 < 1e-25)) {
+    he0 = 0.9999;
+    hep = 0.0001;
+    double hepp = 0.0;
+
+
+    double ne = nH*(1 - h0) + 2*hepp*AHe*nH + hep*AHe*nH;
+    // calculate a new guess for C_H
+    double pHots = 1. / (1. + 77. * he0 / std::sqrt(T) / h0old);
+
+    double ots = AHe*ne*hep*pHots*alpha_e_2sP;
+
+    h0 = (ne*alphaH - ots)/(jH + ne*alphaH + ne*gammaH);
+    return;
+
+  }
+
+
 
 
 
@@ -787,11 +805,6 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     hep = (1.0 - he0 - hepp);
 
 
-    if (he0 > 0.999) {
-      he0 = 0.999;
-      hep = 0.001;
-      hepp = 0.0;
-    }
 
     double ne = nH*(1 - h0) + 2*hepp*AHe*nH + hep*AHe*nH;
 
