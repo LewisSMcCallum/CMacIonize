@@ -858,13 +858,7 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     std::cout << h0 << " " << he0 << std::endl;
     cmac_error("SHTAP");
   }
-    if ((h0 < 0.1) & (nH > 30.*1.e6)){
-    std::cout << alphaH << " " << alphaHe << " " << alphaHe2 << " " << gammaH << " " << gammaHe1 << " " << gammaHe2 << std::endl;
-    std::cout << jH << " " << jHe << std::endl;
-    std::cout << T << " " << nH << std::endl;
-    std::cout << h0 << " " << he0 << std::endl;
-    cmac_error("Found an offender.");
-  }
+
 
 }
 
