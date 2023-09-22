@@ -807,8 +807,8 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
       h0 = 0.5 * (h0 + h0old);
       he0 = 0.5 * (he0 + he0old);
     }
-    if (niter > 100) {
-      if (h0 < 1e-6) {
+    if (niter > 200) {
+      if (h0 < 1e-6 & false) {
         break;
       } else {
         std::cout << "UH OH " << std::endl;
