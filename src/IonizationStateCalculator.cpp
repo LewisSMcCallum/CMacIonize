@@ -782,7 +782,7 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     he0 = (-1.0*Ehe - std::sqrt(Ehe * Ehe - 4. * Dhe*Fhe)) /
           (2. * Dhe);
 
-    const double hepp = (1.0-he0)*gammaHe2/(alphaHe2+gammaHe2);
+    double hepp = (1.0-he0)*gammaHe2/(alphaHe2+gammaHe2);
 
     hep = (1.0 - he0 - hepp);
 
