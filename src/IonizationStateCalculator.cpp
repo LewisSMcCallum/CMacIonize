@@ -711,6 +711,8 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
 
 
 
+
+
   // make sure the input to this function is physical
   cmac_assert(alphaH >= 0.);
   cmac_assert(alphaHe >= 0.);
@@ -783,6 +785,13 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     const double hepp = (1.0-he0)*gammaHe2/(alphaHe2+gammaHe2);
 
     hep = (1.0 - he0 - hepp);
+
+
+    if (he0 > 0.999) {
+      he0 = 0.999;
+      hep = 0.001;
+      hepp = 0.0;
+    }
 
     double ne = nH*(1 - h0) + 2*hepp*AHe*nH + hep*AHe*nH;
 
