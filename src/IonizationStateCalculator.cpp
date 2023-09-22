@@ -720,6 +720,8 @@ void IonizationStateCalculator::compute_ionization_states_hydrogen_helium(
     // calculate a new guess for C_H
     double pHots = 1. / (1. + 77. * he0 / std::sqrt(T) / h0old);
 
+    double alpha_e_2sP = 4.17e-20 * std::pow(T * 1.e-4, -0.861);
+
     double ots = AHe*ne*hep*pHots*alpha_e_2sP;
 
     h0 = (ne*alphaH - ots)/(jH + ne*alphaH + ne*gammaH);
