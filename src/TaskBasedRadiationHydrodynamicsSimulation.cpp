@@ -1102,6 +1102,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       -1.);
   }
 
+  const bool _ion_every_hydro = params->get_value <bool > (
+     "TaskBasedRadiationHydrodynamicsSimulation:ion every hydro", false);
+
   const size_t number_of_buffers = params->get_value< size_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of buffers", 50000);
   const size_t queue_size_per_thread = params->get_value< size_t >(
@@ -2079,8 +2082,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   }
                 }
 #endif
-                temperature_calculator->calculate_temperature(iloop, numphoton,
+            if (!_ion_every_hydro) {
+              temperature_calculator->calculate_temperature(iloop, numphoton,
                                                               *gridit, hydro_radtime);
+            }
+                
                 task.stop();
                 cpucycle_tick(task_stop);
                 active_time[get_thread_index()] += task_stop - task_start;
@@ -2125,8 +2131,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
               }
-              temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,hydro_radtime);
+              if (!_ion_every_hydro) {
+                temperature_calculator->calculate_temperature(0, 0,
+                                        *gridit,hydro_radtime);
+
+              }
+
             }
           }
           stop_parallel_timing_block();
@@ -2159,9 +2169,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               } else {
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
-              }     
-              temperature_calculator->calculate_temperature(0, 0,
+              }   
+              if (!_ion_every_hydro) {
+                              temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime);
+              }  
+
             }
           }
           stop_parallel_timing_block();
@@ -2416,6 +2429,35 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       sourcedistribution->float_sources(grid_creator,actual_timestep);
       sourcedistribution->accrete_gas(grid_creator,hydro);
     }
+
+
+    if (_ion_every_hydro) {
+      AtomicValue< size_t > igrid(0);
+      start_parallel_timing_block();
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+      while (igrid.value() <
+                grid_creator->number_of_original_subgrids()) {
+          const size_t this_igrid = igrid.post_increment();
+        if (this_igrid < grid_creator->number_of_original_subgrids()) {
+        auto gridit = grid_creator->get_subgrid(this_igrid); 
+        if (sourcedistribution == nullptr) {
+                        temperature_calculator->calculate_temperature(0, 0,
+                                    *gridit,actual_timestep);
+        } else if (sourcedistribution->get_total_luminosity() > 0) {
+                temperature_calculator->calculate_temperature(0, sourcedistribution->get_total_luminosity(),
+                          *gridit,actual_timestep);
+        } else {
+          temperature_calculator->calculate_temperature(0, 0,
+              *gridit,actual_timestep);
+        }
+        }
+      }    
+    }
+
+
+
 
     cpucycle_tick(iteration_end);
 
