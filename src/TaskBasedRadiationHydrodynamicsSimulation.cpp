@@ -2448,7 +2448,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         } else if (sourcedistribution->get_total_luminosity() > 0) {
                 temperature_calculator->calculate_temperature(0, sourcedistribution->get_total_luminosity(),
                           *gridit,actual_timestep);
-        std::cout << "UPDATED ION STATE" << std::endl;
         } else {
           temperature_calculator->calculate_temperature(0, 0,
               *gridit,actual_timestep);
