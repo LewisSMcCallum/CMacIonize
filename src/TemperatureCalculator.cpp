@@ -1084,3 +1084,35 @@ void TemperatureCalculator::calculate_temperature(
     _ionization_state_calculator.calculate_ionization_state(totweight, subgrid, timestep);
   }
 }
+
+
+void TemperatureCalculator::quick_ion_calc(const double totweight, DensitySubGrid &subgrid, double timestep) const {
+  
+#ifdef HAS_HELIUM
+  cmac_error("QUICK CALC NOT IMPLEMENTED FOR HELIUM. TURN OFF ION EVERY HYDRO.");
+#endif
+     
+
+    for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
+
+      IonizationVariables &ionization_variables = cellit.get_ionization_variables();
+    
+      const double jfac = _luminosity / totweight/cellit.get_volume();
+
+      const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
+      
+
+
+      const double ntot = ionization_variables.get_number_density();
+      const double T = ionization_variables.get_temperature();
+      const double alphaH =
+        _recombination_rates.get_recombination_rate(ION_H_n, T);
+      const double gammaH =
+        _collisional_rates.get_collisional_rate(ION_H_n, T);
+      const double prev = ionization_variables.get_prev_ionic_fraction(ION_H_n);
+      double h0 = _ionization_state_calculator.compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, prev, timestep);
+      ionization_variables.set_ionic_fraction(ION_H_n,h0);
+    }
+
+
+}

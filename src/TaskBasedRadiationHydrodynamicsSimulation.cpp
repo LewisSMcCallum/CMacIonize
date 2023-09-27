@@ -2452,13 +2452,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                     
         }
         if (sourcedistribution == nullptr) {
-                        temperature_calculator->calculate_temperature(0, 0,
+                        temperature_calculator->quick_ion_calc(0,
                                     *gridit,actual_timestep);
         } else if (sourcedistribution->get_total_luminosity() > 0) {
-                temperature_calculator->calculate_temperature(0, sourcedistribution->get_total_luminosity(),
+                temperature_calculator->quick_ion_calc(sourcedistribution->get_total_luminosity(),
                           *gridit,actual_timestep);
         } else {
-          temperature_calculator->calculate_temperature(0, 0,
+          temperature_calculator->quick_ion_calc(0,
               *gridit,actual_timestep);
         }
         }
