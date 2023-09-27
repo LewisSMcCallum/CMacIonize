@@ -215,6 +215,10 @@ public:
 
   void calculate_temperature(const uint_fast32_t loop, const double totweight,
                              DensitySubGrid &subgrid, double timestep) const;
+                        
+
+  void quick_ion_calc(const double totweight, 
+                                              DensitySubGrid &subgrid, double timestep) const;
 };
 
 #endif // TEMPERATURECALCULATOR_HPP
