@@ -2441,7 +2441,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 grid_creator->number_of_original_subgrids()) {
           const size_t this_igrid = igrid.post_increment();
         if (this_igrid < grid_creator->number_of_original_subgrids()) {
-        auto gridit = grid_creator->get_subgrid(this_igrid); 
+        auto gridit = grid_creator->get_subgrid(this_igrid);                  
+        for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
+            ++cellit) {
+          if (_throttle_ion_state) {
+            cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+          } else {
+            cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
+          }
+                    
+        }
         if (sourcedistribution == nullptr) {
                         temperature_calculator->calculate_temperature(0, 0,
                                     *gridit,actual_timestep);
