@@ -792,7 +792,7 @@ public:
           }
         }
       }
-      if (_number_of_updates == 1) {
+      if (_number_of_updates == 0) {
           init_running_mass = running_mass;
       }
 
