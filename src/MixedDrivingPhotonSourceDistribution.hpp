@@ -792,7 +792,7 @@ public:
           }
         }
       }
-      if (_number_of_updates == 0) {
+      if (_number_of_updates == 1) {
           init_running_mass = running_mass;
       }
 
@@ -928,6 +928,7 @@ public:
 
         _last_sf = _total_time;
         updated = true;
+        ++_number_of_updates;
     }
 
 
@@ -942,7 +943,7 @@ public:
         _output_file->flush();
       }
 
-      ++_number_of_updates;
+      
 
 
 
