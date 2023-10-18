@@ -38,6 +38,7 @@ class ParameterFile;
 class PhotonSourceSpectrum;
 class RestartWriter;
 class RestartReader;
+class SupernovaHandler;
 
 
 /**
@@ -79,6 +80,7 @@ private:
 
   /*! @brief Total luminosity of all sources in the snapshot file (in s^-1). */
   double _total_luminosity;
+  SupernovaHandler *novahandler;
 
 
 
@@ -97,11 +99,6 @@ public:
   virtual double get_total_luminosity() const;
   virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index);
   virtual void write_restart_file(RestartWriter &restart_writer) const;
-
-  virtual double get_r_inj(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                         CoordinateVector<> sne_loc);
-  virtual double get_r_st(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                 CoordinateVector<> sne_loc, double r_inj);
   virtual bool do_stellar_feedback(const double current_time) const;
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator);
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro);

@@ -34,6 +34,7 @@
 #include "RestartReader.hpp"
 #include "RestartWriter.hpp"
 #include "DensitySubGridCreator.hpp"
+#include "SupernovaHandler.hpp"
 
 /**
  * @brief Constructor.
@@ -120,6 +121,9 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
   HDF5Tools::close_file(file);
 
 
+  novahandler = new SupernovaHandler(1.e44);
+
+
   for (size_t i = 0; i < positions.size(); ++i) {
     CoordinateVector<> position = positions[i];
     if (box.inside(position)) {
@@ -184,7 +188,8 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
                     "SimulationBox:sides")),
           params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:update interval", "0.05 Myr"),
           params.get_value<bool>("PhotonSourceDistribution:has lifetimes", false),
-          log) {}
+          log) {
+          }
 
 /**
  * @brief Get the number of sources in the snapshot file.
@@ -286,79 +291,12 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,nullptr));
     _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,nullptr));
+
+    novahandler = new SupernovaHandler(1.e44);
   }
 
-//BELOW IS SNE RELATED STUFF, SHOULD DEFO MAKE AN OBJECT TO HANDLE THIS ALL....
-
-    double HDF5PhotonSourceDistribution::get_r_inj(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                         CoordinateVector<> sne_loc) {
 
 
-
-      HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(sne_loc);
-
-      double cell_vol =  subgrid.get_cell(sne_loc).get_volume();
-
-
-      double dx = std::pow(cell_vol,1./3.);
-
-      double r_run = 4*dx;
-
-
-      std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
-
-
-      vec = grid_creator->cells_within_radius(sne_loc,r_run);
-
-
-      double mtot = 0.0;
-      for (auto & pair : vec) {
-        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-        mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-
-      }
-      if (mtot > 1.988e+33) {
-        _num_cells_injected.push_back(268);
-        return r_run;
-      }
-
-      while (mtot < 1.988e+33) {
-        r_run = r_run+(0.25*dx);
-        vec = grid_creator->cells_within_radius(sne_loc,r_run);
-        mtot = 0.0;
-        for (auto & pair : vec) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-          double cell_mass = (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-          mtot = mtot + cell_mass;
-        }
-      }
-      _num_cells_injected.push_back(vec.size());
-      return r_run;
-
-   }
-
-   double HDF5PhotonSourceDistribution::get_r_st(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                 CoordinateVector<> sne_loc, double r_inj) {
-
-       std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
-
-        vec = grid_creator->cells_within_radius(sne_loc,r_inj);
-        double mtot = 0.0;
-        for (auto & pair : vec) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-          mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-        }
-
-        double inj_vol = 1.3333*3.14159265*std::pow(r_inj,3.0);
-        double rho = mtot/inj_vol;
-        double nbar = 1.e-6*rho/1.67262192e-27;
-        _nbar.push_back(nbar);
-
-        double r_st = 3.086e+16 * 19.1 * std::pow(1.e44*1.e-44,5./17.) * std::pow(nbar,-7./17);
-
-        return r_st;
-
-      }
 
 
  bool HDF5PhotonSourceDistribution::do_stellar_feedback(const double current_time) const {
@@ -367,17 +305,19 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
 
 
-  void HDF5PhotonSourceDistribution::get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
+   void HDF5PhotonSourceDistribution::get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 
        for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
 
-         double r_inj = get_r_inj(&grid_creator,_to_do_feedback[i]);
+        double r_inj,r_st,nbar,num_inj;
 
-         double r_st = get_r_st(&grid_creator,_to_do_feedback[i],r_inj);
 
+        std::tie(r_inj,r_st,nbar,num_inj) = novahandler->get_r_inj(&grid_creator,_to_do_feedback[i]);
 
          _r_inj.push_back(r_inj);
          _r_st.push_back(r_st);
+         _nbar.push_back(nbar);
+         _num_cells_injected.push_back(num_inj);
 
 
        }
@@ -391,61 +331,12 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
     for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
 
-      for (auto cellit = subgrid.hydro_begin();
-           cellit != subgrid.hydro_end(); ++cellit) {
-
-           CoordinateVector<> cellpos = cellit.get_cell_midpoint();
-
-           if (cellit.get_hydro_variables().get_primitives_density() == 0) {
-             //dont add energy to cell without mass...
-             continue;
-           }
-
-          // is cell within injeciton radius of SNe?
-           if ((cellpos - _to_do_feedback[i]).norm() < _r_inj[i]) {
 
 
-             double dx = std::pow(cellit.get_volume(),1./3.);
-             if (_r_st[i] < 4.*dx) {
+
+      novahandler->inject_sne(subgrid, hydro, _to_do_feedback[i], _r_inj[i],_r_st[i],_nbar[i],_num_cells_injected[i]);
 
 
-              CoordinateVector<> vel_prior =
-                       cellit.get_hydro_variables().get_primitives_velocity();
-
-               // Blondin et al
-               double mom_to_inj = 2.6e5*std::pow(_nbar[i],-2./17) * std::pow(1.e44*1.e-44,16./17.);
-               // Msol km/s to kg m/s
-               mom_to_inj = mom_to_inj * 2.e30 * 1.e3;
-
-               double m_tot = (_nbar[i]*1e6*1.67e-27)*(4.*3.14159265*std::pow(_r_inj[i],3)/3.);
-
-               double vel_to_inj = mom_to_inj/m_tot;
-
-               CoordinateVector<> direction = (cellpos-_to_do_feedback[i])/((cellpos-_to_do_feedback[i]).norm());
-
-               CoordinateVector<> vel_new = vel_prior + vel_to_inj*direction;
-
-               cellit.get_hydro_variables().set_primitives_velocity(vel_new);
-
-               double density = cellit.get_hydro_variables().get_primitives_density();
-
-               double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
-
-               double pressure = 8254.397014*1.e4*density*2./(1.+xH);
-
-               cellit.get_ionization_variables().set_temperature(1.e4);
-
-               cellit.get_hydro_variables().set_primitives_pressure(pressure);
-
-               hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
-
-             }
-             else {
-               cellit.get_hydro_variables().set_energy_term(1.e44/_num_cells_injected[i]);
-             }
-           }
-
-        }
     }
   }
 

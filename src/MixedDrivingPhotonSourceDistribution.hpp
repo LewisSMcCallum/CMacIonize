@@ -406,8 +406,7 @@ public:
 
 
 
-      novahandler->inject_sne(subgrid, hydro, _to_do_feedback[i],
-        _r_inj[i],_r_st[i],_nbar[i],_num_cells_injected[i]);
+      novahandler->inject_sne(subgrid, hydro, _to_do_feedback[i], _r_inj[i],_r_st[i],_nbar[i],_num_cells_injected[i]);
 
 
     }
