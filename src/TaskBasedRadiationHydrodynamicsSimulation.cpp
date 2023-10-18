@@ -1713,6 +1713,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                         ".");
     }
 
+
     // decide whether or not to do the radiation step
     if (do_radiation &&
         (hydro_radtime < 0. ||
@@ -1730,72 +1731,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       }
 
       ++hydro_lastrad;
-      // update the PhotonSource
 
-      if (sourcedistribution != nullptr) {
-
-
-      if (sourcedistribution->update(grid_creator)) {
-
-        time_logger.start("source update");
-
-        temperature_calculator->update_luminosity(
-            sourcedistribution->get_total_luminosity());
-
-        if (log) {
-          log->write_status("Updating subgrid copy hierarchy after source "
-                            "distribution change...");
-        }
-
-        // update subgrid copies
-        std::vector< uint_fast8_t > levels(
-            grid_creator->number_of_original_subgrids(), 0);
-
-        // set the copy level off all subgrids containing a source to the given
-        // parameter value (for now)
-        {
-          const photonsourcenumber_t number_of_sources =
-              sourcedistribution->get_number_of_sources();
-          for (photonsourcenumber_t isource = 0; isource < number_of_sources;
-               ++isource) {
-            const CoordinateVector<> position =
-                sourcedistribution->get_position(isource);
-            DensitySubGridCreator< HydroDensitySubGrid >::iterator gridit =
-                grid_creator->get_subgrid(position);
-            levels[gridit.get_index()] = source_copy_level;
-          }
-        }
-
-        // impose copy restrictions
-        {
-          uint_fast8_t max_level = 0;
-          const size_t levelsize = levels.size();
-          for (size_t i = 0; i < levelsize; ++i) {
-            max_level = std::max(max_level, levels[i]);
-          }
-
-          size_t ngbs[6];
-          while (max_level > 0) {
-            for (size_t i = 0; i < levelsize; ++i) {
-              if (levels[i] == max_level) {
-                const uint_fast8_t numngbs =
-                    grid_creator->get_neighbours(i, ngbs);
-                for (uint_fast8_t ingb = 0; ingb < numngbs; ++ingb) {
-                  const size_t ngbi = ngbs[ingb];
-                  if (levels[ngbi] < levels[i] - 1) {
-                    levels[ngbi] = levels[i] - 1;
-                  }
-                }
-              }
-            }
-            --max_level;
-          }
-        }
-        grid_creator->update_copies(levels);
-
-        time_logger.end("source update");
-      }
-    }
     if(sourcedistribution != nullptr) {
 
       if (sourcedistribution->get_total_luminosity() > 0.) {
@@ -2542,6 +2478,74 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     time_logger.start("task cleanup");
     tasks->clear_after(radiation_task_offset);
     time_logger.end("task cleanup");
+
+
+      // update the PhotonSource
+
+      if (sourcedistribution != nullptr) {
+
+
+      if (sourcedistribution->update(grid_creator,actual_timestep)) {
+
+        time_logger.start("source update");
+
+        temperature_calculator->update_luminosity(
+            sourcedistribution->get_total_luminosity());
+
+        if (log) {
+          log->write_status("Updating subgrid copy hierarchy after source "
+                            "distribution change...");
+        }
+
+        // update subgrid copies
+        std::vector< uint_fast8_t > levels(
+            grid_creator->number_of_original_subgrids(), 0);
+
+        // set the copy level off all subgrids containing a source to the given
+        // parameter value (for now)
+        {
+          const photonsourcenumber_t number_of_sources =
+              sourcedistribution->get_number_of_sources();
+          for (photonsourcenumber_t isource = 0; isource < number_of_sources;
+               ++isource) {
+            const CoordinateVector<> position =
+                sourcedistribution->get_position(isource);
+            DensitySubGridCreator< HydroDensitySubGrid >::iterator gridit =
+                grid_creator->get_subgrid(position);
+            levels[gridit.get_index()] = source_copy_level;
+          }
+        }
+
+        // impose copy restrictions
+        {
+          uint_fast8_t max_level = 0;
+          const size_t levelsize = levels.size();
+          for (size_t i = 0; i < levelsize; ++i) {
+            max_level = std::max(max_level, levels[i]);
+          }
+
+          size_t ngbs[6];
+          while (max_level > 0) {
+            for (size_t i = 0; i < levelsize; ++i) {
+              if (levels[i] == max_level) {
+                const uint_fast8_t numngbs =
+                    grid_creator->get_neighbours(i, ngbs);
+                for (uint_fast8_t ingb = 0; ingb < numngbs; ++ingb) {
+                  const size_t ngbi = ngbs[ingb];
+                  if (levels[ngbi] < levels[i] - 1) {
+                    levels[ngbi] = levels[i] - 1;
+                  }
+                }
+              }
+            }
+            --max_level;
+          }
+        }
+        grid_creator->update_copies(levels);
+
+        time_logger.end("source update");
+      }
+    }    
 
 
     if (sourcedistribution != nullptr) {

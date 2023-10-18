@@ -81,6 +81,9 @@ private:
 
 
 
+
+
+
   std::vector< CoordinateVector<> > _to_do_feedback;
 
   std::vector< double > _r_inj;
@@ -116,6 +119,13 @@ private:
   uint_fast32_t _number_of_holmes;
 
   int type1done = 0;
+
+
+  double _total_time = 0.;
+
+  bool _holmes_added = false;
+
+  double _last_sf = 0.;
 
   RandomGenerator _random_generator;
 
@@ -618,9 +628,12 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) override {
+   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
 
-    double total_time = _number_of_updates*_update_interval;
+    _total_time += actual_timestep;
+
+
+    bool updated = false;
 
 
 
@@ -629,11 +642,11 @@ public:
     // clear out sources which no longer exist and add them to SNe todo list
     size_t i = 0;
     while (i < _source_lifetimes.size()) {
-      _source_lifetimes[i] -= _update_interval;
+      _source_lifetimes[i] -= actual_timestep;
       if (_source_lifetimes[i] <= 0.) {
         // remove the element
         if (_output_file != nullptr) {
-          *_output_file << total_time << "\t0.\t0.\t0.\t2\t"
+          *_output_file << _total_time << "\t0.\t0.\t0.\t2\t"
                         << _source_indices[i] << "\t0\t0\tSNe\n";
           _source_indices.erase(_source_indices.begin() + i);
         }
@@ -643,6 +656,7 @@ public:
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _source_luminosities.erase(_source_luminosities.begin() + i);
         _num_sne = _num_sne + 1;
+        updated = true;
 
 
 
@@ -670,7 +684,7 @@ public:
     double area_kpc = _sides_x*_sides_y/(3.086e+19)/(3.086e+19);
 
 
-    int should_have_done = int(4*area_kpc*total_time/3.15576e13);
+    int should_have_done = int(4*area_kpc*_total_time/3.15576e13);
 
     int do_type1 = should_have_done-type1done;
 
@@ -696,9 +710,8 @@ public:
   }
 
 
-    uint_fast32_t to_add_holmes = int(_holmes_time/_update_interval);
 
-    if (_number_of_updates == to_add_holmes) {
+    if ((_total_time > _holmes_time) && (!_holmes_added)) {
 
       for (uint_fast32_t i=0; i<_number_of_holmes; ++i) {
 
@@ -727,7 +740,7 @@ public:
           _source_indices.push_back(_next_index);
           ++_next_index;
           const CoordinateVector<> &pos = _source_positions.back();
-          *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
+          *_output_file << _total_time << "\t" << pos.x() << "\t" << pos.y()
                         << "\t" << pos.z() << "\t1\t"
                         << _source_indices.back() << "\t"
                         << _source_luminosities.back() << "\t"
@@ -735,8 +748,12 @@ public:
         }
 
       }
+      _holmes_added = true;
+      updated = true;
     }
 
+
+    if (_total_time - _last_sf > _update_interval) {
 
 
 
@@ -797,7 +814,7 @@ public:
 
       if (_output_file2 != nullptr) {
         double totallum = get_total_luminosity();
-        *_output_file2 << total_time << "\t" << totallum << "\t" << _num_sne << "\t" << _star_formation_rate*std::pow(running_mass/init_running_mass,1.4) << "\n";
+        *_output_file2 << _total_time << "\t" << totallum << "\t" << _num_sne << "\t" << _star_formation_rate*std::pow(running_mass/init_running_mass,1.4) << "\n";
         _output_file2->flush();
 
       }
@@ -889,7 +906,7 @@ public:
           _source_indices.push_back(_next_index);
           ++_next_index;
           const CoordinateVector<> &pos = _source_positions.back();
-          *_output_file << total_time << "\t" << pos.x() << "\t" << pos.y()
+          *_output_file << _total_time << "\t" << pos.x() << "\t" << pos.y()
                         << "\t" << pos.z() << "\t1\t"
                         << _source_indices.back() << "\t"
                         << _source_luminosities.back() << "\t"
@@ -909,6 +926,11 @@ public:
 
       }
 
+        _last_sf = _total_time;
+        updated = true;
+        ++_number_of_updates;
+    }
+
 
 
 
@@ -921,11 +943,11 @@ public:
         _output_file->flush();
       }
 
-      ++_number_of_updates;
+      
 
 
 
-    return true;
+    return updated;
   }
 
 
@@ -951,6 +973,9 @@ public:
     restart_writer.write(_holmes_lum);
     restart_writer.write(_number_of_holmes);
     restart_writer.write(type1done);
+    restart_writer.write(_total_time);
+    restart_writer.write(_holmes_added);
+    restart_writer.write(_last_sf);
     _random_generator.write_restart_file(restart_writer);
     {
       const auto size = _source_positions.size();
@@ -1014,6 +1039,9 @@ public:
         _holmes_lum(restart_reader.read<double>()),
         _number_of_holmes(restart_reader.read<uint_fast32_t>()),
         type1done(restart_reader.read<int>()),
+        _total_time(restart_reader.read<double>()),
+        _holmes_added(restart_reader.read<bool>()),
+        _last_sf(restart_reader.read<double>()),
         _random_generator(restart_reader) {
 
     {
