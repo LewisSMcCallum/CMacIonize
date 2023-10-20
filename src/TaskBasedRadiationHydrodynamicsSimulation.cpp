@@ -2361,7 +2361,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
     time_logger.end("hydro");
 
-    if (log) {
+    if (log & false) {
       const uint_fast64_t total_interval = iteration_end - iteration_start;
       log->write_status("Thread activity level:");
       for (int_fast32_t ithread = 0; ithread < num_thread; ++ithread) {

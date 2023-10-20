@@ -35,6 +35,7 @@
 #include "PhotonSourceDistribution.hpp"
 #include "RestartReader.hpp"
 #include "RestartWriter.hpp"
+#include "SupernovaHandler.hpp"
 
 /**
  * @brief PhotonSourceDistribution without UV sources that mimicks a single
@@ -67,80 +68,7 @@ private:
 
   double _num_cells_injected;
 
-  double get_r_inj(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                         CoordinateVector<> sne_loc) {
-
-
-
-      HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(sne_loc);
-
-      double cell_vol =  subgrid.get_cell(sne_loc).get_volume();
-
-
-      double dx = std::pow(cell_vol,1./3.);
-
-      double r_run = 4*dx;
-
-      std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
-
-
-      vec = grid_creator->cells_within_radius(sne_loc,r_run);
-
-
-
-      _num_cells_injected = 33510.32;
-      return 1.57e17;
-
-      double mtot = 0.0;
-      for (auto & pair : vec) {
-        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-        mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-
-      }
-      if (mtot > 1.988e+33) {  // 1.988e+33
-        _num_cells_injected = 268;
-        return r_run;
-      }
-
-      while (mtot < 1.988e+33) {   // 1.988e+33
-        r_run = r_run+(0.25*dx);
-        vec = grid_creator->cells_within_radius(sne_loc,r_run);
-        mtot = 0.0;
-        for (auto & pair : vec) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-          double cell_mass = (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-          mtot = mtot + cell_mass;
-        }
-      }
-      _num_cells_injected = vec.size();
-
-
-      return r_run;
-
-   }
-
-   double get_r_st(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                 CoordinateVector<> sne_loc, double r_inj) {
-
-       std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
-
-        vec = grid_creator->cells_within_radius(sne_loc,r_inj);
-        double mtot = 0.0;
-        for (auto & pair : vec) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-          mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-        }
-
-        double inj_vol = 1.3333*3.14159265*std::pow(r_inj,3.0);
-        double rho = mtot/inj_vol;
-        double nbar = 1.e-6*rho/1.67262192e-27;
-        _nbar = nbar;
-
-        double r_st = 3.086e+16 * 19.1 * std::pow(_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
-
-        return r_st;
-
-      }
+  SupernovaHandler *novahandler;
 
 public:
   /**
@@ -158,6 +86,9 @@ public:
       const double luminosity, const double energy, Log *log = nullptr)
       : _position(position), _lifetime(lifetime), _luminosity(luminosity),
         _energy(energy), _has_exploded(false),_inform_dist(false) {
+
+
+      novahandler = new SupernovaHandler(_energy);
 
 
 
@@ -271,20 +202,7 @@ public:
     }
   }
 
-  /**
-   * @brief Add stellar feedback at the given time.
-   *
-   * @param grid DensityGrid to operate on.
-   * @param time Current simulation time (in s).
-   */
-  virtual void add_stellar_feedback(DensityGrid &grid, const double time) {
 
-    if (!_has_exploded && time >= _lifetime) {
-      DensityGrid::iterator cell = grid.get_cell(_position);
-      cell.get_hydro_variables().set_energy_term(_energy);
-      _has_exploded = true;
-    }
-  }
 
   /**
    * @brief Will the distribution do stellar feedback at the given time?
@@ -305,112 +223,31 @@ public:
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 
 
-         double r_inj = get_r_inj(&grid_creator,_position);
 
-         double r_st = get_r_st(&grid_creator,_position,r_inj);
+        double r_inj,r_st,nbar,num_inj;
 
 
-         _r_inj= r_inj;
+        std::tie(r_inj,r_st,nbar,num_inj) = novahandler->get_r_inj(&grid_creator,_position);
+
+         _r_inj=r_inj;
          _r_st = r_st;
+         _nbar = nbar;
+         _num_cells_injected = num_inj;
 
 
-
-
+       
   }
-  /**
-   * @brief Add stellar feedback to the given subgrid.
-   *
-   * Should only be called if add_stellar_feedback is called first.
-   *
-   * @param subgrid DensitySubGrid to operate on.
-   */
-   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro) {
 
 
 
-       for (auto cellit = subgrid.hydro_begin();
-            cellit != subgrid.hydro_end(); ++cellit) {
-            CoordinateVector<> cellpos = cellit.get_cell_midpoint();
-
-            if (cellit.get_hydro_variables().get_primitives_density() == 0) {
-              //dont add energy to cell without mass...
-              continue;
-            }
-            cmac_assert_message(cellit.get_hydro_variables().get_primitives_density() < 1.e40,
-                 "rho exceeded. Simulation is failing.");
-
-
-            if ((cellpos - _position).norm() < _r_inj) {
-
-
-              double dx = std::pow(cellit.get_volume(),1./3.);
-
-        if(_r_st < 4.*dx) {
+  virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro) {
 
 
 
-               CoordinateVector<> vel_prior =
-                        cellit.get_hydro_variables().get_primitives_velocity();
+      novahandler->inject_sne(subgrid, hydro, _position, _r_inj,_r_st,_nbar,_num_cells_injected);
 
-
-
-                double mom_to_inj = 2.6e5*std::pow(_nbar,-2./17) * std::pow(_energy*1.e-44,16./17.);
-                // Msol km/s to kg m/s
-                mom_to_inj = mom_to_inj * 2.e30 * 1.e3/_num_cells_injected;
-
-
-
-                double vel_to_inj = mom_to_inj/cellit.get_hydro_variables().get_conserved_mass();
-
-                CoordinateVector<> direction = (cellpos-_position)/((cellpos-_position).norm());
-
-                CoordinateVector<> vel_new = vel_prior + vel_to_inj*direction;
-
-                cellit.get_hydro_variables().set_primitives_velocity(vel_new);
-
-
-                //std::cout << "INJECT MOM - r_inj = " << _r_inj << "\n";
-                //std::cout << "R_ST = " << _r_st << " 4*dx =  " << 4*dx << "\n";
-
-
-              // set temperature to 10^4k
-
-               double density = cellit.get_hydro_variables().get_primitives_density();
-
-             double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
-
-      //8254 is k/mh
-
-      double pressure = 8254.397014*1.e4*density*2./(1.+xH);
-
-       cellit.get_ionization_variables().set_temperature(1.e4);
-
-       cellit.get_hydro_variables().set_primitives_pressure(pressure);
-
-
-
-
-
-              }
-              else {
-
-                //double cell_mass = cellit.get_hydro_variables().get_conserved_mass();
-
-                //double fraction_mass = cell_mass/1.988e33;
-
-                cellit.get_hydro_variables().set_energy_term(_energy/_num_cells_injected);
-
-
-                //std::cout << "INJECT THERM - r_inj = " << _r_inj << "\n";
-                //std::cout << "R_ST = " << _r_st << " 4*dx =  " << 4*dx << "\n";
-                //std::cout << "INJECTING" << _energy/113.;
-              }
-            }
-            cmac_assert_message(cellit.get_hydro_variables().get_conserved_total_energy() >=0,
-              "Energy negative after SNe feedback.");
-         }
-
-   }
+    
+  }
 
 
   /**
@@ -441,7 +278,9 @@ public:
       : _position(restart_reader), _lifetime(restart_reader.read< double >()),
         _luminosity(restart_reader.read< double >()),
         _energy(restart_reader.read< double >()),
-        _has_exploded(restart_reader.read< bool >()) {}
+        _has_exploded(restart_reader.read< bool >()) {
+          novahandler = new SupernovaHandler(_energy);
+        }
 };
 
 #endif // SINGLESUPERNOVAPHOTONSOURCEDISTRIBUTION_HPP
