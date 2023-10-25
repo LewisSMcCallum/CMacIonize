@@ -933,7 +933,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   
 
   double last_xn;
-  double xrun;
+
 
 
 
