@@ -913,9 +913,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
   double xn;
-
-  
-
+  double cutdowns = 20;
 
 
   if (jH ==0 && nH > 0) {
@@ -932,34 +930,46 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   }
 
 
+  
+
+  double last_xn;
+
+
+
   if ((ts > 0.0) & (old_xn > -0.5)) {
-    double largest_change = ts*(alphaH*nH*(std::pow(1.- old_xn,2.0)) - old_xn*jH - gammaH*nH*old_xn*(1.-old_xn));
-    if (largest_change > 0 && xn < old_xn) {
+    last_xn = old_xn;
+    for (uint_fast32_t i=0;i<(uint_fast32_t)cutdowns;i++) {
+    double largest_change = ts*(alphaH*nH*(std::pow(1.- last_xn,2.0)) - last_xn*jH - gammaH*nH*last_xn*(1.-last_xn));
+    largest_change /= cutdowns;
+    if (largest_change > 0 && xn < last_xn) {
       // this is a problem...
       cmac_error("Numerical is net recombining, but xn is lower than last step.")
     }
-    if (largest_change < 0 && xn > old_xn) {
+    if (largest_change < 0 && xn > last_xn) {
       // similarly a problem, lets hope this doesnt get called?
       cmac_error("Numerical is net ionizing but xn is increasing from last step.")
     }
     if (largest_change > 0) {
       // we are recombining
-      if ((xn-old_xn) > largest_change) {
+      if ((xn-last_xn) > largest_change) {
         //we have over-recombined, add limiter by implementing numerical time dependence
         //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
-        xn = old_xn + largest_change;
+        xn = last_xn + largest_change;
+        last_xn = xn;
         
       }
     } else if (largest_change < 0) {
       // we are ionizing 
-      if ((xn - old_xn) < largest_change) {
+      if ((xn - last_xn) < largest_change) {
        // std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
         // we have over-ionized for this time, implement limiter
-        xn = old_xn + largest_change;
+        xn = last_xn + largest_change;
+        last_xn = xn;
       }
     }
   }
-
+  }
+  
 
 
   return std::max(1.e-14,xn);
