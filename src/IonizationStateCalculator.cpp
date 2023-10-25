@@ -957,6 +957,8 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
         xn = last_xn + largest_change;
         last_xn = xn;
         
+      } else {
+        break;
       }
     } else if (largest_change < 0) {
       // we are ionizing 
@@ -965,6 +967,8 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
         // we have over-ionized for this time, implement limiter
         xn = last_xn + largest_change;
         last_xn = xn;
+      } else {
+        break;
       }
     }
   }
