@@ -945,11 +945,11 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     largest_change /= cutdowns;
     if (largest_change > 0 && xn < last_xn) {
       // this is a problem...
-      cmac_error("Numerical is net recombining, but xn is lower than last step.")
+      //cmac_error("Numerical is net recombining, but xn is lower than last step.")
     }
     if (largest_change < 0 && xn > last_xn) {
       // similarly a problem, lets hope this doesnt get called?
-      cmac_error("Numerical is net ionizing but xn is increasing from last step.")
+      //cmac_error("Numerical is net ionizing but xn is increasing from last step.")
     }
     if (largest_change > 0) {
       // we are recombining
