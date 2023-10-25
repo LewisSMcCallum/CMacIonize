@@ -933,11 +933,13 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   
 
   double last_xn;
+  double xrun;
 
 
 
   if ((ts > 0.0) & (old_xn > -0.5)) {
     last_xn = old_xn;
+
     for (uint_fast32_t i=0;i<(uint_fast32_t)cutdowns;i++) {
     double largest_change = ts*(alphaH*nH*(std::pow(1.- last_xn,2.0)) - last_xn*jH - gammaH*nH*last_xn*(1.-last_xn));
     largest_change /= cutdowns;
@@ -954,10 +956,10 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
       if ((xn-last_xn) > largest_change) {
         //we have over-recombined, add limiter by implementing numerical time dependence
         //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
-        xn = last_xn + largest_change;
-        last_xn = xn;
+        last_xn = last_xn + largest_change;
         
       } else {
+        last_xn = xn;
         break;
       }
     } else if (largest_change < 0) {
@@ -965,13 +967,14 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
       if ((xn - last_xn) < largest_change) {
        // std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
         // we have over-ionized for this time, implement limiter
-        xn = last_xn + largest_change;
-        last_xn = xn;
+        last_xn = last_xn + largest_change;
       } else {
+        last_xn = xn;
         break;
       }
     }
   }
+  xn = last_xn;
   }
   
 
