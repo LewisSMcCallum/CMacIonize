@@ -913,7 +913,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
   double xn;
-  double max_change = 0.1;
+  double max_change = 0.01;
 
 
 
