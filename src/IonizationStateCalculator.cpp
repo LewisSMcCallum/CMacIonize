@@ -918,18 +918,34 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   
 
 
-  if (jH ==0 && nH > 0) {
-    xn = alphaH/(alphaH+gammaH*0);
-  } else if (jH > 0 && nH > 0){
-    //equation (4) from K+O (2020), in turn from somewhere else...
-    double denom = jH + (2*alphaH + gammaH*0)*nH;
-    const double in_root = std::pow(jH + gammaH*0*nH,2.0) + 4.0*jH*alphaH*nH;
-    denom = denom + std::pow(in_root,0.5);
-    xn = 2.0*alphaH*nH/denom;
+  // if (jH ==0 && nH > 0) {
+  //   xn = alphaH/(alphaH+gammaH*0);
+  // } else if (jH > 0 && nH > 0){
+  //   //equation (4) from K+O (2020), in turn from somewhere else...
+  //   double denom = jH + (2*alphaH + gammaH*0)*nH;
+  //   const double in_root = std::pow(jH + gammaH*0*nH,2.0) + 4.0*jH*alphaH*nH;
+  //   denom = denom + std::pow(in_root,0.5);
+  //   xn = 2.0*alphaH*nH/denom;
 
-  } else {
-    xn = 0;
-  }
+  // } else {
+  //   xn = 0;
+  // }
+
+    if (jH > 0. && nH > 0.) {
+       const double aa = 0.5 * jH / (nH * alphaH);
+       const double bb = 2. / aa;
+       if (bb < 1.e-10) {
+         return std::max(1.e-14, 0.25 * bb);
+       } else {
+         const double cc = std::sqrt(bb + 1.);
+         // For very large values of jH, we can actually over-ionize the cell,
+         // resulting in a negative neutral fraction
+         // To overcome this issue, we impose a lower limit.
+         xn = std::max(1.e-14, 1. + aa * (1. - cc));
+       }
+     } else {
+       xn = 1.;
+     }
 
 
   if ((ts > 0.0) & (old_xn > -0.5)) {
