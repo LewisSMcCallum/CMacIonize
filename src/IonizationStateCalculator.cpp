@@ -939,7 +939,7 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     double dt;
     xrun = old_xn;
     while (clock < ts) {
-      dxdt = (alphaH*nH*(std::pow(1.- last_xn,2.0)) - last_xn*jH - gammaH*nH*last_xn*(1.-last_xn))
+      dxdt = (alphaH*nH*(std::pow(1.- xrun,2.0)) - xrun*jH - gammaH*nH*xrun*(1.-xrun));
       if ((dxdt*ts) > max_change) {
         dt = max_change / dxdt;
         clock += dt;
