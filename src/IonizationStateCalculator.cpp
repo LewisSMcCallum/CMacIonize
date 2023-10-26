@@ -915,15 +915,15 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
   double xn;
 
   
-
+  
 
 
   if (jH ==0 && nH > 0) {
-    xn = alphaH/(alphaH+gammaH);
+    xn = alphaH/(alphaH+gammaH*0);
   } else if (jH > 0 && nH > 0){
     //equation (4) from K+O (2020), in turn from somewhere else...
-    double denom = jH + (2*alphaH + gammaH)*nH;
-    const double in_root = std::pow(jH + gammaH*nH,2.0) + 4.0*jH*alphaH*nH;
+    double denom = jH + (2*alphaH + gammaH*0)*nH;
+    const double in_root = std::pow(jH + gammaH*0*nH,2.0) + 4.0*jH*alphaH*nH;
     denom = denom + std::pow(in_root,0.5);
     xn = 2.0*alphaH*nH/denom;
 
