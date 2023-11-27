@@ -214,7 +214,7 @@ public:
                              std::pair< cellsize_t, cellsize_t > &block, double timestep) const;
 
   void calculate_temperature(const uint_fast32_t loop, const double totweight,
-                             DensitySubGrid &subgrid, double timestep) const;
+                             DensitySubGrid &subgrid, double timestep, bool time_dependent) const;
 };
 
 #endif // TEMPERATURECALCULATOR_HPP

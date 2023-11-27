@@ -204,6 +204,12 @@ public:
     _temperature = other._temperature;
   }
 
+  inline void copy_previous_fractions() {
+    for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
+      _prev_ionic_fractions[i] = _ionic_fractions[i];
+    }
+  }
+
   /**
    * @brief Reset all mean intensity counters.
    */

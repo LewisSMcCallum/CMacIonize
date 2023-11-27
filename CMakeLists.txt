@@ -130,7 +130,20 @@ set(CMACIONIZE_VERSION_MAJOR ${GIT_VERSION_MAJOR})
 set(CMACIONIZE_VERSION_MINOR ${GIT_VERSION_MINOR})
 
 # Enable C++11, since we need this for delegating constructors
-add_compiler_flag("-std=c++11" REQUIRED)
+add_compiler_flag("-std=c++14" REQUIRED)
+
+# Find GSL.
+find_package(GSL)
+if(GSL_FOUND)
+  add_configuration_option(HAVE_GSL True)
+  message(STATUS "GSL found: ${GSL_VERSION}")
+  # Link the appropriate headers and libraries.
+  include_directories(${GSL_INCLUDE_DIRS})
+  link_directories(${GSL_LIBRARY_DIRS})
+else(GSL_FOUND)
+  add_configuration_option(HAVE_GSL False)
+  message(WARNING "GSL not found, some modules will not be build!")
+endif(GSL_FOUND)
 
 # Check if the compiler supports atomic floating point operations (it should if
 # it truly supports C++11, but e.g. the Intel compiler does actually not)

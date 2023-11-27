@@ -38,6 +38,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <gsl/gsl_odeiv2.h>
+#include <gsl/gsl_errno.h>
+
 
 /**
  * @brief Constructor.
@@ -73,7 +76,10 @@ IonizationStateCalculator::IonizationStateCalculator(
  */
 void IonizationStateCalculator::calculate_ionization_state(
     const double jfac, const double hfac,
-    IonizationVariables &ionization_variables, double timestep) const {
+    IonizationVariables &ionization_variables, double timestep, bool time_dependent) const {
+
+
+
 
   // normalize the mean intensity integrals
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
@@ -125,16 +131,35 @@ void IonizationStateCalculator::calculate_ionization_state(
 
       const double gammaHe2 = _collisional_rates.get_collisional_rate(ION_He_p1, T);
       const double alphaHe2 = _recombination_rates.get_recombination_rate(ION_He_p1, T);
+      if (time_dependent) {
+      h0 = ionization_variables.get_prev_ionic_fraction(ION_H_n);
+      he0 = ionization_variables.get_prev_ionic_fraction(ION_He_n);
+      hep = ionization_variables.get_prev_ionic_fraction(ION_He_p1);
+      compute_time_dependent_hydrogen_helium(alphaH, alphaHe,alphaHe2, jH, jHe, ntot,
+                                                AHe, T, h0, he0, hep, gammaH, gammaHe1,
+                                                 gammaHe2,timestep);
+
+      } else {
       compute_ionization_states_hydrogen_helium(alphaH, alphaHe,alphaHe2, jH, jHe, ntot,
                                                 AHe, T, h0, he0, hep, gammaH, gammaHe1,
                                                  gammaHe2);
+      }
 
 
     } else {
-      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+      if (time_dependent) {
+        h0 = compute_time_dependent_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+      } else {
+         h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+      }
     }
 #else
-    const double h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+  double h0;
+    if (time_dependent) {
+      h0 = compute_time_dependent_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+    } else {
+      h0 = compute_ionization_state_hydrogen(alphaH, jH, ntot, gammaH, ionization_variables.get_prev_ionic_fraction(ION_H_n), timestep);
+    }
 #endif
 
     ionization_variables.set_ionic_fraction(ION_H_n, h0);
@@ -197,9 +222,19 @@ void IonizationStateCalculator::calculate_ionization_state(
     const double nhe0 = 0.;
 #endif
 
+    if (time_dependent) {
+    compute_time_dependent_metals(
+        j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
+        _charge_transfer_rates, _collisional_rates, ionization_variables, timestep);
+
+    } else {
     compute_ionization_states_metals(
         j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
         _charge_transfer_rates, _collisional_rates, ionization_variables);
+
+    }
+
+
 
 
 
@@ -571,9 +606,9 @@ void IonizationStateCalculator::calculate_ionization_state(
  * @param subgrid DensitySubGrid to work on.
  */
 void IonizationStateCalculator::calculate_ionization_state(
-    const double totweight, DensitySubGrid &subgrid, double timestep) const {
+    const double totweight, DensitySubGrid &subgrid, double timestep, bool time_dependent) const {
 
-
+  
   double jfac;
   double hfac;
 
@@ -593,7 +628,7 @@ void IonizationStateCalculator::calculate_ionization_state(
   for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
     calculate_ionization_state(jfac / cellit.get_volume(),
                                hfac / cellit.get_volume(),
-                               cellit.get_ionization_variables(),timestep);
+                               cellit.get_ionization_variables(),timestep, time_dependent);
   }
 }
 
@@ -913,6 +948,8 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
   double xn;
+  double xrun = old_xn;
+
 
   
   if (jH ==0 && nH > 0) {
@@ -928,36 +965,313 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
     xn = 0;
   }
 
+  uint_fast32_t divs = 10;
 
+  
+
+  
   if ((ts > 0.0) & (old_xn > -0.5)) {
-    double largest_change = ts*(alphaH*nH*(std::pow(1.- old_xn,2.0)) - old_xn*jH - gammaH*nH*old_xn*(1.-old_xn));
-    if (largest_change > 0 && xn < old_xn) {
-      // this is a problem...
-      cmac_error("Numerical is net recombining, but xn is lower than last step.")
-    }
-    if (largest_change < 0 && xn > old_xn) {
-      // similarly a problem, lets hope this doesnt get called?
-      cmac_error("Numerical is net ionizing but xn is increasing from last step.")
-    }
-    if (largest_change > 0) {
-      // we are recombining
-      if ((xn-old_xn) > largest_change) {
-        //we have over-recombined, add limiter by implementing numerical time dependence
-        //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
-        xn = old_xn + largest_change;
-        
+    for (uint_fast32_t i=0;i<divs;i++) {
+      double largest_change = ts*(alphaH*nH*(std::pow(1.- xrun,2.0)) - xrun*jH - gammaH*nH*xrun*(1.-xrun))/divs;
+      // if (largest_change > 0 && xn < xrun) {
+      //   // this is a problem...
+      //   cmac_error("Numerical is net recombining, but xn is lower than last step.")
+      // }
+      // if (largest_change < 0 && xn > xrun) {
+      //   // similarly a problem, lets hope this doesnt get called?
+      //   cmac_error("Numerical is net ionizing but xn is increasing from last step.")
+      // }
+      if (largest_change > 0) {
+        // we are recombining
+        if ((xn-xrun) > largest_change) {
+          //we have over-recombined, add limiter by implementing numerical time dependence
+          //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
+          xrun = xrun + largest_change;
+          
+        } else {
+          xrun = xn;
+          break;
+        }
+      } else if (largest_change < 0) {
+        // we are ionizing 
+        if ((xn - xrun) < largest_change) {
+          //std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
+          // we have over-ionized for this time, implement limiter
+          xrun = xrun + largest_change;
+        } else {
+          xrun = xn;
+          break;
+        }
       }
-    } else if (largest_change < 0) {
-      // we are ionizing 
-      if ((xn - old_xn) < largest_change) {
-       // std::cout << "Applied limiter, old x =" << old_xn << " was gonna go " << xn << " but will go to " << old_xn + largest_change << " instead " << std::endl;
-        // we have over-ionized for this time, implement limiter
-        xn = old_xn + largest_change;
-      }
-    }
+  }
+  xn = xrun;
   }
 
 
 
   return std::max(1.e-14,xn);
 }
+int hydrogen_ode_system(double t, const double y[], double f[], void *params) {
+    (void)(t); // Avoid unused parameter warning
+
+    // Extract rate coefficients and total density from params
+    double *coefficients = static_cast<double*>(params);
+    double k_coll = coefficients[0];
+    double k_photo = coefficients[1];
+    double k_rec = coefficients[2];
+    double n_total = coefficients[3];
+
+    // Neutral fraction
+    double x = y[0];
+
+    // ODE for the neutral fraction x
+    f[0] = -k_coll * x * (1 - x) * n_total - k_photo * x + k_rec * (1 - x) * (1 - x) * n_total;
+
+    return GSL_SUCCESS;
+}
+
+double IonizationStateCalculator::compute_time_dependent_hydrogen(
+    const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
+
+  double coefficients[4] = {gammaH, jH, alphaH, nH};
+  // Initial conditions: n_H, n_H_plus
+  double y[1] = {old_xn}; // Example initial population densities
+
+    // Time domain
+  double t = 0.0;
+
+    // Set up the solver
+  gsl_odeiv2_system sys = {hydrogen_ode_system, nullptr, 1, coefficients};
+
+  gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-6, 0.0);
+
+
+  int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+
+  if (status != GSL_SUCCESS) {
+      cmac_error("Error in solver!");
+  }
+    
+
+  gsl_odeiv2_driver_free(driver);
+
+  double xn = y[0];
+
+
+
+  return std::max(1.e-14,xn);
+}
+
+int hydrogen_helium_ode_system(double t, const double y[], double f[], void *params) {
+    (void)(t); // Avoid unused parameter warning
+
+    // Extract rate coefficients and total density from params
+    double *coefficients = static_cast<double*>(params);
+    double alphaH = coefficients[0];
+    double alphaHe = coefficients[1];
+    double alphaHe2 = coefficients[2];
+    double jH = coefficients[3];
+    double jHe = coefficients[4];
+    double nH = coefficients[5];
+    double AHe = coefficients[6];
+    double gammaH = coefficients[7];
+    double gammaHe1 = coefficients[8];
+    double gammaHe2 = coefficients[9];
+    double sqrtT = coefficients[10];
+    double alpha_e_2sP = coefficients[11];
+    
+
+    // Neutral fraction
+    double xh = y[0];
+    double he0 = y[1];
+    double hep = y[2];
+
+    double hepp = 1-he0-hep;
+
+    double ne = (1-xh)*nH + hep*nH*AHe + 2.0*hepp*nH*AHe;
+
+    double pHots = 1. / (1. + 77. * he0 / sqrtT / xh);
+
+
+    // ODE for the neutral fraction x
+    f[0] = -gammaH*ne*xh - jH*xh + alphaH*(1-xh)*ne - ne*pHots*hep*alpha_e_2sP*AHe;
+    f[1] = -gammaHe1*ne*he0 - jHe*he0 + alphaHe*ne*hep;
+    f[2] = gammaHe1*ne*he0 + jHe*he0 + alphaHe2*ne*hepp - alphaHe*ne*hep - gammaHe2*ne*hep;
+
+    return GSL_SUCCESS;
+}
+
+
+void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
+    const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
+    const double jHe, const double nH, const double AHe, const double T,
+    double &h0, double &he0, double &hep, const double gammaH, const double gammaHe1,
+    const double gammaHe2, double ts) {
+
+
+  
+  double alpha_e_2sP = 4.17e-20 * std::pow(T * 1.e-4, -0.861);
+  double sqrtT = std::sqrt(T);
+
+
+  double coefficients[12] = {alphaH, alphaHe, alphaHe2, jH, jHe, nH, AHe, gammaH, gammaHe1, gammaHe2, 
+              sqrtT,alpha_e_2sP};
+
+  double y[3] = {h0,he0,hep};
+
+  double t = 0.0;
+
+  gsl_odeiv2_system sys = {hydrogen_helium_ode_system, nullptr, 3, coefficients};
+
+  gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+        &sys, gsl_odeiv2_step_rkf45, ts/10., 1e-3, 0.0);
+
+  int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+
+
+  if (status != GSL_SUCCESS) {
+      cmac_error("Error in solver!");
+  }
+    
+
+  gsl_odeiv2_driver_free(driver);
+
+  h0 = y[0];
+  he0 = y[1];
+  hep = y[2];
+
+}
+
+struct ODEParams {
+    std::vector<std::vector<double>> coefficients;
+    double ne;
+};
+
+
+int metals_ode_system(double t, const double y[], double f[], void *params) {
+    (void)(t); // Avoid unused parameter warning
+    ODEParams* p = static_cast<ODEParams*>(params);
+    std::vector<std::vector<double>> coefficients = p->coefficients;
+    double ne = p->ne;
+    //levels here is one less than total number of states
+    size_t levels = coefficients.size();
+    // Boundary conditions
+
+    double frac_last = 1.0;
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+        frac_last -= y[i];
+    }
+
+    
+
+    f[0] = -coefficients[0][0]*y[0]*ne - coefficients[0][1]*y[0] + coefficients[0][2]*y[1]*ne;
+    f[levels-1] = -coefficients[levels-1][0]*y[levels-1]*ne - coefficients[levels-1][1]*y[levels-1] + coefficients[levels-1][2]*frac_last*ne
+        +coefficients[levels-1][0]*y[levels-1]*ne + coefficients[levels-2][1]*y[levels-2] - coefficients[levels-2][2]*y[levels-1]*ne;
+
+
+    // Middle levels
+    for (size_t i = 1; i < levels-1; ++i) {
+//ok this is terrible but lets try and comment this, in order the terms are
+// loss due to collisions up, loss due to photoionize up, gain due to recombine from above
+//  gain due to collisions from below, gain from photoionize from below, loss as recombine down
+      f[i] = -coefficients[i][0]*y[i]*ne - coefficients[i][1]*y[i] + coefficients[i][2]*y[i+1]*ne
+        +coefficients[i-1][0]*y[i-1]*ne + coefficients[i-1][1]*y[i-1] - coefficients[i-1][2]*y[i]*ne;
+    }
+
+    return GSL_SUCCESS;
+}
+
+
+
+void IonizationStateCalculator::compute_time_dependent_metals(
+    const double *j_metals, const double ne, const double T, const double T4,
+    const double nh0, const double nhe0, const double nhp,
+    const RecombinationRates &recombination_rates,
+    const ChargeTransferRates &charge_transfer_rates,
+    const CollisionalRates &collisional_rates,
+    IonizationVariables &ionization_variables, double ts) {
+
+#ifdef HAS_CARBON
+  const double jCp1 = j_metals[0];
+  const double jCp2 = j_metals[1];
+#endif
+
+// #ifdef HAS_NITROGEN
+//   const double jNn = j_metals[2];
+//   const double jNp1 = j_metals[3];
+//   const double jNp2 = j_metals[4];
+// #endif
+
+// #ifdef HAS_OXYGEN
+//   const double jOn = j_metals[5];
+//   const double jOp1 = j_metals[6];
+// #endif
+
+// #ifdef HAS_NEON
+//   const double jNen = j_metals[7];
+//   const double jNep1 = j_metals[8];
+// #endif
+
+// #ifdef HAS_SULPHUR
+//   const double jSp1 = j_metals[9];
+//   const double jSp2 = j_metals[10];
+//   const double jSp3 = j_metals[11];
+// #endif
+
+
+//CARBON
+#ifdef HAS_CARBON
+      const size_t levels_carbon = 3;
+
+      double y[levels_carbon-1] = {ionization_variables.get_ionic_fraction(ION_C_p1), 
+                              ionization_variables.get_ionic_fraction(ION_C_p2)};
+
+      ODEParams params;
+      params.coefficients = std::vector<std::vector<double>>(levels_carbon-1, std::vector<double>(3, 0.0));
+      params.ne = ne;
+
+    //set collisional rates 
+      params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_C_p1, T);
+      params.coefficients[1][0] = collisional_rates.get_collisional_rate(ION_C_p2, T);
+
+    //set photoionization rates
+      params.coefficients[0][1] = jCp1;
+      params.coefficients[1][1] = jCp2;
+
+    //set recombination rates, note rate is rate of tranition which MAKES named ion, i.e. ION_H_n rate is times by H+
+
+      params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_C_p1, T);
+      params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_C_p2, T);
+
+      double t = 0.0;
+
+      gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_carbon - 1, &params};
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/10., 1e-3, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+      if (status != GSL_SUCCESS) {
+          cmac_error("Error in solver!");
+      }
+    
+      gsl_odeiv2_driver_free(driver);
+      //set new 
+      ionization_variables.set_ionic_fraction(ION_C_p1, y[0]);
+      ionization_variables.set_ionic_fraction(ION_C_p2, y[1]);
+#endif
+
+
+    
+    
+    }
+
+
+
+
+
+
+

@@ -72,7 +72,7 @@ public:
 
   void
   calculate_ionization_state(const double jfac, const double hfac,
-                             IonizationVariables &ionization_variables, double timestep) const;
+                             IonizationVariables &ionization_variables, double timestep, bool time_dependent) const;
 
   /**
    * @brief Update the total luminosity of the sources.
@@ -91,12 +91,33 @@ public:
       const CollisionalRates &collisional_rates,
       IonizationVariables &ionization_variables);
 
+  static void compute_time_dependent_metals(
+      const double *j_metals, const double ne, const double T, const double T4,
+      const double nh0, const double nhe0, const double nhp,
+      const RecombinationRates &recombination_rates,
+      const ChargeTransferRates &charge_transfer_rates,
+      const CollisionalRates &collisional_rates,
+      IonizationVariables &ionization_variables, double timestep);
+
   static void compute_ionization_states_hydrogen_helium(
       const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
       const double jHe, const double nH, const double AHe, const double T,
       double &h0, double &he0, double &hep, double gammaH, double gammaHe1, double gammaHe2);
 
+  static void compute_time_dependent_hydrogen_helium(
+      const double alphaH, const double alphaHe, const double alphaHe2, const double jH,
+      const double jHe, const double nH, const double AHe, const double T,
+      double &h0, double &he0, double &hep, double gammaH, double gammaHe1, double gammaHe2, double ts);
+
   static double compute_ionization_state_hydrogen(const double alphaH,
+                                                  const double jH,
+                                                  const double nH,
+                                                  const double gammaH,
+                                                  const double old_xn,
+                                                  double ts);
+
+
+  static double compute_time_dependent_hydrogen(const double alphaH,
                                                   const double jH,
                                                   const double nH,
                                                   const double gammaH,
@@ -146,7 +167,8 @@ public:
     inline void operator()(DensityGrid::iterator &cell) {
       _calculator.calculate_ionization_state(_jfac / cell.get_volume(),
                                              _hfac / cell.get_volume(),
-                                             cell.get_ionization_variables(),_timestep);
+                                             cell.get_ionization_variables(),_timestep, 
+                                             false);
     }
   };
 
@@ -155,7 +177,7 @@ public:
                              std::pair< cellsize_t, cellsize_t > &block, double timestep) const;
 
   void calculate_ionization_state(const double totweight,
-                                  DensitySubGrid &subgrid, double timestep) const;
+                                  DensitySubGrid &subgrid, double timestep, bool time_dependent) const;
 };
 
 #endif // IONIZATIONSTATECALCULATOR_HPP

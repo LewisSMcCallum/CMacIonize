@@ -1071,7 +1071,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   const double hydro_radtime = params->get_physical_value< QUANTITY_TIME >(
       "TaskBasedRadiationHydrodynamicsSimulation:radiation time", "-1. s");
-  uint_fast32_t hydro_lastrad = 0;
+  uint_fast32_t hydro_lastrad = 1;
   const bool do_radiation = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:do radiation", true);
 
@@ -1094,13 +1094,26 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     
   double maximum_neutral_fraction;
 
-  if (_throttle_ion_state) {
-    maximum_neutral_fraction = -1;
+
+
+  const bool _time_dependent_ionization = params->get_value<bool> (
+    "TaskBasedRadiationHydrodynamicsSimulation:time dependent ionization", false);
+#ifndef HAVE_GSL
+ // if (_time_dependent_ionization) {
+  //  cmac_error("Cant do full time dependent ionization without GSL.")
+ // }
+#endif
+
+
+  if (_throttle_ion_state || _time_dependent_ionization) {
+    maximum_neutral_fraction = 1.e-3;
   } else {
       maximum_neutral_fraction = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
       -1.);
   }
+  
+
 
   const size_t number_of_buffers = params->get_value< size_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of buffers", 50000);
@@ -1717,7 +1730,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     // decide whether or not to do the radiation step
     if (do_radiation &&
         (hydro_radtime < 0. ||
-         (current_time - actual_timestep) >= hydro_lastrad * hydro_radtime)) {
+         (current_time-actual_timestep) >= hydro_lastrad * hydro_radtime)) {
 
         if (_cooling_file != nullptr) {
           *_cooling_file << current_time << "\t" << total_thermal_lost<< "\n";
@@ -1748,6 +1761,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             if (this_igrid < grid_creator->number_of_original_subgrids()) {
               HydroDensitySubGrid &subgrid =
                   *grid_creator->get_subgrid(this_igrid);
+
+                for (auto cellit = subgrid.begin(); cellit != subgrid.end();
+                  ++cellit) {
+                  if (_throttle_ion_state || _time_dependent_ionization) {
+                    cellit.get_ionization_variables().copy_previous_fractions();
+                  } else {
+                    cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
+                  }
+                    
+                }
               subgrid.update_ionization_variables(hydro,
                                                   maximum_neutral_fraction);
             }
@@ -1797,18 +1820,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               if (this_igrid < grid_creator->number_of_actual_subgrids()) {
                 auto gridit = grid_creator->get_subgrid(this_igrid);
                 (*gridit).reset_intensities();
-                if (iloop == 0) {
-                  // if first loop, set previous 
-                  for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
-                     ++cellit) {
-                      if (_throttle_ion_state) {
-                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
-                      } else {
-                        cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
-                      }
-                    
-                  }
-                }
               }
             }
             stop_parallel_timing_block();
@@ -2015,8 +2026,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   }
                 }
 #endif
-                temperature_calculator->calculate_temperature(iloop, numphoton,
-                                                              *gridit, hydro_radtime);
+                if (_time_dependent_ionization) {
+                    temperature_calculator->calculate_temperature(iloop, numphoton,
+                                *gridit, hydro_radtime, true);
+
+                } else {
+                    temperature_calculator->calculate_temperature(iloop, numphoton,
+                                        *gridit, hydro_radtime, false);
+
+                }
+
                 task.stop();
                 cpucycle_tick(task_stop);
                 active_time[get_thread_index()] += task_stop - task_start;
@@ -2055,14 +2074,19 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               (*gridit).reset_intensities();
               for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
                     ++cellit) {
-              if (_throttle_ion_state) {
-                  cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+              if (_throttle_ion_state || _time_dependent_ionization) {
+                  cellit.get_ionization_variables().copy_previous_fractions();
               } else {
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
               }
+              if (_time_dependent_ionization) {
+                temperature_calculator->calculate_temperature(0, 0,
+                                                            *gridit,hydro_radtime,true);
+              } else {
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,hydro_radtime);
+                                                            *gridit,hydro_radtime,false);
+              }
             }
           }
           stop_parallel_timing_block();
@@ -2090,14 +2114,19 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               (*gridit).reset_intensities();
               for (auto cellit = (*gridit).begin(); cellit != (*gridit).end();
                     ++cellit) {
-              if (_throttle_ion_state) {
-                  cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n, cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+              if (_throttle_ion_state || _time_dependent_ionization) {
+                  cellit.get_ionization_variables().copy_previous_fractions();
               } else {
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
-              }     
+              } 
+              if (_time_dependent_ionization) {
+                temperature_calculator->calculate_temperature(0, 0,
+                            *gridit,hydro_radtime,true);
+              } else{
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,hydro_radtime);
+                                                            *gridit,hydro_radtime,false);
+              }
             }
           }
           stop_parallel_timing_block();
@@ -2431,7 +2460,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     // write snapshot
     // we don't write if this is the last snapshot, because then it is written
     // outside the integration loop
-    if (write_output && hydro_lastsnap * hydro_snaptime <= current_time &&
+    if (write_output && hydro_lastsnap * hydro_snaptime <= current_time-actual_timestep &&
         has_next_step) {
       if (hydro_firstsnap <= hydro_lastsnap) {
         time_logger.start("snapshot");

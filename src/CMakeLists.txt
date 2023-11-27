@@ -287,7 +287,7 @@ target_link_libraries(CMacIonize LegacyEngine)
 target_link_libraries(CMacIonize TaskBasedEngine)
 target_link_libraries(CMacIonize EmissionEngine)
 target_link_libraries(CMacIonize DustEngine)
-
+target_link_libraries(CMacIonize GSL::gsl GSL::gslcblas)
 set(LIBCMILIBRARY_SOURCES
     CMILibrary.cpp
     SPHArrayInterface.cpp

@@ -113,7 +113,11 @@ public:
     values.set_dust_gas_ratio(_dust_to_gas);
     values.set_fraction_silicates(_fraction_silicates);
 #ifdef HAS_HELIUM
-    values.set_ionic_fraction(ION_He_n, 1.e-6);
+    values.set_ionic_fraction(ION_He_n, 0.999);
+    values.set_ionic_fraction(ION_He_p1, 0.001);
+    values.set_ionic_fraction(ION_C_p1, 0.999);
+    values.set_ionic_fraction(ION_C_p2, 0.001);
+
 #endif
     return values;
   }
