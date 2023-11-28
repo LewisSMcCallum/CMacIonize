@@ -130,7 +130,7 @@ set(CMACIONIZE_VERSION_MAJOR ${GIT_VERSION_MAJOR})
 set(CMACIONIZE_VERSION_MINOR ${GIT_VERSION_MINOR})
 
 # Enable C++11, since we need this for delegating constructors
-add_compiler_flag("-std=c++14" REQUIRED)
+add_compiler_flag("-std=c++11" REQUIRED)
 
 # Find GSL.
 find_package(GSL)
