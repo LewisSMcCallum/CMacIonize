@@ -76,7 +76,7 @@ IonizationStateCalculator::IonizationStateCalculator(
  */
 void IonizationStateCalculator::calculate_ionization_state(
     const double jfac, const double hfac,
-    IonizationVariables &ionization_variables, double timestep, bool time_dependent) const {
+    IonizationVariables &ionization_variables, double timestep, bool time_dependent, bool do_metals) const {
 
 
 
@@ -221,18 +221,19 @@ void IonizationStateCalculator::calculate_ionization_state(
 #else
     const double nhe0 = 0.;
 #endif
+  if (do_metals) {
+      if (time_dependent) {
+      compute_time_dependent_metals(
+          j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
+          _charge_transfer_rates, _collisional_rates, ionization_variables, timestep);
 
-    if (time_dependent) {
-    compute_time_dependent_metals(
-        j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
-        _charge_transfer_rates, _collisional_rates, ionization_variables, timestep);
+      } else {
+      compute_ionization_states_metals(
+          j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
+          _charge_transfer_rates, _collisional_rates, ionization_variables);
 
-    } else {
-    compute_ionization_states_metals(
-        j_metals, ne, T, T4, nh0, nhe0, nhp, _recombination_rates,
-        _charge_transfer_rates, _collisional_rates, ionization_variables);
-
-    }
+      }
+  }
 
 
 
@@ -606,7 +607,7 @@ void IonizationStateCalculator::calculate_ionization_state(
  * @param subgrid DensitySubGrid to work on.
  */
 void IonizationStateCalculator::calculate_ionization_state(
-    const double totweight, DensitySubGrid &subgrid, double timestep, bool time_dependent) const {
+    const double totweight, DensitySubGrid &subgrid, double timestep, bool time_dependent, bool do_metals) const {
 
   
   double jfac;
@@ -628,7 +629,7 @@ void IonizationStateCalculator::calculate_ionization_state(
   for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
     calculate_ionization_state(jfac / cellit.get_volume(),
                                hfac / cellit.get_volume(),
-                               cellit.get_ionization_variables(),timestep, time_dependent);
+                               cellit.get_ionization_variables(),timestep, time_dependent, do_metals);
   }
 }
 
@@ -1126,7 +1127,7 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   gsl_odeiv2_system sys = {hydrogen_helium_ode_system, nullptr, 3, coefficients};
 
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-        &sys, gsl_odeiv2_step_rkf45, ts/10., 1e-3, 0.0);
+        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
 
   int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1154,8 +1155,8 @@ struct ODEParams {
 int metals_ode_system(double t, const double y[], double f[], void *params) {
     (void)(t); // Avoid unused parameter warning
     ODEParams* p = static_cast<ODEParams*>(params);
-    std::vector<std::vector<double>> coefficients = p->coefficients;
-    double ne = p->ne;
+    std::vector<std::vector<double>>& coefficients = p->coefficients;
+    double& ne = p->ne;
     //levels here is one less than total number of states
     size_t levels = coefficients.size();
     // Boundary conditions
@@ -1166,10 +1167,12 @@ int metals_ode_system(double t, const double y[], double f[], void *params) {
     }
 
     
-
-    f[0] = -coefficients[0][0]*y[0]*ne - coefficients[0][1]*y[0] + coefficients[0][2]*y[1]*ne;
+//change for first level, and last level, note last level is actually second last level, with the highest level not being tracked explicity
+    f[0] = -coefficients[0][0]*y[0]*ne - coefficients[0][1]*y[0] + coefficients[0][2]*y[1]*ne
+         -coefficients[0][3]*y[0] + coefficients[0][4]*y[1];
     f[levels-1] = -coefficients[levels-1][0]*y[levels-1]*ne - coefficients[levels-1][1]*y[levels-1] + coefficients[levels-1][2]*frac_last*ne
-        +coefficients[levels-1][0]*y[levels-1]*ne + coefficients[levels-2][1]*y[levels-2] - coefficients[levels-2][2]*y[levels-1]*ne;
+        +coefficients[levels-2][0]*y[levels-2]*ne + coefficients[levels-2][1]*y[levels-2] - coefficients[levels-2][2]*y[levels-1]*ne
+        -coefficients[levels-1][3]*y[levels-1] + coefficients[levels-1][4]*frac_last + coefficients[levels-2][3]*y[levels-2] - coefficients[levels-2][4]*y[levels-1];
 
 
     // Middle levels
@@ -1177,8 +1180,10 @@ int metals_ode_system(double t, const double y[], double f[], void *params) {
 //ok this is terrible but lets try and comment this, in order the terms are
 // loss due to collisions up, loss due to photoionize up, gain due to recombine from above
 //  gain due to collisions from below, gain from photoionize from below, loss as recombine down
+// loss from CT ionize up, gain from CT recombine from above, gain from CT ionize from below, loss from CT recombine down
       f[i] = -coefficients[i][0]*y[i]*ne - coefficients[i][1]*y[i] + coefficients[i][2]*y[i+1]*ne
-        +coefficients[i-1][0]*y[i-1]*ne + coefficients[i-1][1]*y[i-1] - coefficients[i-1][2]*y[i]*ne;
+        +coefficients[i-1][0]*y[i-1]*ne + coefficients[i-1][1]*y[i-1] - coefficients[i-1][2]*y[i]*ne
+        -coefficients[i][3]*y[i] + coefficients[i][4]*y[i+1] + coefficients[i-1][3]*y[i-1] - coefficients[i-1][4]*y[i];
     }
 
     return GSL_SUCCESS;
@@ -1199,38 +1204,39 @@ void IonizationStateCalculator::compute_time_dependent_metals(
   const double jCp2 = j_metals[1];
 #endif
 
-// #ifdef HAS_NITROGEN
-//   const double jNn = j_metals[2];
-//   const double jNp1 = j_metals[3];
-//   const double jNp2 = j_metals[4];
-// #endif
+#ifdef HAS_NITROGEN
+  const double jNn = j_metals[2];
+  const double jNp1 = j_metals[3];
+  const double jNp2 = j_metals[4];
+#endif
 
-// #ifdef HAS_OXYGEN
-//   const double jOn = j_metals[5];
-//   const double jOp1 = j_metals[6];
-// #endif
+#ifdef HAS_OXYGEN
+  const double jOn = j_metals[5];
+  const double jOp1 = j_metals[6];
+#endif
 
-// #ifdef HAS_NEON
-//   const double jNen = j_metals[7];
-//   const double jNep1 = j_metals[8];
-// #endif
+#ifdef HAS_NEON
+  const double jNen = j_metals[7];
+  const double jNep1 = j_metals[8];
+#endif
 
-// #ifdef HAS_SULPHUR
-//   const double jSp1 = j_metals[9];
-//   const double jSp2 = j_metals[10];
-//   const double jSp3 = j_metals[11];
-// #endif
+#ifdef HAS_SULPHUR
+  const double jSp1 = j_metals[9];
+  const double jSp2 = j_metals[10];
+  const double jSp3 = j_metals[11];
+#endif
 
 
 //CARBON
 #ifdef HAS_CARBON
+{
       const size_t levels_carbon = 3;
 
       double y[levels_carbon-1] = {ionization_variables.get_ionic_fraction(ION_C_p1), 
                               ionization_variables.get_ionic_fraction(ION_C_p2)};
 
       ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_carbon-1, std::vector<double>(3, 0.0));
+      params.coefficients = std::vector<std::vector<double>>(levels_carbon-1, std::vector<double>(5, 0.0));
       params.ne = ne;
 
     //set collisional rates 
@@ -1246,11 +1252,21 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_C_p1, T);
       params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_C_p2, T);
 
+    // set charge transfer rates, multiply them by appropriate densities here, use as pure rate in solver
+
+    //index [3] total ionization rates, index [4] total recomb rates
+     
+    // for C, level 1 is neglible, only have recomb for level 2
+      
+      params.coefficients[1][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_C_p2,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_C_p2,T4);
+
+
       double t = 0.0;
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_carbon - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/10., 1e-3, 0.0);
+          &sys, gsl_odeiv2_step_rk2, ts/100., 1e-2, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1262,12 +1278,267 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       //set new 
       ionization_variables.set_ionic_fraction(ION_C_p1, y[0]);
       ionization_variables.set_ionic_fraction(ION_C_p2, y[1]);
+}    
+#endif
+
+#ifdef HAS_NITROGEN
+{
+      const size_t levels_nitrogen = 4;
+
+      double y[levels_nitrogen-1] = {ionization_variables.get_ionic_fraction(ION_N_n), 
+                              ionization_variables.get_ionic_fraction(ION_N_p1),
+                              ionization_variables.get_ionic_fraction(ION_N_p2)};
+
+      ODEParams params;
+      params.coefficients = std::vector<std::vector<double>>(levels_nitrogen-1, std::vector<double>(5, 0.0));
+      params.ne = ne;
+
+    //set collisional rates 
+      params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_N_n, T);
+      params.coefficients[1][0] = collisional_rates.get_collisional_rate(ION_N_p1, T);
+      params.coefficients[2][0] = collisional_rates.get_collisional_rate(ION_N_p2, T);
+
+    //set photoionization rates
+      params.coefficients[0][1] = jNn;
+      params.coefficients[1][1] = jNp1;
+      params.coefficients[2][1] = jNp2;
+
+    //set recombination rates, note rate is rate of tranition which MAKES named ion, i.e. ION_H_n rate is times by H+
+
+      params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_N_n, T);
+      params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_N_p1, T);
+      params.coefficients[2][2] = recombination_rates.get_recombination_rate(ION_N_p2, T);
+
+    // set charge transfer rates, multiply them by appropriate densities here, use as pure rate in solver
+
+    //index [3] total ionization rates, index [4] total recomb rates
+     
+      params.coefficients[0][3] = nhp*charge_transfer_rates.get_charge_transfer_ionization_rate_H(ION_N_n,T4);
+      params.coefficients[0][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_N_n,T4);
+
+      params.coefficients[1][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_N_p1,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_N_p1,T4);
+
+      params.coefficients[2][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_N_p2,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_N_p2,T4);
+
+      double t = 0.0;
+
+      gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_nitrogen - 1, &params};
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+      if (status != GSL_SUCCESS) {
+          cmac_error("Error in solver!");
+      }
+    
+      gsl_odeiv2_driver_free(driver);
+      //set new 
+      ionization_variables.set_ionic_fraction(ION_N_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_N_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_N_p2, y[2]);
+}
+#endif
+
+#ifdef HAS_OXYGEN
+{
+      const size_t levels_oxygen = 5;
+
+      double y[levels_oxygen-1] = {ionization_variables.get_ionic_fraction(ION_O_n), 
+                              ionization_variables.get_ionic_fraction(ION_O_p1),
+                              ionization_variables.get_ionic_fraction(ION_O_p2),
+                              ionization_variables.get_ionic_fraction(ION_O_p3)};
+
+      ODEParams params;
+      params.coefficients = std::vector<std::vector<double>>(levels_oxygen-1, std::vector<double>(5, 0.0));
+      params.ne = ne;
+
+    //set collisional rates 
+      params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_O_n, T);
+      params.coefficients[1][0] = collisional_rates.get_collisional_rate(ION_O_p1, T);
+      params.coefficients[2][0] = collisional_rates.get_collisional_rate(ION_O_p2, T);
+      params.coefficients[3][0] = collisional_rates.get_collisional_rate(ION_O_p3, T);
+
+    //set photoionization rates
+      params.coefficients[0][1] = jOn;
+      params.coefficients[1][1] = jOp1;
+
+    //set recombination rates, note rate is rate of tranition which MAKES named ion, i.e. ION_H_n rate is times by H+
+
+      params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_O_n, T);
+      params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_O_p1, T);
+      params.coefficients[2][2] = recombination_rates.get_recombination_rate(ION_O_p2, T);
+      params.coefficients[3][2] = recombination_rates.get_recombination_rate(ION_O_p3, T);
+
+    // set charge transfer rates, multiply them by appropriate densities here, use as pure rate in solver
+
+    //index [3] total ionization rates, index [4] total recomb rates
+     
+      params.coefficients[0][3] = nhp*charge_transfer_rates.get_charge_transfer_ionization_rate_H(ION_O_n,T4);
+      params.coefficients[0][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_O_n,T4);
+
+      params.coefficients[1][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_O_p1,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_O_p1,T4);
+
+      params.coefficients[2][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_O_p2,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_O_p2,T4);
+
+      params.coefficients[3][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_O_p3,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_O_p3,T4);
+
+      double t = 0.0;
+
+      gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_oxygen - 1, &params};
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+      if (status != GSL_SUCCESS) {
+          cmac_error("Error in solver!");
+      }
+    
+      gsl_odeiv2_driver_free(driver);
+      //set new 
+      ionization_variables.set_ionic_fraction(ION_O_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_O_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_O_p2, y[2]);
+      ionization_variables.set_ionic_fraction(ION_O_p3, y[3]);
+}
+#endif
+
+#ifdef HAS_NEON
+{
+      const size_t levels_neon = 5;
+
+      double y[levels_neon-1] = {ionization_variables.get_ionic_fraction(ION_Ne_n), 
+                              ionization_variables.get_ionic_fraction(ION_Ne_p1),
+                              ionization_variables.get_ionic_fraction(ION_Ne_p2),
+                              ionization_variables.get_ionic_fraction(ION_Ne_p3)};
+
+      ODEParams params;
+      params.coefficients = std::vector<std::vector<double>>(levels_neon-1, std::vector<double>(5, 0.0));
+      params.ne = ne;
+
+    //set collisional rates 
+      params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_Ne_n, T);
+      params.coefficients[1][0] = collisional_rates.get_collisional_rate(ION_Ne_p1, T);
+      params.coefficients[2][0] = collisional_rates.get_collisional_rate(ION_Ne_p2, T);
+      params.coefficients[3][0] = collisional_rates.get_collisional_rate(ION_Ne_p3, T);
+
+    //set photoionization rates
+      params.coefficients[0][1] = jNen;
+      params.coefficients[1][1] = jNep1;
+
+    //set recombination rates, note rate is rate of tranition which MAKES named ion, i.e. ION_H_n rate is times by H+
+
+      params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_Ne_n, T);
+      params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_Ne_p1, T);
+      params.coefficients[2][2] = recombination_rates.get_recombination_rate(ION_Ne_p2, T);
+      params.coefficients[3][2] = recombination_rates.get_recombination_rate(ION_Ne_p3, T);
+
+    // set charge transfer rates, multiply them by appropriate densities here, use as pure rate in solver
+
+    //index [3] total ionization rates, index [4] total recomb rates
+     
+      params.coefficients[1][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_Ne_p1,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_Ne_p1,T4);
+
+      params.coefficients[2][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_Ne_p2,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_Ne_p2,T4);
+
+
+      double t = 0.0;
+
+      gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_neon - 1, &params};
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+      if (status != GSL_SUCCESS) {
+          cmac_error("Error in solver!");
+      }
+    
+      gsl_odeiv2_driver_free(driver);
+      //set new 
+      ionization_variables.set_ionic_fraction(ION_Ne_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p2, y[2]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p3, y[3]);
+}
+#endif
+
+#ifdef HAS_SULPHUR
+{
+      const size_t levels_sulphur = 4;
+
+      double y[levels_sulphur-1] = {ionization_variables.get_ionic_fraction(ION_S_p1), 
+                              ionization_variables.get_ionic_fraction(ION_S_p2),
+                              ionization_variables.get_ionic_fraction(ION_S_p3)};
+
+      ODEParams params;
+      params.coefficients = std::vector<std::vector<double>>(levels_sulphur-1, std::vector<double>(5, 0.0));
+      params.ne = ne;
+
+    //set collisional rates 
+      params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_S_p1, T);
+      params.coefficients[1][0] = collisional_rates.get_collisional_rate(ION_S_p2, T);
+      params.coefficients[2][0] = collisional_rates.get_collisional_rate(ION_S_p3, T);
+
+    //set photoionization rates
+      params.coefficients[0][1] = jSp1;
+      params.coefficients[1][1] = jSp2;
+      params.coefficients[2][1] = jSp3;
+
+    //set recombination rates, note rate is rate of tranition which MAKES named ion, i.e. ION_H_n rate is times by H+
+
+      params.coefficients[0][2] = recombination_rates.get_recombination_rate(ION_S_p1, T);
+      params.coefficients[1][2] = recombination_rates.get_recombination_rate(ION_S_p2, T);
+      params.coefficients[2][2] = recombination_rates.get_recombination_rate(ION_S_p3, T);
+
+    // set charge transfer rates, multiply them by appropriate densities here, use as pure rate in solver
+
+    //index [3] total ionization rates, index [4] total recomb rates
+     
+    // for C, level 1 is neglible, only have recomb for level 2
+
+      params.coefficients[0][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_S_p1,T4);
+      
+      params.coefficients[1][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_S_p2,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_S_p2,T4);
+
+      params.coefficients[2][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_S_p3,T4)
+                        + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_S_p3,T4);
+
+
+      double t = 0.0;
+
+      gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_sulphur - 1, &params};
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+      if (status != GSL_SUCCESS) {
+          cmac_error("Error in solver!");
+      }
+    
+      gsl_odeiv2_driver_free(driver);
+      //set new 
+      ionization_variables.set_ionic_fraction(ION_S_p1, y[0]);
+      ionization_variables.set_ionic_fraction(ION_S_p2, y[1]);
+      ionization_variables.set_ionic_fraction(ION_S_p3, y[1]);
+
+}
 #endif
 
 
     
     
-    }
+  }
 
 
 

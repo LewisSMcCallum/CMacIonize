@@ -1064,7 +1064,7 @@ void TemperatureCalculator::calculate_temperature(
  */
 void TemperatureCalculator::calculate_temperature(
     const uint_fast32_t loop, const double totweight,
-    DensitySubGrid &subgrid, double timestep, bool time_dependent) const {
+    DensitySubGrid &subgrid, double timestep, bool time_dependent, bool do_metals) const {
 
   if (_do_temperature_computation && loop > _minimum_iteration_number) {
     // get the normalization factors for the ionizing intensity and heating
@@ -1081,6 +1081,6 @@ void TemperatureCalculator::calculate_temperature(
           hfac / cellit.get_volume(), cellit.get_cell_midpoint(), timestep);
     }
   } else {
-    _ionization_state_calculator.calculate_ionization_state(totweight, subgrid, timestep, time_dependent);
+    _ionization_state_calculator.calculate_ionization_state(totweight, subgrid, timestep, time_dependent, do_metals);
   }
 }

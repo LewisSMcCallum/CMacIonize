@@ -180,6 +180,10 @@ private:
   /*! @brief Output a snapshot before the initial iteration? */
   const bool _output_initial_snapshot;
 
+  const bool _time_dependent_ionization;
+
+  const double _time_dependent_timestep;
+
 public:
   TaskBasedIonizationSimulation(const int_fast32_t num_thread,
                                 const std::string parameterfile_name,

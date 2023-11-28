@@ -201,7 +201,11 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
       _simulation_box(_parameter_file),
       _abundance_model(AbundanceModelFactory::generate(_parameter_file, log)),
       _abundances(_abundance_model->get_abundances()), _log(log),
-      _task_plot(task_plot), _output_initial_snapshot(output_initial_snapshot) {
+      _task_plot(task_plot), _output_initial_snapshot(output_initial_snapshot),
+      _time_dependent_ionization(_parameter_file.get_value< bool >(
+          "TaskBasedIonizationSimulation:time dependent ionization", false)), 
+        _time_dependent_timestep(_parameter_file.get_physical_value<QUANTITY_TIME >(
+          "TaskBasedIonizationSimulation:time dependent timestep", "0.5 Myr")){
 
   set_number_of_threads(num_thread);
 
@@ -637,6 +641,14 @@ void TaskBasedIonizationSimulation::run(
           subgrid.set_active_buffer(ingb, NEIGHBOUR_OUTSIDE);
           subgrid.set_owning_thread(get_thread_index());
         }
+        for (auto cellit = subgrid.begin(); cellit != subgrid.end();
+              ++cellit) {
+        if (_time_dependent_ionization) {
+              cellit.get_ionization_variables().copy_previous_fractions();
+        } else {
+              cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
+          }      
+         } 
       }
     }
     stop_parallel_timing_block();
@@ -921,8 +933,8 @@ void TaskBasedIonizationSimulation::run(
     _photon_propagation_timer.stop();
 
     if (_log != nullptr) {
-      _log->write_info("Done shooting photons.");
-      _log->write_info("Starting temperature calculation...");
+      _log->write_status("Done shooting photons.");
+      _log->write_status("Starting temperature calculation...");
     }
     _cell_update_timer.start();
     _time_log.start("temperature calculation");
@@ -933,6 +945,7 @@ void TaskBasedIonizationSimulation::run(
 #pragma omp parallel default(shared)
 #endif
       while (igrid.value() < _grid_creator->number_of_original_subgrids()) {
+        std::cout << 100*igrid.value()/_grid_creator->number_of_original_subgrids() << "% done." << std::endl;
         const size_t this_igrid = igrid.post_increment();
         if (this_igrid < _grid_creator->number_of_original_subgrids()) {
           auto gridit = _grid_creator->get_subgrid(this_igrid);
@@ -963,9 +976,18 @@ void TaskBasedIonizationSimulation::run(
 #endif
           }
 #endif
-
+         if (_time_dependent_ionization) {
+          if (iloop == _number_of_iterations -1) {
+            _temperature_calculator->calculate_temperature(
+              iloop, _number_of_photons, *gridit, _time_dependent_timestep, true, true);
+          } else {
           _temperature_calculator->calculate_temperature(
-              iloop, _number_of_photons, *gridit, 0.0, false);
+              iloop, _number_of_photons, *gridit, _time_dependent_timestep, true, false);
+          }
+         } else {
+          _temperature_calculator->calculate_temperature(
+              iloop, _number_of_photons, *gridit, 0.0, false, true);
+         }
 
 
           task.stop();

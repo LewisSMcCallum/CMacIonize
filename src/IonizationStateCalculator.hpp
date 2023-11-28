@@ -72,7 +72,8 @@ public:
 
   void
   calculate_ionization_state(const double jfac, const double hfac,
-                             IonizationVariables &ionization_variables, double timestep, bool time_dependent) const;
+                             IonizationVariables &ionization_variables, double timestep, bool time_dependent,
+                            bool do_metals) const;
 
   /**
    * @brief Update the total luminosity of the sources.
@@ -168,7 +169,7 @@ public:
       _calculator.calculate_ionization_state(_jfac / cell.get_volume(),
                                              _hfac / cell.get_volume(),
                                              cell.get_ionization_variables(),_timestep, 
-                                             false);
+                                             false, true);
     }
   };
 
@@ -177,7 +178,7 @@ public:
                              std::pair< cellsize_t, cellsize_t > &block, double timestep) const;
 
   void calculate_ionization_state(const double totweight,
-                                  DensitySubGrid &subgrid, double timestep, bool time_dependent) const;
+                                  DensitySubGrid &subgrid, double timestep, bool time_dependent, bool do_metals) const;
 };
 
 #endif // IONIZATIONSTATECALCULATOR_HPP
