@@ -232,6 +232,11 @@ if(HAVE_HDF5)
     target_link_libraries(SharedEngine ${HDF5_LIBRARIES})
 endif(HAVE_HDF5)
 
+if(HAVE_GSL)
+    target_link_libraries(SharedEngine ${GSL_LIBRARIES})
+endif(HAVE_GSL)
+  
+
 # link to MPI, if we have found it
 if(HAVE_MPI)
     target_link_libraries(SharedEngine ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
@@ -287,7 +292,6 @@ target_link_libraries(CMacIonize LegacyEngine)
 target_link_libraries(CMacIonize TaskBasedEngine)
 target_link_libraries(CMacIonize EmissionEngine)
 target_link_libraries(CMacIonize DustEngine)
-target_link_libraries(CMacIonize GSL::gsl GSL::gslcblas)
 set(LIBCMILIBRARY_SOURCES
     CMILibrary.cpp
     SPHArrayInterface.cpp

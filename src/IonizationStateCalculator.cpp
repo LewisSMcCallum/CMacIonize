@@ -1152,7 +1152,7 @@ struct ODEParams {
 };
 
 
-int metals_ode_system(double t, const double y[], double f[], void *params) {
+inline int metals_ode_system(double t, const double y[], double f[], void *params) {
     (void)(t); // Avoid unused parameter warning
     ODEParams* p = static_cast<ODEParams*>(params);
     std::vector<std::vector<double>>& coefficients = p->coefficients;
@@ -1266,7 +1266,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_carbon - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rk2, ts/100., 1e-2, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1.e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
