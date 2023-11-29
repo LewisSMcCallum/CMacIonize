@@ -1530,7 +1530,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       //set new 
       ionization_variables.set_ionic_fraction(ION_S_p1, y[0]);
       ionization_variables.set_ionic_fraction(ION_S_p2, y[1]);
-      ionization_variables.set_ionic_fraction(ION_S_p3, y[1]);
+      ionization_variables.set_ionic_fraction(ION_S_p3, y[2]);
 
 }
 #endif
