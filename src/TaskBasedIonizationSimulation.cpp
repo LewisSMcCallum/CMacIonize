@@ -945,7 +945,6 @@ void TaskBasedIonizationSimulation::run(
 #pragma omp parallel default(shared)
 #endif
       while (igrid.value() < _grid_creator->number_of_original_subgrids()) {
-        std::cout << 100*igrid.value()/_grid_creator->number_of_original_subgrids() << "% done." << std::endl;
         const size_t this_igrid = igrid.post_increment();
         if (this_igrid < _grid_creator->number_of_original_subgrids()) {
           auto gridit = _grid_creator->get_subgrid(this_igrid);

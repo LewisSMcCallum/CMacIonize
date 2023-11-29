@@ -36,10 +36,10 @@
 #ifndef HAVE_HYDROGEN_ONLY
 #define HAS_HELIUM
 #define HAS_CARBON
-//#define HAS_NITROGEN
-//#define HAS_OXYGEN
-//#define HAS_NEON
-//#define HAS_SULPHUR
+#define HAS_NITROGEN
+#define HAS_OXYGEN
+#define HAS_NEON
+#define HAS_SULPHUR
 #endif
 
 // activate new additional metals
