@@ -1045,7 +1045,7 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
   gsl_odeiv2_system sys = {hydrogen_ode_system, nullptr, 1, coefficients};
 
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-6, 0.0);
+        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
 
 
   int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
