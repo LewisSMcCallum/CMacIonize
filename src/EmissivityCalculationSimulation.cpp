@@ -156,9 +156,14 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
   Abundances abundances;
   if (simulation_parameters.has_value("Abundances:helium") && false) {
     abundances = Abundances(simulation_parameters);
-  } else {
+  } else if (false) {
     const AbundanceModel *abundance_model =
         AbundanceModelFactory::generate(simulation_parameters, log);
+    abundances = abundance_model->get_abundances();
+    delete abundance_model;
+  } else {
+        const AbundanceModel *abundance_model =
+        AbundanceModelFactory::generate(params, log);
     abundances = abundance_model->get_abundances();
     delete abundance_model;
   }

@@ -54,7 +54,7 @@ public:
   static AbundanceModel *generate(ParameterFile &params, Log *log = nullptr) {
 
     // check if we have an old parameter file
-    if (false && !params.has_value("Abundances:type") &&
+    if (!params.has_value("Abundances:type") &&
         (params.has_value("Abundances:helium") ||
          params.has_value("Abundances:carbon") ||
          params.has_value("Abundances:nitrogen") ||
