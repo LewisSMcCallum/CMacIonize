@@ -191,7 +191,7 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // we assume all oxygen is either O0, O+ or O++
     // we use all of them
     abund[OI] = abundances.get_abundance(ELEMENT_O) *
-                onization_variables.get_ionic_fraction(ION_O_n);
+                ionization_variables.get_ionic_fraction(ION_O_n);
     abund[OII] = abundances.get_abundance(ELEMENT_O) *
                  ionization_variables.get_ionic_fraction(ION_O_p1);
     abund[OIII] = abundances.get_abundance(ELEMENT_O) *
