@@ -154,7 +154,7 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
   //  - old parameter file: directly
   //  - new paramter file: using the AbundanceModel
   Abundances abundances;
-  if (simulation_parameters.has_value("Abundances:helium")) {
+  if (simulation_parameters.has_value("Abundances:helium") && false) {
     abundances = Abundances(simulation_parameters);
   } else {
     const AbundanceModel *abundance_model =
