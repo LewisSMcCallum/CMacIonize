@@ -166,10 +166,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // note that the ionic fraction of C_p1 corresponds to the fraction of
     // ionized C+, i.e. the fraction of C++
     abund[CII] = abundances.get_abundance(ELEMENT_C) *
-                 (1. - ionization_variables.get_ionic_fraction(ION_C_p1) -
-                  ionization_variables.get_ionic_fraction(ION_C_p2));
+                 ionization_variables.get_ionic_fraction(ION_C_p1);
     abund[CIII] = abundances.get_abundance(ELEMENT_C) *
-                  ionization_variables.get_ionic_fraction(ION_C_p1);
+                  ionization_variables.get_ionic_fraction(ION_C_p2);
 #else
 // Lewis hacked this in to make an error go away... Dont see it causing problems...
    abund[CII] = 0.0;
@@ -192,14 +191,11 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // we assume all oxygen is either O0, O+ or O++
     // we use all of them
     abund[OI] = abundances.get_abundance(ELEMENT_O) *
-                (1. - ionization_variables.get_ionic_fraction(ION_O_n) -
-                 ionization_variables.get_ionic_fraction(ION_O_p1) -
-                 ionization_variables.get_ionic_fraction(ION_O_p2) -
-                  ionization_variables.get_ionic_fraction(ION_O_p3));
+                onization_variables.get_ionic_fraction(ION_O_n);
     abund[OII] = abundances.get_abundance(ELEMENT_O) *
-                 ionization_variables.get_ionic_fraction(ION_O_n);
+                 ionization_variables.get_ionic_fraction(ION_O_p1);
     abund[OIII] = abundances.get_abundance(ELEMENT_O) *
-                  ionization_variables.get_ionic_fraction(ION_O_p1);
+                  ionization_variables.get_ionic_fraction(ION_O_p2);
 #endif
 
 #ifdef HAS_NEON
@@ -207,9 +203,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // we make no assumptions on the relative abundances of different neon ions
     // we only use Ne+ and Ne++
     abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
-                  ionization_variables.get_ionic_fraction(ION_Ne_n);
+                  ionization_variables.get_ionic_fraction(ION_Ne_p1);
     abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
-                   ionization_variables.get_ionic_fraction(ION_Ne_p1);
+                   ionization_variables.get_ionic_fraction(ION_Ne_p2);
 #endif
 
 #ifdef HAS_SULPHUR
@@ -217,13 +213,11 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // we assume all sulphur is either S+, S++, S+++ or S++++
     // we only use S+, S++ and S+++
     abund[SII] = abundances.get_abundance(ELEMENT_S) *
-                 (1. - ionization_variables.get_ionic_fraction(ION_S_p1) -
-                  ionization_variables.get_ionic_fraction(ION_S_p2) -
-                  ionization_variables.get_ionic_fraction(ION_S_p3));
+                 ionization_variables.get_ionic_fraction(ION_S_p1);
     abund[SIII] = abundances.get_abundance(ELEMENT_S) *
-                  ionization_variables.get_ionic_fraction(ION_S_p1);
+                  ionization_variables.get_ionic_fraction(ION_S_p2);
     abund[SIV] = abundances.get_abundance(ELEMENT_S) *
-                 ionization_variables.get_ionic_fraction(ION_S_p2);
+                 ionization_variables.get_ionic_fraction(ION_S_p3);
 #endif
 
     std::vector< std::vector< double > > line_strengths =
