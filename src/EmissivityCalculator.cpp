@@ -179,14 +179,14 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // nitrogen
     // we assume all nitrogen is either N0, N+, N++ or N+++
     // we only use N0, N+ and N++
-    abund[NI] = abundances.get_abundance(ELEMENT_N) *
-                (1. - ionization_variables.get_ionic_fraction(ION_N_n) -
-                 ionization_variables.get_ionic_fraction(ION_N_p1) -
-                 ionization_variables.get_ionic_fraction(ION_N_p2));
+    abund[NI] = abundances.get_abundance(ELEMENT_N)*
+                ionization_variables.get_ionic_fraction(ION_N_n) ;
     abund[NII] = abundances.get_abundance(ELEMENT_N) *
                  ionization_variables.get_ionic_fraction(ION_N_p1);
+    std::cout << abund[NII] << " " abundances.get_abundance(ELEMENT_N) << " " <<  ionization_variables.get_ionic_fraction(ION_N_p1)<< std::endl;
+    
     abund[NIII] = abundances.get_abundance(ELEMENT_N) *
-                  ionization_variables.get_ionic_fraction(ION_N_p1);
+                  ionization_variables.get_ionic_fraction(ION_N_p2);
 #endif
 
 #ifdef HAS_OXYGEN
