@@ -182,9 +182,7 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     abund[NI] = abundances.get_abundance(ELEMENT_N)*
                 ionization_variables.get_ionic_fraction(ION_N_n) ;
     abund[NII] = abundances.get_abundance(ELEMENT_N) *
-                 ionization_variables.get_ionic_fraction(ION_N_p1);
-    std::cout << abund[NII] << " " <<  abundances.get_abundance(ELEMENT_N) << " " <<  ionization_variables.get_ionic_fraction(ION_N_p1)<< std::endl;
-    
+                 ionization_variables.get_ionic_fraction(ION_N_p1);    
     abund[NIII] = abundances.get_abundance(ELEMENT_N) *
                   ionization_variables.get_ionic_fraction(ION_N_p2);
 #endif
