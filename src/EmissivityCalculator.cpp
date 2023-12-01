@@ -136,7 +136,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
   EmissivityValues eval;
 
   for (uint_fast32_t i=0;i<NUMBER_OF_IONNAMES;i++) {
-    ionization_variables.set_ionic_fraction(i,std::max(1.e-3,ionization_variables.get_ionic_fraction(i)));
+    if (ionization_variables.get_ionic_fraction(i) < 1.e-3) {
+      ionization_variables.set_ionic_fraction(i,0.0);
+    }
   }
 
 
