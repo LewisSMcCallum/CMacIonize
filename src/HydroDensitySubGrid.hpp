@@ -168,7 +168,7 @@ public:
       _hydro_variables[i].set_energy_term(0.);
       for (int_fast8_t j = 0; j < 5; ++j) {
         _hydro_variables[i].conserved(j) +=
-            _hydro_variables[i].delta_conserved(j) * timestep*0;
+            _hydro_variables[i].delta_conserved(j) * timestep;
 
         // reset hydro variables
         _hydro_variables[i].delta_conserved(j) = 0;
