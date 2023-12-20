@@ -622,7 +622,7 @@ public:
             double cell_mass = it.get_hydro_variables().get_conserved_mass();
             double cell_z = std::abs(it.get_cell_midpoint()[2]);
 
-            if (cell_z > 6.171e18) {
+            if (cell_z > 6.171e18 && false) {
               cell_mass = 0.0;
             }
 
