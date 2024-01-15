@@ -2036,6 +2036,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                     std::cout << "NOT LAST LOOP LETS NOT DO METALS" << std::endl;
                   temperature_calculator->calculate_temperature(
                       iloop, numphoton, *gridit, hydro_radtime, true, false);
+                  }
                 } else {
                     temperature_calculator->calculate_temperature(iloop, numphoton,
                                         *gridit, hydro_radtime, false, true);
@@ -2093,6 +2094,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   } else {
                   temperature_calculator->calculate_temperature(
                       0, 0, *gridit, hydro_radtime, true, false);
+                  }
               } else {
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime,false, true);
@@ -2137,6 +2139,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 } else {
                 temperature_calculator->calculate_temperature(
                     0, 0, *gridit, hydro_radtime, true, false);
+                }
               } else{
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime,false,true);
