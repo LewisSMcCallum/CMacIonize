@@ -2088,13 +2088,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 }      
               }
               if (_time_dependent_ionization) {
-                  if (iloop == _number_of_iterations -1) {
-                    temperature_calculator->calculate_temperature(
+                  
+               temperature_calculator->calculate_temperature(
                       0, 0, *gridit, hydro_radtime, true, true);
-                  } else {
-                  temperature_calculator->calculate_temperature(
-                      0, 0, *gridit, hydro_radtime, true, false);
-                  }
+
               } else {
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime,false, true);
@@ -2133,13 +2130,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 }      
               } 
               if (_time_dependent_ionization) {
-                if (iloop == nloop -1) {
+              
                   temperature_calculator->calculate_temperature(
                     0, 0, *gridit, hydro_radtime, true, true);
-                } else {
-                temperature_calculator->calculate_temperature(
-                    0, 0, *gridit, hydro_radtime, true, false);
-                }
+    
               } else{
               temperature_calculator->calculate_temperature(0, 0,
                                                             *gridit,hydro_radtime,false,true);
