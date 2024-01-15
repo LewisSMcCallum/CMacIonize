@@ -2029,12 +2029,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 if (_time_dependent_ionization) {
                   if (iloop == nloop -1) {
                     std::cout << "LAST LOOP LETS DO METALS" << std::endl;
-                    _temperature_calculator->calculate_temperature(
+                    temperature_calculator->calculate_temperature(
                       iloop, _number_of_photons, *gridit, hydro_radtime, true, true);
                       
                   } else {
                     std::cout << "NOT LAST LOOP LETS NOT DO METALS" << std::endl;
-                  _temperature_calculator->calculate_temperature(
+                  temperature_calculator->calculate_temperature(
                       iloop, _number_of_photons, *gridit, hydro_radtime, true, false);
                 } else {
                     temperature_calculator->calculate_temperature(iloop, numphoton,
@@ -2088,10 +2088,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               }
               if (_time_dependent_ionization) {
                   if (iloop == _number_of_iterations -1) {
-                    _temperature_calculator->calculate_temperature(
+                    temperature_calculator->calculate_temperature(
                       0, 0, *gridit, hydro_radtime, true, true);
                   } else {
-                  _temperature_calculator->calculate_temperature(
+                  temperature_calculator->calculate_temperature(
                       0, 0, *gridit, hydro_radtime, true, false);
               } else {
               temperature_calculator->calculate_temperature(0, 0,
@@ -2132,10 +2132,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               } 
               if (_time_dependent_ionization) {
                 if (iloop == nloop -1) {
-                  _temperature_calculator->calculate_temperature(
+                  temperature_calculator->calculate_temperature(
                     0, 0, *gridit, hydro_radtime, true, true);
                 } else {
-                _temperature_calculator->calculate_temperature(
+                temperature_calculator->calculate_temperature(
                     0, 0, *gridit, hydro_radtime, true, false);
               } else{
               temperature_calculator->calculate_temperature(0, 0,
