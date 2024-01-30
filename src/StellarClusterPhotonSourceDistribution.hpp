@@ -299,6 +299,11 @@ public:
       _source_luminosities.push_back(lum_from_mass(m_cur));
 
       double total_time = 0.0;
+      if (_output_file == nullptr) {
+        std::cout << "NO OUTPUT FILE OBJECT" << std::endl;
+      } else {
+        std::cout << "Should be writing sources in. m=" << m_cur << std::endl;
+      }
       if (_output_file != nullptr) {
         _source_indices.push_back(_next_index);
         ++_next_index;
