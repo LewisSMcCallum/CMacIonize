@@ -249,7 +249,7 @@ public:
 
     if (output_sources) {
       _output_file = new std::ofstream("StellarCluster_source_positions.txt");
-      *_output_file << "#time (s)\tx (m)\ty (m)\tz (m)\tevent\tindex\tluminosity\ttype\n";
+      *_output_file << "#time (s)\tx (m)\ty (m)\tz (m)\tevent\tindex\tluminosity\tmass\ttype\n";
       _output_file->flush();
 
       _output_file2 = new std::ofstream("TotalLuminosity.txt");
@@ -308,12 +308,9 @@ public:
                       << "\t" << pos.z() << "\t1\t"
                       << _source_indices.back() << "\t"
                       << _source_luminosities.back() << "\t"
+                      << m_cur << "\t"
                       << "OSTAR" << "\n";
-        std::cout << total_time << "\t" << pos.x() << "\t" << pos.y()
-                      << "\t" << pos.z() << "\t1\t"
-                      << _source_indices.back() << "\t"
-                      << _source_luminosities.back() << "\t"
-                      << "OSTAR" << "\n";
+        _output_file->flush();
       }
 
       mass_generated += m_cur;
