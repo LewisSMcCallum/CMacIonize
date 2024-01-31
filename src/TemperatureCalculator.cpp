@@ -600,7 +600,7 @@ void TemperatureCalculator::calculate_temperature(
 
   // if the ionizing intensity is 0, the gas is trivially neutral and all
   // coolants are in the ground state
-  if (ionization_variables.get_number_density() == 0.) {
+  if (ionization_variables.get_number_density() == 0. || jH == 0.) {
     ionization_variables.set_temperature(500.);
 
     ionization_variables.set_ionic_fraction(ION_H_n, 1.);
@@ -910,7 +910,7 @@ void TemperatureCalculator::calculate_temperature(
 
   // cap the temperature at 30,000 K, since helium charge transfer rates are
   // only valid until 30,000 K
-  //T0 = std::min(30000., T0);
+  T0 = std::min(30000., T0);
 
   // update the ionic fractions and temperature
   ionization_variables.set_temperature(T0);
