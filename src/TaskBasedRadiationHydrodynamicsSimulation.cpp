@@ -1252,11 +1252,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   if (sourcedistribution == nullptr) {
     temperature_calculator = new TemperatureCalculator(
         0.0, abundances, line_cooling_data,
-        *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
+        *recombination_rates, charge_transfer_rates, collisional_rates,radiative_cooling, *params, log);
   } else {
     temperature_calculator = new TemperatureCalculator(
         sourcedistribution->get_total_luminosity(), abundances, line_cooling_data,
-        *recombination_rates, charge_transfer_rates, collisional_rates, *params, log);
+        *recombination_rates, charge_transfer_rates, collisional_rates,radiative_cooling, *params, log);
 
   }
 

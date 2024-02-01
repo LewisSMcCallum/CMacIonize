@@ -32,6 +32,7 @@
 #include "DensityGridTraversalJobMarket.hpp"
 #include "DensitySubGrid.hpp"
 #include "DensityValues.hpp"
+#include "DeRijckeRadiativeCooling.hpp"
 #include "IonizationStateCalculator.hpp"
 #include "LineCoolingData.hpp"
 #include "PhysicalConstants.hpp"
@@ -77,13 +78,15 @@ TemperatureCalculator::TemperatureCalculator(
     const LineCoolingData &line_cooling_data,
     const RecombinationRates &recombination_rates,
     const ChargeTransferRates &charge_transfer_rates,
-    const CollisionalRates &collisional_rates, Log *log)
+    const CollisionalRates &collisional_rates,
+    const DeRijckeRadiativeCooling* radiative_cooling, Log *log)
     : _luminosity(luminosity), _abundances(abundances), _pahfac(pahfac),
       _crfac(crfac), _crlim(crlim), _crscale(crscale),
       _line_cooling_data(line_cooling_data),
       _recombination_rates(recombination_rates),
       _charge_transfer_rates(charge_transfer_rates),
       _collisional_rates(collisional_rates),
+      _radiative_cooling(radiative_cooling),
       _ionization_state_calculator(luminosity, abundances, recombination_rates,
                                    charge_transfer_rates, collisional_rates),
       _do_temperature_computation(do_temperature_computation),
@@ -141,6 +144,7 @@ TemperatureCalculator::TemperatureCalculator(
     const RecombinationRates &recombination_rates,
     const ChargeTransferRates &charge_transfer_rates,
     const CollisionalRates &collisional_rates,
+    const DeRijckeRadiativeCooling* radiative_cooling,
     ParameterFile &params,
     Log *log)
     : TemperatureCalculator(
@@ -165,7 +169,7 @@ TemperatureCalculator::TemperatureCalculator(
           params.get_physical_value< QUANTITY_TEMPERATURE >(
               "TemperatureCalculator:minimum ionized temperature", "4000. K"),
           line_cooling_data, recombination_rates, charge_transfer_rates,
-          collisional_rates, log) {}
+          collisional_rates, radiative_cooling,log) {}
 
 /**
  * @brief Function that calculates the cooling and heating rate for a given
@@ -221,7 +225,8 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
     const LineCoolingData &line_cooling_data,
     const RecombinationRates &recombination_rates,
     const ChargeTransferRates &charge_transfer_rates,
-    const CollisionalRates &collisional_rates) {
+    const CollisionalRates &collisional_rates,
+    const DeRijckeRadiativeCooling* radiative_cooling) {
 
   /// step 0: initialize some variables
 
@@ -360,7 +365,7 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   // we precompute the number density of neutral hydrogen and neutral helium
   const double nh0 = n * h0;
   const double nhe0 = n * he0 * AHe;
-
+  if (radiative_cooling == nullptr) {
   IonizationStateCalculator::compute_ionization_states_metals(
       j, ne, T, T4, nh0, nhe0, nhp, recombination_rates,
       charge_transfer_rates, collisional_rates,ionization_variables);
@@ -381,64 +386,56 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   // we only use C+ and C++
   // note that the ionic fraction of C_p1 corresponds to the fraction of ionized
   // C+, i.e. the fraction of C++
-  abund[CII] = abundances.get_abundance(ELEMENT_C) *
-               (1. - ionization_variables.get_ionic_fraction(ION_C_p1) -
-                ionization_variables.get_ionic_fraction(ION_C_p2));
-  abund[CIII] = abundances.get_abundance(ELEMENT_C) *
-                ionization_variables.get_ionic_fraction(ION_C_p1);
+    abund[CII] = abundances.get_abundance(ELEMENT_C) *
+                 ionization_variables.get_ionic_fraction(ION_C_p1);
+    abund[CIII] = abundances.get_abundance(ELEMENT_C) *
+                  ionization_variables.get_ionic_fraction(ION_C_p2);
 #endif
 
 #ifdef HAS_NITROGEN
   // nitrogen
   // we assume all nitrogen is either N0, N+, N++ or N+++
   // we only use N0, N+ and N++
-  abund[NI] = abundances.get_abundance(ELEMENT_N) *
-              (1. - ionization_variables.get_ionic_fraction(ION_N_n) -
-               ionization_variables.get_ionic_fraction(ION_N_p1) -
-               ionization_variables.get_ionic_fraction(ION_N_p2));
-  abund[NII] = abundances.get_abundance(ELEMENT_N) *
-               ionization_variables.get_ionic_fraction(ION_N_n);
-  abund[NIII] = abundances.get_abundance(ELEMENT_N) *
-                ionization_variables.get_ionic_fraction(ION_N_p1);
+    abund[NI] = abundances.get_abundance(ELEMENT_N)*
+                ionization_variables.get_ionic_fraction(ION_N_n) ;
+    abund[NII] = abundances.get_abundance(ELEMENT_N) *
+                 ionization_variables.get_ionic_fraction(ION_N_p1);    
+    abund[NIII] = abundances.get_abundance(ELEMENT_N) *
+                  ionization_variables.get_ionic_fraction(ION_N_p2);
 #endif
 
 #ifdef HAS_OXYGEN
   // oxygen
   // we assume all oxygen is either O0, O+ or O++
   // we use all of them
-  abund[OI] = abundances.get_abundance(ELEMENT_O) *
-              (1. - ionization_variables.get_ionic_fraction(ION_O_n) -
-               ionization_variables.get_ionic_fraction(ION_O_p1) -
-               ionization_variables.get_ionic_fraction(ION_O_p2) -
-               ionization_variables.get_ionic_fraction(ION_O_p3));
-  abund[OII] = abundances.get_abundance(ELEMENT_O) *
-               ionization_variables.get_ionic_fraction(ION_O_n);
-  abund[OIII] = abundances.get_abundance(ELEMENT_O) *
-                ionization_variables.get_ionic_fraction(ION_O_p1);
+    abund[OI] = abundances.get_abundance(ELEMENT_O) *
+                ionization_variables.get_ionic_fraction(ION_O_n);
+    abund[OII] = abundances.get_abundance(ELEMENT_O) *
+                 ionization_variables.get_ionic_fraction(ION_O_p1);
+    abund[OIII] = abundances.get_abundance(ELEMENT_O) *
+                  ionization_variables.get_ionic_fraction(ION_O_p2);
 #endif
 
 #ifdef HAS_NEON
   // neon
   // we make no assumptions on the relative abundances of different neon ions
   // we only use Ne+ and Ne++
-  abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
-                ionization_variables.get_ionic_fraction(ION_Ne_n);
-  abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
-                 ionization_variables.get_ionic_fraction(ION_Ne_p1);
+    abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
+                  ionization_variables.get_ionic_fraction(ION_Ne_p1);
+    abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
+                   ionization_variables.get_ionic_fraction(ION_Ne_p2);
 #endif
 
 #ifdef HAS_SULPHUR
   // sulphur
   // we assume all sulphur is either S+, S++, S+++ or S++++
   // we only use S+ and S++
-  abund[SII] = abundances.get_abundance(ELEMENT_S) *
-               (1. - ionization_variables.get_ionic_fraction(ION_S_p1) -
-                ionization_variables.get_ionic_fraction(ION_S_p2) -
-                ionization_variables.get_ionic_fraction(ION_S_p3));
-  abund[SIII] = abundances.get_abundance(ELEMENT_S) *
-                ionization_variables.get_ionic_fraction(ION_S_p1);
-  abund[SIV] = abundances.get_abundance(ELEMENT_S) *
-               ionization_variables.get_ionic_fraction(ION_S_p2);
+    abund[SII] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p1);
+    abund[SIII] = abundances.get_abundance(ELEMENT_S) *
+                  ionization_variables.get_ionic_fraction(ION_S_p2);
+    abund[SIV] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p3);
 #endif
 
 #ifdef DO_OUTPUT_COOLING
@@ -517,6 +514,9 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
 #endif
 #endif
   loss += Lhp + Lhep;
+  } else {
+    loss = radiative_cooling->get_cooling_rate(T) * n * n;
+  }
 
   // make sure losses are losses and gains are gains
   loss = std::max(loss, 0.);
@@ -800,7 +800,7 @@ void TemperatureCalculator::calculate_temperature(
     compute_cooling_and_heating_balance(
         h01, he01, gain1, loss1, T1, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
-        _recombination_rates, _charge_transfer_rates, _collisional_rates);
+        _recombination_rates, _charge_transfer_rates, _collisional_rates, _radiative_cooling);
 
     const double T2 = 0.9 * T0;
     // ioneng
@@ -808,13 +808,13 @@ void TemperatureCalculator::calculate_temperature(
     compute_cooling_and_heating_balance(
         h02, he02, gain2, loss2, T2, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
-        _recombination_rates, _charge_transfer_rates, _collisional_rates);
+        _recombination_rates, _charge_transfer_rates, _collisional_rates, _radiative_cooling);
 
     // ioneng - this one sets h0, he0, gain0 and loss0
     compute_cooling_and_heating_balance(
         h0, he0, gain0, loss0, T0, ionization_variables, cell_midpoint, jH, jHe, j,
         _abundances, h, _pahfac, crfac, _crscale, _line_cooling_data,
-        _recombination_rates, _charge_transfer_rates, _collisional_rates);
+        _recombination_rates, _charge_transfer_rates, _collisional_rates, _radiative_cooling);
 
     // funny detail: this value is actually constant :p
     static const double logtt = std::log(1.1 / 0.9);

@@ -37,6 +37,7 @@ class CollisionalRates;
 class LineCoolingData;
 class Log;
 class RecombinationRates;
+class DeRijckeRadiativeCooling;
 
 /**
  * @brief Class that calculates the temperature for every cell of a grid after
@@ -90,6 +91,8 @@ private:
 
   const CollisionalRates &_collisional_rates;
 
+  const DeRijckeRadiativeCooling* _radiative_cooling;
+
   /*! @brief IonizationStateCalculator used for low iteration numbers. */
   IonizationStateCalculator _ionization_state_calculator;
 
@@ -111,6 +114,8 @@ private:
    *  (in K). */
   const double _minimum_ionized_temperature;
 
+  
+
   /*! @brief Log to write logging info to. */
   Log *_log;
 
@@ -125,6 +130,7 @@ public:
       const RecombinationRates &recombination_rates,
       const ChargeTransferRates &charge_transfer_rates,
       const CollisionalRates &collisional_rates,
+      const DeRijckeRadiativeCooling* radiative_cooling,
       Log *log = nullptr);
 
   TemperatureCalculator(double luminosity, const Abundances &abundances,
@@ -132,6 +138,7 @@ public:
                         const RecombinationRates &recombination_rates,
                         const ChargeTransferRates &charge_transfer_rates,
                         const CollisionalRates &collisional_rates,
+                        const DeRijckeRadiativeCooling* radiative_cooling,
                         ParameterFile &params, Log *log = nullptr);
 
   static void compute_cooling_and_heating_balance(
@@ -143,7 +150,8 @@ public:
       double crscale, const LineCoolingData &line_cooling_data,
       const RecombinationRates &recombination_rates,
       const ChargeTransferRates &charge_transfer_rates,
-      const CollisionalRates &collisional_rates);
+      const CollisionalRates &collisional_rates,
+      const DeRijckeRadiativeCooling* radiative_cooling);
 
   void calculate_temperature(IonizationVariables &ionization_variables,
                              const double jfac, const double hfac,

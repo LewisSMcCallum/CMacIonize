@@ -194,7 +194,7 @@ IonizationSimulation::IonizationSimulation(const bool write_output,
   // used to calculate both the ionization state and the temperature
   _temperature_calculator = new TemperatureCalculator(
       total_luminosity, _abundances, _line_cooling_data, *_recombination_rates,
-      _charge_transfer_rates, _collisional_rates, _parameter_file, _log);
+      _charge_transfer_rates, _collisional_rates, nullptr,_parameter_file, _log);
 
   // create ray tracing objects
   int_fast32_t random_seed = _parameter_file.get_value< int_fast32_t >(

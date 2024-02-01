@@ -33,6 +33,7 @@
 #include "DensityGridWriterFactory.hpp"
 #include "DensitySubGrid.hpp"
 #include "DensitySubGridCreator.hpp"
+#include "DeRijckeRadiativeCooling.hpp"
 #include "DiffuseReemissionHandlerFactory.hpp"
 #include "DistributedPhotonSource.hpp"
 #include "FlushContinuousPhotonBuffersTaskContext.hpp"
@@ -337,10 +338,15 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
   }
 
   CollisionalRates* _collisional_rates = new CollisionalRates;
+  DeRijckeRadiativeCooling* _radiative_cooling = nullptr;
+  if (true){
+    _radiative_cooling = new DeRijckeRadiativeCooling();
+
+  }
   // used to calculate both the ionization state and the temperature
   _temperature_calculator = new TemperatureCalculator(
       _total_luminosity, _abundances, _line_cooling_data, *_recombination_rates,
-      _charge_transfer_rates, *_collisional_rates, _parameter_file, _log);
+      _charge_transfer_rates, *_collisional_rates,_radiative_cooling, _parameter_file, _log);
 
 
   // the second condition is necessary to deal with old parameter files

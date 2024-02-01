@@ -456,7 +456,7 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
   // used to calculate both the ionization state and the temperature
   TemperatureCalculator *temperature_calculator = new TemperatureCalculator(
       source.get_total_luminosity(), abundances, line_cooling_data,
-      *recombination_rates, charge_transfer_rates, collisional_rates,
+      *recombination_rates, charge_transfer_rates, collisional_rates,nullptr,
       *params, log);
 
   // optional mask to fix the hydrodynamics in some parts of the box
