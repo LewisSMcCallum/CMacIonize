@@ -193,7 +193,35 @@ public:
     values.set_temperature(temperature);
     values.set_ionic_fraction(ION_H_n, neutral_fraction_H);
 #ifdef HAS_HELIUM
-    values.set_ionic_fraction(ION_He_n, 1.e-6);
+    values.set_ionic_fraction(ION_He_n, 0.999);
+    values.set_ionic_fraction(ION_He_p1, 0.001);
+
+#endif
+#ifdef HAS_CARBON
+    values.set_ionic_fraction(ION_C_p1, 0.999);
+    values.set_ionic_fraction(ION_C_p2, 0.001);
+#endif
+#ifdef HAS_NITROGEN
+    values.set_ionic_fraction(ION_N_n, 0.999);
+    values.set_ionic_fraction(ION_N_p1, 0.001);
+    values.set_ionic_fraction(ION_N_p2,0.000);
+#endif
+#ifdef HAS_OXYGEN
+    values.set_ionic_fraction(ION_O_n, 0.999);
+    values.set_ionic_fraction(ION_O_p1, 0.001);
+    values.set_ionic_fraction(ION_O_p2, 0.000);
+    values.set_ionic_fraction(ION_O_p3, 0.000);
+#endif
+#ifdef HAS_NEON
+    values.set_ionic_fraction(ION_Ne_n, 0.999);
+    values.set_ionic_fraction(ION_Ne_p1, 0.001);
+    values.set_ionic_fraction(ION_Ne_p2, 0.000);
+    values.set_ionic_fraction(ION_Ne_p3, 0.000);
+#endif
+#ifdef HAS_SULPHUR
+    values.set_ionic_fraction(ION_S_p1, 0.999);
+    values.set_ionic_fraction(ION_S_p2, 0.001);
+    values.set_ionic_fraction(ION_S_p3, 0.000);
 #endif
     values.set_velocity(velocity);
     return values;
