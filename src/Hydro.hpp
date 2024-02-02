@@ -1133,10 +1133,30 @@ public:
                                     const double timestep) const {
 
     if (_do_explicit_heating) {
-      const double dE = ionization_variables.get_heating(HEATINGTERM_H) *
+      double dE = ionization_variables.get_heating(HEATINGTERM_H) *
                         timestep * ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
+//pls dont forget to bring in the actual variable here
+    const double AHe = 0.1;
+    const double n = ionization_variables.get_number_density();
+    const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+    const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+     dE += AHe*ionization_variables.get_heating(HEATINGTERM_He) *
+                        timestep * ionization_variables.get_number_density() /
+                        inverse_volume *
+                        ionization_variables.get_ionic_fraction(ION_He_n);
+
+    const double T4 = 1.e-4*ionization_variables.get_temperature();
+    const double sqrtT = std::sqrt(ionization_variables.get_temperature());
+    const double alpha_e_2sP = 4.17e-20 * std::pow(T4, -0.861);
+    const double pHots = 1. / (1. + 77. * he0 / (sqrtT * h0));
+    const double ne = n * (1. - h0 + AHe * hep + 2*AHe*(1. - hep - he0));
+    const double nenhep = ne * hep * n * AHe;
+    dE += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume*timestep;
+#endif
       update_energy_variables(ionization_variables, hydro_variables,
                               inverse_volume, dE);
       return;
