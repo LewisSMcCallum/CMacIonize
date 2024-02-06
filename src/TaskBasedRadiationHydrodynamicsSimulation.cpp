@@ -1240,7 +1240,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
             "10 K");
     // if do table cooling
-    if (true) {
+    if (false) {
       radiative_cooling = new DeRijckeRadiativeCooling();
     }
     _cooling_file = new std::ofstream("CoolingProgression.txt");
