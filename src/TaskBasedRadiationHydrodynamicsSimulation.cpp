@@ -1233,9 +1233,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   DeRijckeRadiativeCooling *radiative_cooling = nullptr;
   std::ofstream *_cooling_file = nullptr;
   double _cooling_temp_floor = 10.;
-  if (params->get_value< bool >(
+  const bool do_rad_cool = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
-          false)) {
+          false);
+  if (do_rad_cool) {
     _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
             "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
             "10 K");
@@ -2487,7 +2488,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       }
     }
 
-    if (radiative_cooling != nullptr) {
+    if (do_rad_cool) {
       time_logger.start("cooling");
 
       if (log) {
