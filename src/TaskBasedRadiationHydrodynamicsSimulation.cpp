@@ -822,6 +822,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
   double volume = 1./inverse_volume;
   double k= 1.38064852e-23;
   double mh = 1.672621898e-27;
+  double n = ionization_variables.get_number_density();
   
 
 
@@ -829,7 +830,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     double AHe = abundances.get_abundance(ELEMENT_He);
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-    const double ne = rho*(1-xh) + 2.0*AHe*rho*(1.0-he0-hep) + rho*hep*AHe;
+    const double ne = n*(1-xh) + 2.0*AHe*n*(1.0-he0-hep) + n*hep*AHe;
 #else
     const double ne = rho*(1-xh);
 #endif
@@ -876,7 +877,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
   //}
   double cooling;
   if (radiative_cooling == nullptr) {
-    cooling = line_cooling_data.get_cooling(t_start, ne, abund) * rho /inverse_volume;
+    cooling = line_cooling_data.get_cooling(t_start, ne, abund) * n /inverse_volume;
   } else {
     cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
   }
@@ -918,7 +919,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
       }
     
       if (radiative_cooling == nullptr) {
-        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * rho /inverse_volume;
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
       }
@@ -944,7 +945,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         break;
       }
       if (radiative_cooling == nullptr) {
-        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * rho /inverse_volume;
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
       }
