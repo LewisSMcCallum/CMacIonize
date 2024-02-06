@@ -32,6 +32,7 @@
 #include "IonizationVariables.hpp"
 #include "ParameterFile.hpp"
 #include "PhysicalConstants.hpp"
+#include "Abundances.hpp"
 
 #include <cfloat>
 
@@ -62,6 +63,8 @@ private:
 
   /*! @brief Enable explicit radiation heating? */
   const bool _do_explicit_heating;
+
+  const Abundances &_abundances;
 
   /*! @brief @f$\gamma{}-1@f$. */
   const double _gamma_minus_one;
@@ -162,10 +165,10 @@ public:
    */
   inline Hydro(const double gamma, const double neutral_temperature,
                const double ionised_temperature, const double max_velocity,
-               const bool do_explicit_heating)
+               const bool do_explicit_heating, const Abundances &abundances)
       : _gamma(gamma), _neutral_temperature(neutral_temperature),
         _ionised_temperature(ionised_temperature), _max_velocity(max_velocity),
-        _do_explicit_heating(do_explicit_heating),
+        _do_explicit_heating(do_explicit_heating), _abundances(abundances),
         _gamma_minus_one(_gamma - 1.),
         _one_over_gamma_minus_one(1. / _gamma_minus_one),
         _density_conversion_factor(PhysicalConstants::get_physical_constant(
@@ -203,7 +206,7 @@ public:
    *
    * @param params ParameterFile to read from.
    */
-  inline Hydro(ParameterFile &params)
+  inline Hydro(const Abundances &abundances, ParameterFile &params)
       : Hydro(params.get_value< double >("Hydro:polytropic index", 5. / 3.),
               params.get_physical_value< QUANTITY_TEMPERATURE >(
                   "Hydro:neutral temperature", "100. K"),
@@ -211,7 +214,7 @@ public:
                   "Hydro:ionised temperature", "1.e4 K"),
               params.get_physical_value< QUANTITY_VELOCITY >(
                   "Hydro:maximum velocity", "1.e99 m s^-1"),
-              params.get_value< bool >("Hydro:do explicit heating", false)) {}
+              params.get_value< bool >("Hydro:do explicit heating", false), abundances) {}
 
   /**
    * @brief Get the soundspeed for the given hydrodynamic variables.
@@ -1138,8 +1141,8 @@ public:
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_H_n);
 #ifdef HAS_HELIUM
-//pls dont forget to bring in the actual variable here
-    const double AHe = 0.1;
+   //calculate heating due to helium photoionization
+    const double AHe = _abundances.get_abundance(ELEMENT_He);
     const double n = ionization_variables.get_number_density();
     const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
@@ -1148,7 +1151,7 @@ public:
                         timestep * ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n);
-
+// calculate heating due to hydrogen OTS absorption of HeLyAlpha photon
     const double T4 = 1.e-4*ionization_variables.get_temperature();
     const double sqrtT = std::sqrt(ionization_variables.get_temperature());
     const double alpha_e_2sP = 4.17e-20 * std::pow(T4, -0.861);
@@ -1157,6 +1160,7 @@ public:
     const double nenhep = ne * hep * n * AHe;
     dE += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume*timestep;
 #endif
+
       update_energy_variables(ionization_variables, hydro_variables,
                               inverse_volume, dE);
       return;

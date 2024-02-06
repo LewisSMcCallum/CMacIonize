@@ -763,16 +763,76 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
                               HydroVariables &hydro_variables,
                               const double inverse_volume, const double nH2V,
                               const double total_dt,
-                              DeRijckeRadiativeCooling &radiative_cooling,
+                              DeRijckeRadiativeCooling* radiative_cooling,
                               Hydro &hydro, double _cooling_temp_floor,
-                              double gamma_minus_one) {
+                              double gamma_minus_one,
+                              LineCoolingData &line_cooling_data,
+                              Abundances &abundances) {
+//get loss from full metals by doing this
+//loss = _line_cooling_data.get_cooling(T, ne, abund) * n * V;
 
+  double abund[LINECOOLINGDATA_NUMELEMENTS];
+  if (radiative_cooling == nullptr) {
 
+#ifdef HAS_CARBON
+  // carbon
+    abund[CII] = abundances.get_abundance(ELEMENT_C) *
+                 ionization_variables.get_ionic_fraction(ION_C_p1);
+    abund[CIII] = abundances.get_abundance(ELEMENT_C) *
+                  ionization_variables.get_ionic_fraction(ION_C_p2);
+#endif
+
+#ifdef HAS_NITROGEN
+    abund[NI] = abundances.get_abundance(ELEMENT_N)*
+                ionization_variables.get_ionic_fraction(ION_N_n) ;
+    abund[NII] = abundances.get_abundance(ELEMENT_N) *
+                 ionization_variables.get_ionic_fraction(ION_N_p1);    
+    abund[NIII] = abundances.get_abundance(ELEMENT_N) *
+                  ionization_variables.get_ionic_fraction(ION_N_p2);
+#endif
+
+#ifdef HAS_OXYGEN
+    abund[OI] = abundances.get_abundance(ELEMENT_O) *
+                ionization_variables.get_ionic_fraction(ION_O_n);
+    abund[OII] = abundances.get_abundance(ELEMENT_O) *
+                 ionization_variables.get_ionic_fraction(ION_O_p1);
+    abund[OIII] = abundances.get_abundance(ELEMENT_O) *
+                  ionization_variables.get_ionic_fraction(ION_O_p2);
+#endif
+
+#ifdef HAS_NEON
+    abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
+                  ionization_variables.get_ionic_fraction(ION_Ne_p1);
+    abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
+                   ionization_variables.get_ionic_fraction(ION_Ne_p2);
+#endif
+
+#ifdef HAS_SULPHUR
+    abund[SII] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p1);
+    abund[SIII] = abundances.get_abundance(ELEMENT_S) *
+                  ionization_variables.get_ionic_fraction(ION_S_p2);
+    abund[SIV] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p3);
+#endif
+
+  }
   double rho = hydro_variables.get_primitives_density();
   double xh = ionization_variables.get_ionic_fraction(ION_H_n);
   double volume = 1./inverse_volume;
   double k= 1.38064852e-23;
   double mh = 1.672621898e-27;
+  
+
+
+#ifdef HAS_HELIUM
+    double AHe = abundances.get_abundance(ELEMENT_He);
+    const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    const double ne = rho*(1-xh) + 2.0*AHe*rho*(1.0-he0-hep) + rho*hep*AHe;
+#else
+    const double ne = rho*(1-xh);
+#endif
 
 
   double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
@@ -814,7 +874,13 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
   //  cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
   //                temperature);
   //}
-  double cooling = radiative_cooling.get_cooling_rate(t_start) * nH2V;
+  double cooling;
+  if (radiative_cooling == nullptr) {
+    cooling = line_cooling_data.get_cooling(t_start, ne, abund) * rho /inverse_volume;
+  } else {
+    cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
+  }
+  
 
 
   double cool_limit = 0.001;
@@ -850,7 +916,12 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
       if (temperature <= _cooling_temp_floor) {
         break;
       }
-      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+    
+      if (radiative_cooling == nullptr) {
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * rho /inverse_volume;
+      } else {
+        cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
+      }
 
     } else {
 
@@ -872,7 +943,11 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
       if (temperature <= _cooling_temp_floor) {
         break;
       }
-      cooling = radiative_cooling.get_cooling_rate(temperature) * nH2V;
+      if (radiative_cooling == nullptr) {
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * rho /inverse_volume;
+      } else {
+        cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
+      }
 
 
 
@@ -1161,10 +1236,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   if (params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
           false)) {
-    radiative_cooling = new DeRijckeRadiativeCooling();
     _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
             "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
             "10 K");
+    // if do table cooling
+    if (true) {
+      radiative_cooling = new DeRijckeRadiativeCooling();
+    }
     _cooling_file = new std::ofstream("CoolingProgression.txt");
     *_cooling_file << "#time (s)\tTotal lost Energy\n";
     _cooling_file->flush();
@@ -1241,7 +1319,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const double _max_velocity = params->get_physical_value< QUANTITY_VELOCITY >(
       "Hydro:maximum velocity", "1.e99 m s^-1");
 
-  Hydro hydro(*params);
+  Hydro hydro(abundances, *params);
   HydroBoundaryManager hydro_boundary_manager(*params);
 
   ChargeTransferRates charge_transfer_rates;
@@ -2437,8 +2515,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             const double nH2 = nH * nH;
             do_cooling(ionization_variables, hydro_variables,
                        1. / cellit.get_volume(), nH2 * cellit.get_volume(),
-                       actual_timestep, *radiative_cooling, hydro,
-                        _cooling_temp_floor,_gamma-1.);
+                       actual_timestep, radiative_cooling, hydro,
+                        _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
             cellit.get_hydro_variables().set_primitives_pressure(
