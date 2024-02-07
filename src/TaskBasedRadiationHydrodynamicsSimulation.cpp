@@ -1197,6 +1197,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const double hydro_radtime = params->get_physical_value< QUANTITY_TIME >(
       "TaskBasedRadiationHydrodynamicsSimulation:radiation time", "-1. s");
   uint_fast32_t hydro_lastrad = 0;
+  double lastrad_time = 0.0;
   const bool do_radiation = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:do radiation", true);
 
@@ -2160,15 +2161,15 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 if (_time_dependent_ionization) {
                   if (iloop == nloop -1) {
                     temperature_calculator->calculate_temperature(
-                      iloop, numphoton, *gridit, hydro_radtime, true, true);
+                      iloop, numphoton, *gridit, current_time - lastrad_time, true, true);
                       
                   } else {
                   temperature_calculator->calculate_temperature(
-                      iloop, numphoton, *gridit, hydro_radtime, true, false);
+                      iloop, numphoton, *gridit, current_time - lastrad_time, true, false);
                   }
                 } else {
                     temperature_calculator->calculate_temperature(iloop, numphoton,
-                                        *gridit, hydro_radtime, false, true);
+                                        *gridit, current_time - lastrad_time, false, true);
 
                 }
 
@@ -2219,11 +2220,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               if (_time_dependent_ionization) {
                   
                temperature_calculator->calculate_temperature(
-                      0, 0, *gridit, hydro_radtime, true, true);
+                      0, 0, *gridit, current_time - lastrad_time, true, true);
 
               } else {
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,hydro_radtime,false, true);
+                                                            *gridit,current_time - lastrad_time,false, true);
               }
             }
           }
@@ -2261,11 +2262,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               if (_time_dependent_ionization) {
               
                   temperature_calculator->calculate_temperature(
-                    0, 0, *gridit, hydro_radtime, true, true);
+                    0, 0, *gridit, current_time - lastrad_time, true, true);
     
               } else{
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,hydro_radtime,false,true);
+                                                            *gridit,current_time - lastrad_time,false,true);
               }
             }
           }
@@ -2297,6 +2298,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       if (log) {
         log->write_status("Done with radiation step.");
       }
+
+      std::cout << "setting last radtime to " << current_time << std::endl;
+      std::cout << "last one was " << lastrad_time << " for a difference of " << current_time - lastrad_time <<  std::endl; 
+
+      lastrad_time = current_time;
 
       time_logger.end("radiation");
     }
