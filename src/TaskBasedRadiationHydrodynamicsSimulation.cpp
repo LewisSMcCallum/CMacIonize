@@ -2277,6 +2277,36 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       cmac_assert_message(buffers->is_empty(), "Number of active buffers: %zu",
                           buffers->get_number_of_active_buffers());
 
+//       {
+//         time_logger.start("ionizing energy update");
+//         AtomicValue< size_t > igrid(0);
+//         start_parallel_timing_block();
+// #ifdef HAVE_OPENMP
+// #pragma omp parallel default(shared)
+// #endif
+//         while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+//           const size_t this_igrid = igrid.post_increment();
+//           if (this_igrid < grid_creator->number_of_original_subgrids()) {
+//             auto gridit = grid_creator->get_subgrid(this_igrid);
+//             (*gridit).add_ionization_energy(hydro, actual_timestep);
+//           }
+//         }
+//         stop_parallel_timing_block();
+//         time_logger.end("ionizing energy update");
+//       }
+
+      if (log) {
+        log->write_status("Done with radiation step.");
+      }
+
+      std::cout << "setting last radtime to " << current_time << std::endl;
+      std::cout << "last one was " << lastrad_time << " for a difference of " << current_time - lastrad_time <<  std::endl; 
+
+      lastrad_time = current_time;
+
+      time_logger.end("radiation");
+    }
+
       {
         time_logger.start("ionizing energy update");
         AtomicValue< size_t > igrid(0);
@@ -2294,18 +2324,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         stop_parallel_timing_block();
         time_logger.end("ionizing energy update");
       }
-
-      if (log) {
-        log->write_status("Done with radiation step.");
-      }
-
-      std::cout << "setting last radtime to " << current_time << std::endl;
-      std::cout << "last one was " << lastrad_time << " for a difference of " << current_time - lastrad_time <<  std::endl; 
-
-      lastrad_time = current_time;
-
-      time_logger.end("radiation");
-    }
 
 
 
