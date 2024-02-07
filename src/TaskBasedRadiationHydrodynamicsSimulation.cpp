@@ -898,7 +898,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     const double Lhp =
       2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(t_start));
     const double Lhep = 1.55e-39 * nenhep * std::pow(t_start, 0.3647);
-    cooling += Lhp + Lhep;
+    cooling += (Lhp + Lhep)/inverse_volume;
     cooling = std::max(cooling,0.0);
   } else {
     cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
@@ -953,7 +953,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         const double Lhp =
           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-        cooling += Lhp + Lhep;
+        cooling += (Lhp + Lhep)/inverse_volume;
         cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
@@ -993,7 +993,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         const double Lhp =
           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-        cooling += Lhp + Lhep;
+        cooling += (Lhp + Lhep)/inverse_volume;
         cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
