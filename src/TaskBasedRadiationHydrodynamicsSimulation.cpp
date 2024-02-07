@@ -823,6 +823,8 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
   double k= 1.38064852e-23;
   double mh = 1.672621898e-27;
   double n = ionization_variables.get_number_density();
+
+
   
 
 
@@ -831,9 +833,14 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
     const double ne = n*(1-xh) + 2.0*AHe*n*(1.0-he0-hep) + n*hep*AHe;
+    double nenhep = ne*n*AHe*ionization_variables.get_ionic_fraction(ION_He_p1);
 #else
     const double ne = rho*(1-xh);
 #endif
+
+  double nenhp = ne*n*(1.-xh);
+  
+
 
 
   double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
@@ -876,8 +883,23 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
   //                temperature);
   //}
   double cooling;
+  double logT;
+  double sqrtT;
   if (radiative_cooling == nullptr) {
+    //get line cooling
     cooling = line_cooling_data.get_cooling(t_start, ne, abund) * n /inverse_volume;
+    //get brehm cooling
+    logT = std::log(t_start);
+    sqrtT = std::pow(t_start,0.5);
+    double c = 5.5 - logT;
+    double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+    cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+    //get recomb cooling
+    const double Lhp =
+      2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(t_start));
+    const double Lhep = 1.55e-39 * nenhep * std::pow(t_start, 0.3647);
+    cooling += Lhp + Lhep;
+    cooling = std::max(cooling,0.0);
   } else {
     cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
   }
@@ -919,10 +941,24 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
       }
     
       if (radiative_cooling == nullptr) {
+        //get line cooling
         cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
+        //get brehm cooling
+        logT = std::log(temperature);
+        sqrtT = std::pow(temperature,0.5);
+        double c = 5.5 - logT;
+        double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+        cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+        //get recomb cooling
+        const double Lhp =
+          2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
+        const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
+        cooling += Lhp + Lhep;
+        cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
       }
+      
 
     } else {
 
@@ -945,7 +981,20 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         break;
       }
       if (radiative_cooling == nullptr) {
+        //get line cooling
         cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
+        //get brehm cooling
+        logT = std::log(temperature);
+        sqrtT = std::pow(temperature,0.5);
+        double c = 5.5 - logT;
+        double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+        cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+        //get recomb cooling
+        const double Lhp =
+          2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
+        const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
+        cooling += Lhp + Lhep;
+        cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
       }
@@ -1147,7 +1196,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   const double hydro_radtime = params->get_physical_value< QUANTITY_TIME >(
       "TaskBasedRadiationHydrodynamicsSimulation:radiation time", "-1. s");
-  uint_fast32_t hydro_lastrad = 1;
+  uint_fast32_t hydro_lastrad = 0;
   const bool do_radiation = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:do radiation", true);
 
