@@ -887,7 +887,7 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.001;
+double max_frac = 0.1;
 double tot_dif;
 double time_left;
 double tstep;
@@ -928,268 +928,268 @@ while (clock < total_dt) {
 
 }
 
-// inline static void do_cooling(IonizationVariables &ionization_variables,
-//                               HydroVariables &hydro_variables,
-//                               const double inverse_volume, const double nH2V,
-//                               const double total_dt,
-//                               DeRijckeRadiativeCooling* radiative_cooling,
-//                               Hydro &hydro, double _cooling_temp_floor,
-//                               double gamma_minus_one,
-//                               LineCoolingData &line_cooling_data,
-//                               Abundances &abundances) {
-// //get loss from full metals by doing this
-// //loss = _line_cooling_data.get_cooling(T, ne, abund) * n * V;
+inline static void do_cooling(IonizationVariables &ionization_variables,
+                              HydroVariables &hydro_variables,
+                              const double inverse_volume, const double nH2V,
+                              const double total_dt,
+                              DeRijckeRadiativeCooling* radiative_cooling,
+                              Hydro &hydro, double _cooling_temp_floor,
+                              double gamma_minus_one,
+                              LineCoolingData &line_cooling_data,
+                              Abundances &abundances) {
+//get loss from full metals by doing this
+//loss = _line_cooling_data.get_cooling(T, ne, abund) * n * V;
 
-//   double abund[LINECOOLINGDATA_NUMELEMENTS];
-//   if (radiative_cooling == nullptr) {
+  double abund[LINECOOLINGDATA_NUMELEMENTS];
+  if (radiative_cooling == nullptr) {
 
-// #ifdef HAS_CARBON
-//   // carbon
-//     abund[CII] = abundances.get_abundance(ELEMENT_C) *
-//                  ionization_variables.get_ionic_fraction(ION_C_p1);
-//     abund[CIII] = abundances.get_abundance(ELEMENT_C) *
-//                   ionization_variables.get_ionic_fraction(ION_C_p2);
-// #endif
+#ifdef HAS_CARBON
+  // carbon
+    abund[CII] = abundances.get_abundance(ELEMENT_C) *
+                 ionization_variables.get_ionic_fraction(ION_C_p1);
+    abund[CIII] = abundances.get_abundance(ELEMENT_C) *
+                  ionization_variables.get_ionic_fraction(ION_C_p2);
+#endif
 
-// #ifdef HAS_NITROGEN
-//     abund[NI] = abundances.get_abundance(ELEMENT_N)*
-//                 ionization_variables.get_ionic_fraction(ION_N_n) ;
-//     abund[NII] = abundances.get_abundance(ELEMENT_N) *
-//                  ionization_variables.get_ionic_fraction(ION_N_p1);    
-//     abund[NIII] = abundances.get_abundance(ELEMENT_N) *
-//                   ionization_variables.get_ionic_fraction(ION_N_p2);
-// #endif
+#ifdef HAS_NITROGEN
+    abund[NI] = abundances.get_abundance(ELEMENT_N)*
+                ionization_variables.get_ionic_fraction(ION_N_n) ;
+    abund[NII] = abundances.get_abundance(ELEMENT_N) *
+                 ionization_variables.get_ionic_fraction(ION_N_p1);    
+    abund[NIII] = abundances.get_abundance(ELEMENT_N) *
+                  ionization_variables.get_ionic_fraction(ION_N_p2);
+#endif
 
-// #ifdef HAS_OXYGEN
-//     abund[OI] = abundances.get_abundance(ELEMENT_O) *
-//                 ionization_variables.get_ionic_fraction(ION_O_n);
-//     abund[OII] = abundances.get_abundance(ELEMENT_O) *
-//                  ionization_variables.get_ionic_fraction(ION_O_p1);
-//     abund[OIII] = abundances.get_abundance(ELEMENT_O) *
-//                   ionization_variables.get_ionic_fraction(ION_O_p2);
-// #endif
+#ifdef HAS_OXYGEN
+    abund[OI] = abundances.get_abundance(ELEMENT_O) *
+                ionization_variables.get_ionic_fraction(ION_O_n);
+    abund[OII] = abundances.get_abundance(ELEMENT_O) *
+                 ionization_variables.get_ionic_fraction(ION_O_p1);
+    abund[OIII] = abundances.get_abundance(ELEMENT_O) *
+                  ionization_variables.get_ionic_fraction(ION_O_p2);
+#endif
 
-// #ifdef HAS_NEON
-//     abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
-//                   ionization_variables.get_ionic_fraction(ION_Ne_p1);
-//     abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
-//                    ionization_variables.get_ionic_fraction(ION_Ne_p2);
-// #endif
+#ifdef HAS_NEON
+    abund[NeII] = abundances.get_abundance(ELEMENT_Ne) *
+                  ionization_variables.get_ionic_fraction(ION_Ne_p1);
+    abund[NeIII] = abundances.get_abundance(ELEMENT_Ne) *
+                   ionization_variables.get_ionic_fraction(ION_Ne_p2);
+#endif
 
-// #ifdef HAS_SULPHUR
-//     abund[SII] = abundances.get_abundance(ELEMENT_S) *
-//                  ionization_variables.get_ionic_fraction(ION_S_p1);
-//     abund[SIII] = abundances.get_abundance(ELEMENT_S) *
-//                   ionization_variables.get_ionic_fraction(ION_S_p2);
-//     abund[SIV] = abundances.get_abundance(ELEMENT_S) *
-//                  ionization_variables.get_ionic_fraction(ION_S_p3);
-// #endif
+#ifdef HAS_SULPHUR
+    abund[SII] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p1);
+    abund[SIII] = abundances.get_abundance(ELEMENT_S) *
+                  ionization_variables.get_ionic_fraction(ION_S_p2);
+    abund[SIV] = abundances.get_abundance(ELEMENT_S) *
+                 ionization_variables.get_ionic_fraction(ION_S_p3);
+#endif
 
-//   }
-//   double rho = hydro_variables.get_primitives_density();
-//   double xh = ionization_variables.get_ionic_fraction(ION_H_n);
-//   double volume = 1./inverse_volume;
-//   double k= 1.38064852e-23;
-//   double mh = 1.672621898e-27;
-//   double n = ionization_variables.get_number_density();
+  }
+  double rho = hydro_variables.get_primitives_density();
+  double xh = ionization_variables.get_ionic_fraction(ION_H_n);
+  double volume = 1./inverse_volume;
+  double k= 1.38064852e-23;
+  double mh = 1.672621898e-27;
+  double n = ionization_variables.get_number_density();
 
 
   
 
 
-// #ifdef HAS_HELIUM
-//     double AHe = abundances.get_abundance(ELEMENT_He);
-//     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
-//     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-//     const double ne = n*(1-xh) + 2.0*AHe*n*(1.0-he0-hep) + n*hep*AHe;
-//     double nenhep = ne*n*AHe*ionization_variables.get_ionic_fraction(ION_He_p1);
-// #else
-//     const double ne = rho*(1-xh);
-// #endif
+#ifdef HAS_HELIUM
+    double AHe = abundances.get_abundance(ELEMENT_He);
+    const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    const double ne = n*(1-xh) + 2.0*AHe*n*(1.0-he0-hep) + n*hep*AHe;
+    double nenhep = ne*n*AHe*ionization_variables.get_ionic_fraction(ION_He_p1);
+#else
+    const double ne = rho*(1-xh);
+#endif
 
-//   double nenhp = ne*n*(1.-xh);
+  double nenhp = ne*n*(1.-xh);
   
 
 
 
-//   double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
+  double e_factor = volume*rho*2.0*k/(gamma_minus_one*mh*(1.0+xh));
 
-//   double t_start = ionization_variables.get_temperature();
-//   double temperature = t_start;
+  double t_start = ionization_variables.get_temperature();
+  double temperature = t_start;
 
-//   double current_energy = t_start*e_factor;
+  double current_energy = t_start*e_factor;
 
-//   double calced_e = current_energy;
+  double calced_e = current_energy;
 
-//   double kinetic_energy =
-//         0.5*CoordinateVector<>::dot_product(
-//                    hydro_variables.get_primitives_velocity(),
-//                    hydro_variables.get_conserved_momentum());
+  double kinetic_energy =
+        0.5*CoordinateVector<>::dot_product(
+                   hydro_variables.get_primitives_velocity(),
+                   hydro_variables.get_conserved_momentum());
 
-//   double bkp_thermal = hydro_variables.get_conserved_total_energy() - kinetic_energy;
+  double bkp_thermal = hydro_variables.get_conserved_total_energy() - kinetic_energy;
 
-//   current_energy = std::min(bkp_thermal, calced_e);
+  current_energy = std::min(bkp_thermal, calced_e);
 
-//    //cmac_assert_message(kinetic_energy >= 0, "KE <0 = %g", kinetic_energy);
-//    //cmac_assert_message(bkp_thermal >=0, "thermal < 0 = %g", bkp_thermal);
-
-
-
-
-//   if (current_energy == 0.) {
-//     // don't cool gas that has no thermal energy
-//     return;
-//   }
+   //cmac_assert_message(kinetic_energy >= 0, "KE <0 = %g", kinetic_energy);
+   //cmac_assert_message(bkp_thermal >=0, "thermal < 0 = %g", bkp_thermal);
 
 
 
-//   if (t_start <= _cooling_temp_floor) {
-//     return;
-//   }
 
-//   //if (temperature > radiative_cooling.get_maximum_temperature()) {
-//   //  cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
-//   //                temperature);
-//   //}
-//   double cooling;
-//   double logT;
-//   double sqrtT;
-//   if (radiative_cooling == nullptr) {
-//     //get line cooling
-//     cooling = line_cooling_data.get_cooling(t_start, ne, abund) * n /inverse_volume;
-//     //get brehm cooling
-//     logT = std::log(t_start);
-//     sqrtT = std::pow(t_start,0.5);
-//     double c = 5.5 - logT;
-//     double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
-//     cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
-//     //get recomb cooling
-//     const double Lhp =
-//       2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(t_start));
-//     const double Lhep = 1.55e-39 * nenhep * std::pow(t_start, 0.3647);
-//     cooling += (Lhp + Lhep)/inverse_volume;
-//     cooling = std::max(cooling,0.0);
-//   } else {
-//     cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
-//   }
+  if (current_energy == 0.) {
+    // don't cool gas that has no thermal energy
+    return;
+  }
+
+
+
+  if (t_start <= _cooling_temp_floor) {
+    return;
+  }
+
+  //if (temperature > radiative_cooling.get_maximum_temperature()) {
+  //  cmac_warning("Temperatures higher than cooling tables can deal with: %g ",
+  //                temperature);
+  //}
+  double cooling;
+  double logT;
+  double sqrtT;
+  if (radiative_cooling == nullptr) {
+    //get line cooling
+    cooling = line_cooling_data.get_cooling(t_start, ne, abund) * n /inverse_volume;
+    //get brehm cooling
+    logT = std::log(t_start);
+    sqrtT = std::pow(t_start,0.5);
+    double c = 5.5 - logT;
+    double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+    cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+    //get recomb cooling
+    const double Lhp =
+      2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(t_start));
+    const double Lhep = 1.55e-39 * nenhep * std::pow(t_start, 0.3647);
+    cooling += (Lhp + Lhep)/inverse_volume;
+    cooling = std::max(cooling,0.0);
+  } else {
+    cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
+  }
   
 
 
-//   double cool_limit = 0.001;
-//   double clock = 0.;
-//   double tstep = total_dt;
-//   double e_lost = 0.0;
+  double cool_limit = 0.001;
+  double clock = 0.;
+  double tstep = total_dt;
+  double e_lost = 0.0;
 
 
-//   while (clock < total_dt) {
+  while (clock < total_dt) {
 
-//     tstep = total_dt - clock;
-//     if (cooling*tstep > cool_limit*current_energy) {
+    tstep = total_dt - clock;
+    if (cooling*tstep > cool_limit*current_energy) {
 
-//       tstep = cool_limit * current_energy/cooling;
+      tstep = cool_limit * current_energy/cooling;
 
-//     //  if (tstep < total_dt/1.e6) {
-//     //    tstep = total_dt/1.e6;
-//     //  }
+    //  if (tstep < total_dt/1.e6) {
+    //    tstep = total_dt/1.e6;
+    //  }
 
-//       double dE = tstep*cooling;
+      double dE = tstep*cooling;
 
-//       if (current_energy < dE) {
-//         break;
-//       }
-
-
-//       current_energy = current_energy - dE;
-//       e_lost = e_lost + dE;
-//       temperature = current_energy/e_factor;
-//       clock = clock + tstep;
+      if (current_energy < dE) {
+        break;
+      }
 
 
-//       if (temperature <= _cooling_temp_floor) {
-//         break;
-//       }
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
     
-//       if (radiative_cooling == nullptr) {
-//         //get line cooling
-//         cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
-//         //get brehm cooling
-//         logT = std::log(temperature);
-//         sqrtT = std::pow(temperature,0.5);
-//         double c = 5.5 - logT;
-//         double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
-//         cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
-//         //get recomb cooling
-//         const double Lhp =
-//           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
-//         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-//         cooling += (Lhp + Lhep)/inverse_volume;
-//         cooling = std::max(cooling,0.0);
-//       } else {
-//         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
-//       }
+      if (radiative_cooling == nullptr) {
+        //get line cooling
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
+        //get brehm cooling
+        logT = std::log(temperature);
+        sqrtT = std::pow(temperature,0.5);
+        double c = 5.5 - logT;
+        double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+        cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+        //get recomb cooling
+        const double Lhp =
+          2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
+        const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
+        cooling += (Lhp + Lhep)/inverse_volume;
+        cooling = std::max(cooling,0.0);
+      } else {
+        cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
+      }
       
 
-//     } else {
+    } else {
 
-//       if (current_energy < tstep*cooling) {
-//         break;
-//       }
-
-
-//       double dE = tstep*cooling;
-//       current_energy = current_energy - dE;
-//       e_lost = e_lost + dE;
-
-//       // do actual cooling step
-
-//       temperature = current_energy/e_factor;
-//       clock = clock + tstep;
+      if (current_energy < tstep*cooling) {
+        break;
+      }
 
 
-//       if (temperature <= _cooling_temp_floor) {
-//         break;
-//       }
-//       if (radiative_cooling == nullptr) {
-//         //get line cooling
-//         cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
-//         //get brehm cooling
-//         logT = std::log(temperature);
-//         sqrtT = std::pow(temperature,0.5);
-//         double c = 5.5 - logT;
-//         double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
-//         cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
-//         //get recomb cooling
-//         const double Lhp =
-//           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
-//         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-//         cooling += (Lhp + Lhep)/inverse_volume;
-//         cooling = std::max(cooling,0.0);
-//       } else {
-//         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
-//       }
+      double dE = tstep*cooling;
+      current_energy = current_energy - dE;
+      e_lost = e_lost + dE;
+
+      // do actual cooling step
+
+      temperature = current_energy/e_factor;
+      clock = clock + tstep;
+
+
+      if (temperature <= _cooling_temp_floor) {
+        break;
+      }
+      if (radiative_cooling == nullptr) {
+        //get line cooling
+        cooling = line_cooling_data.get_cooling(temperature, ne, abund) * n /inverse_volume;
+        //get brehm cooling
+        logT = std::log(temperature);
+        sqrtT = std::pow(temperature,0.5);
+        double c = 5.5 - logT;
+        double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+        cooling += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
+        //get recomb cooling
+        const double Lhp =
+          2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
+        const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
+        cooling += (Lhp + Lhep)/inverse_volume;
+        cooling = std::max(cooling,0.0);
+      } else {
+        cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
+      }
 
 
 
 
-//     }
+    }
 
-//   }
+  }
 
-//   cmac_assert_message(e_lost < hydro_variables.get_conserved_total_energy(), "Trying to remove e = %g from total = %g",
-//                 e_lost, hydro_variables.get_conserved_total_energy());
+  cmac_assert_message(e_lost < hydro_variables.get_conserved_total_energy(), "Trying to remove e = %g from total = %g",
+                e_lost, hydro_variables.get_conserved_total_energy());
 
-//   cmac_assert_message(bkp_thermal > e_lost, "Update energy will fail as e_lost > thermal, elost = %g, thermal=%g, calc e= %g, KE = %g, tstart=%g, press = %g",
-//                        e_lost, bkp_thermal,calced_e, kinetic_energy, t_start, hydro_variables.get_primitives_pressure());
+  cmac_assert_message(bkp_thermal > e_lost, "Update energy will fail as e_lost > thermal, elost = %g, thermal=%g, calc e= %g, KE = %g, tstart=%g, press = %g",
+                       e_lost, bkp_thermal,calced_e, kinetic_energy, t_start, hydro_variables.get_primitives_pressure());
 
-//   double pressure = gamma_minus_one*inverse_volume*(current_energy);
+  double pressure = gamma_minus_one*inverse_volume*(current_energy);
 
-//   //hydro_variables.set_conserved_total_energy(hydro_variables.get_conserved_total_energy() - e_lost);
-//   hydro_variables.set_primitives_pressure(pressure);
-//   ionization_variables.set_temperature(temperature);
-// //  hydro.update_energy_variables(ionization_variables,hydro_variables,inverse_volume,-1.*e_lost);
+  //hydro_variables.set_conserved_total_energy(hydro_variables.get_conserved_total_energy() - e_lost);
+  hydro_variables.set_primitives_pressure(pressure);
+  ionization_variables.set_temperature(temperature);
+//  hydro.update_energy_variables(ionization_variables,hydro_variables,inverse_volume,-1.*e_lost);
 
-//   cmac_assert_message(hydro_variables.get_conserved_total_energy() >= 0, "Negative energy after cooling.");
-// }
+  cmac_assert_message(hydro_variables.get_conserved_total_energy() >= 0, "Negative energy after cooling.");
+}
 
 /**
  * @brief Perform an RHD simulation.
@@ -1456,19 +1456,22 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool do_rad_cool = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
           false);
+  
   if (do_rad_cool) {
-    _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
-            "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
-            "10 K");
-    // if do table cooling
-    if (params->get_value< bool >(
-          "TaskBasedRadiationHydrodynamicsSimulation:use cooling tables",
-          true)) {
-      radiative_cooling = new DeRijckeRadiativeCooling();
-    }
+    radiative_cooling = new DeRijckeRadiativeCooling();
     _cooling_file = new std::ofstream("CoolingProgression.txt");
     *_cooling_file << "#time (s)\tTotal lost Energy\n";
     _cooling_file->flush();
+  }
+
+  const bool do_explicit_temp_calc = params->get_value< bool >(
+          "TaskBasedRadiationHydrodynamicsSimulation:do explicit temperature calculation",
+          false);
+
+  if (do_rad_cool || do_explicit_temp_calc) {
+    _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
+            "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
+            "10 K");
   }
 
   double total_thermal_lost=0.0;
@@ -2476,23 +2479,25 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       time_logger.end("radiation");
     }
 
-//       {
-//         time_logger.start("ionizing energy update");
-//         AtomicValue< size_t > igrid(0);
-//         start_parallel_timing_block();
-// #ifdef HAVE_OPENMP
-// #pragma omp parallel default(shared)
-// #endif
-//         while (igrid.value() < grid_creator->number_of_original_subgrids()) {
-//           const size_t this_igrid = igrid.post_increment();
-//           if (this_igrid < grid_creator->number_of_original_subgrids()) {
-//             auto gridit = grid_creator->get_subgrid(this_igrid);
-//             (*gridit).add_ionization_energy(hydro, actual_timestep);
-//           }
-//         }
-//         stop_parallel_timing_block();
-//         time_logger.end("ionizing energy update");
-//       }
+      {
+  if (!do_explicit_temp_calc) {
+        time_logger.start("ionizing energy update");
+        AtomicValue< size_t > igrid(0);
+        start_parallel_timing_block();
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+        while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+          const size_t this_igrid = igrid.post_increment();
+          if (this_igrid < grid_creator->number_of_original_subgrids()) {
+            auto gridit = grid_creator->get_subgrid(this_igrid);
+            (*gridit).add_ionization_energy(hydro, actual_timestep);
+          }
+        }
+        stop_parallel_timing_block();
+        time_logger.end("ionizing energy update");
+  }
+      }
 
 
 
@@ -2733,7 +2738,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       }
     }
 
-    if (do_rad_cool) {
+    if (do_rad_cool || do_explicit_temp_calc) {
       time_logger.start("cooling");
 
       if (log) {
@@ -2759,14 +2764,19 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             HydroVariables hydro_variables = cellit.get_hydro_variables();
             const double nH = ionization_variables.get_number_density();
             const double nH2 = nH * nH;
-            // do_cooling(ionization_variables, hydro_variables,
-            //            1. / cellit.get_volume(), nH2 * cellit.get_volume(),
-            //            actual_timestep, radiative_cooling, hydro,
-            //             _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
-            do_explicit_heat_cool(ionization_variables, hydro_variables,
-                       1. / cellit.get_volume(), nH2 * cellit.get_volume(),
-                       actual_timestep, radiative_cooling, hydro,
-                        _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
+            if (do_rad_cool) {
+              do_cooling(ionization_variables, hydro_variables,
+                        1. / cellit.get_volume(), nH2 * cellit.get_volume(),
+                        actual_timestep, radiative_cooling, hydro,
+                          _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
+
+            }
+            if (do_explicit_temp_calc) {
+              do_explicit_heat_cool(ionization_variables, hydro_variables,
+                        1. / cellit.get_volume(), nH2 * cellit.get_volume(),
+                        actual_timestep, radiative_cooling, hydro,
+                          _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
+            }
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
             cellit.get_hydro_variables().set_primitives_pressure(
