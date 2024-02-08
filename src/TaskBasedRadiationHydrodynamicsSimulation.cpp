@@ -794,15 +794,19 @@ double sqrtT = std::pow(temp,0.5);
     const double nenhp = ne*n*(1-h0);
     gain += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume;
 
-  if (ionization_variables.get_heating(HEATINGTERM_He) > 0.0) {
+  if (ionization_variables.get_heating(HEATINGTERM_He) > 0.0 && n > 0.0) {
     std::cout << "HELIUM HEATING" << std::endl;
     std::cout << "PHOTO = " << AHe*ionization_variables.get_heating(HEATINGTERM_He) *
                         ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n) << std::endl;
     std::cout << "Lyman Alpha = " << pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume << std::endl;
-      
+      if (gain != gain) {
+        cmac_error("GAIN IS NAN");
+      } 
   }
+
+
 
   gain = std::max(gain,0.0);
 
