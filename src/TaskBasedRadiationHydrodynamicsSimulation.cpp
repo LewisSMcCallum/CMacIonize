@@ -801,6 +801,10 @@ double sqrtT = std::pow(temp,0.5);
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n) << std::endl;
     std::cout << "Lyman Alpha = " << pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume << std::endl;
+    std::cout << "Hydrogen photo = " << ionization_variables.get_heating(HEATINGTERM_H) *
+                        ionization_variables.get_number_density() /
+                        inverse_volume *
+                        ionization_variables.get_ionic_fraction(ION_H_n); << std::endl;
       if (gain != gain) {
         cmac_error("GAIN IS NAN");
       } 
