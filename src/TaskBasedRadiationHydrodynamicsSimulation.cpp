@@ -804,7 +804,7 @@ double sqrtT = std::pow(temp,0.5);
     std::cout << "Hydrogen photo = " << ionization_variables.get_heating(HEATINGTERM_H) *
                         ionization_variables.get_number_density() /
                         inverse_volume *
-                        ionization_variables.get_ionic_fraction(ION_H_n); << std::endl;
+                        ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
       if (gain != gain) {
         cmac_error("GAIN IS NAN");
       } 
