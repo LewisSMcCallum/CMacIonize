@@ -764,7 +764,8 @@ inline static void get_thermal_gain_loss(double &gain, double &loss,
                               IonizationVariables &ionization_variables,
                               const double inverse_volume,
                               LineCoolingData &line_cooling_data,
-                              double abund[LINECOOLINGDATA_NUMELEMENTS], double AHe){
+                              double abund[LINECOOLINGDATA_NUMELEMENTS], double AHe,
+                              DeRijckeRadiativeCooling* radiative_cooling){
 
 
 double temp = ionization_variables.get_temperature();
@@ -776,23 +777,32 @@ double sqrtT = std::pow(temp,0.5);
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_H_n);
 
+
+const double T4 = 1.e-4*temp;
+const double n = ionization_variables.get_number_density();
+const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
    //calculate heating due to helium photoionization
-    const double n = ionization_variables.get_number_density();
-    const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-     gain += 1000.0*AHe*ionization_variables.get_heating(HEATINGTERM_He) *
+     gain += 0.0*AHe*ionization_variables.get_heating(HEATINGTERM_He) *
                         ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n);
 // calculate heating due to hydrogen OTS absorption of HeLyAlpha photon
-    const double T4 = 1.e-4*temp;
+    
     const double alpha_e_2sP = 4.17e-20 * std::pow(T4, -0.861);
     const double pHots = 1. / (1. + 77. * he0 / (sqrtT * h0));
     const double ne = n * (1. - h0 + AHe * hep + 2*AHe*(1. - hep - he0));
     const double nenhep = ne * hep * n * AHe;
-    const double nenhp = ne*n*(1-h0);
     gain += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume;
+#else
+    const double ne = n*(1-h0);
+    const double nenhep = 0.0;
+#endif
+
+const double nenhp = ne*n*(1-h0);
+
 
   // if (ionization_variables.get_heating(HEATINGTERM_He) > 0.0 && n > 0.0) {
   //   std::cout << "HELIUM HEATING" << std::endl;
@@ -814,7 +824,7 @@ double sqrtT = std::pow(temp,0.5);
 
   gain = std::max(gain,0.0);
 
-
+  if (radiative_cooling == nullptr) {
   //get line cooling
   loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
     //get brehm cooling
@@ -824,9 +834,17 @@ double sqrtT = std::pow(temp,0.5);
   loss += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
   //get recomb cooling
   const double Lhp = 2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temp));
-  const double Lhep = 1.55e-39 * nenhep * std::pow(temp, 0.3647);
+#ifdef HAS_HELIUM
+    const double Lhep = 1.55e-39 * nenhep * std::pow(temp, 0.3647);
+#else
+    const double Lhep = 0.0;
+#endif
+  
   loss += (Lhp + Lhep)/inverse_volume;
   loss = std::max(loss,0.0);
+  } else {
+    loss = radiative_cooling->get_cooling_rate(temp)*n*n/inverse_volume;
+  }
 
 }
 
@@ -921,7 +939,7 @@ while (clock < total_dt) {
   time_left = total_dt - clock;
 
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
-                              line_cooling_data, abund, AHe);
+                              line_cooling_data, abund, AHe, radiative_cooling);
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
@@ -1473,8 +1491,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool do_rad_cool = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do radiative cooling",
           false);
+
+  const bool use_cool_tables = params->get_value< bool >(
+          "TaskBasedRadiationHydrodynamicsSimulation:use cooling tables",
+          false);
   
-  if (do_rad_cool) {
+  if (do_rad_cool || use_cool_tables) {
     radiative_cooling = new DeRijckeRadiativeCooling();
     _cooling_file = new std::ofstream("CoolingProgression.txt");
     *_cooling_file << "#time (s)\tTotal lost Energy\n";
