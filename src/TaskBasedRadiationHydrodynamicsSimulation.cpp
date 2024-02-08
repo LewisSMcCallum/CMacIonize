@@ -778,14 +778,15 @@ double sqrtT = std::pow(temp,0.5);
                         ionization_variables.get_ionic_fraction(ION_H_n);
 
 
-const double T4 = 1.e-4*temp;
+
 const double n = ionization_variables.get_number_density();
 const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
 #ifdef HAS_HELIUM
    //calculate heating due to helium photoionization
+    const double T4 = 1.e-4*temp;
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-     gain += 0.0*AHe*ionization_variables.get_heating(HEATINGTERM_He) *
+     gain += AHe*ionization_variables.get_heating(HEATINGTERM_He) *
                         ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n);
@@ -866,8 +867,11 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
   double e_factor = rho*2.0*k/(gamma_minus_one*mh*(1.0+xh))/inverse_volume;
 
-
+#ifdef HAS_HELIUM
   double AHe = abundances.get_abundance(ELEMENT_He);
+#else
+  double AHe = 0.0;
+#endif
 
 
 
@@ -922,7 +926,7 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.1;
+double max_frac = 0.01;
 double tot_dif;
 double time_left;
 double tstep;
@@ -946,9 +950,9 @@ while (clock < total_dt) {
 
 
   tot_dif = gain - loss;
-  if (tot_dif*time_left > max_frac*current_energy) {
-    tstep  = max_frac*current_energy/tot_dif;
-    dE = max_frac*current_energy;
+  if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
+    tstep  = std::abs(max_frac*current_energy/tot_dif);
+    dE = tot_dif*tstep;
     clock += tstep;
   } else {
     dE = tot_dif*time_left;
@@ -1040,6 +1044,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     double nenhep = ne*n*AHe*ionization_variables.get_ionic_fraction(ION_He_p1);
 #else
     const double ne = rho*(1-xh);
+    double nenhep = 0.0;
 #endif
 
   double nenhp = ne*n*(1.-xh);
@@ -2487,7 +2492,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
       cmac_assert_message(buffers->is_empty(), "Number of active buffers: %zu",
                           buffers->get_number_of_active_buffers());
-
+//commented out cause Ive moved this
 //       {
 //         time_logger.start("ionizing energy update");
 //         AtomicValue< size_t > igrid(0);
