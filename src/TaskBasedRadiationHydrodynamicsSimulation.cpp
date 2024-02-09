@@ -926,7 +926,7 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.01;
+double max_frac = 0.1;
 double tot_dif;
 double time_left;
 double tstep;
