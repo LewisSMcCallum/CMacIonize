@@ -2803,7 +2803,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           auto gridit = grid_creator->get_subgrid(this_igrid);
           for (auto cellit = (*gridit).hydro_begin();
                cellit != (*gridit).hydro_end(); ++cellit) {
-            hydro.set_primitive_variables(cellit.get_hydro_variables(), cellit.get_ionization_variables(), cellit.get_volume())
+           // hydro.set_primitive_variables(cellit.get_hydro_variables(), cellit.get_ionization_variables(), cellit.get_volume())
             hydro.hydro_to_ionization(cellit.get_hydro_variables(), cellit.get_ionization_variables());
             hydro.align_temp_to_p(cellit.get_hydro_variables(), cellit.get_ionization_variables());
 
