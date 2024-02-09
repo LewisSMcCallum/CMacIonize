@@ -740,7 +740,13 @@ public:
         _source_positions.push_back(CoordinateVector<double>(x,y,z));
 
       }
-        double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+        double a0z = 9.955209529401348;
+        double a1z = -3.3370109454102326;
+        double a2z = 0.8116654874025604;
+       // double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+       double lifetime = a0z + a1z*std::log10(m_cur) + a2z*(std::log10(m_cur)*std::log10(m_cur));
+       lifetime = std::pow(10.0,lifetime);
+       lifetime = lifetime*3.154e+7;
         double offset =
               _random_generator.get_uniform_random_double() * _update_interval;
         _source_lifetimes.push_back(lifetime-offset);

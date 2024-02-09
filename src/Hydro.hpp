@@ -1086,8 +1086,18 @@ public:
         0.5 * CoordinateVector<>::dot_product(
                   hydro_variables.get_primitives_velocity(),
                   hydro_variables.get_conserved_momentum());
+
+    //comment out berts version, trying mine with helium for now.... see what happens
     const double mean_molecular_mass =
         0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+
+
+    // const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+    // const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    // const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+    // const double AHe = 0.1;
+
+    // const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
 
     double new_energy = old_energy + delta_energy;
 
