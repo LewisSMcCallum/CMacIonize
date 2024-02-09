@@ -861,7 +861,6 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
 
   double rho = hydro_variables.get_primitives_density();
-  double xh = ionization_variables.get_ionic_fraction(ION_H_n);
   double k= PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_BOLTZMANN);
   double mh = PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_PROTON_MASS);
   const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
