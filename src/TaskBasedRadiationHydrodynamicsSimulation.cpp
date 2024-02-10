@@ -2407,7 +2407,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   }
                 } else {
                     temperature_calculator->calculate_temperature(iloop, numphoton,
-                                        *gridit, current_time - lastrad_time, false, true);
+                                        *gridit, 0.0, false, true);
 
                 }
 
@@ -2462,7 +2462,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
               } else {
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,current_time - lastrad_time,false, true);
+                                                            *gridit,0.0,false, true);
               }
             }
           }
@@ -2504,7 +2504,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     
               } else{
               temperature_calculator->calculate_temperature(0, 0,
-                                                            *gridit,current_time - lastrad_time,false,true);
+                                                            *gridit,0.0,false,true);
               }
             }
           }
