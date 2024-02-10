@@ -877,7 +877,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
   const double mean_molecular_mass = (1.0)/(2.0 - h0);
 #endif
 
-  
+  std::cout << "MMM = " << mean_molecular_mass << std::endl;
 
 
   //double e_factor = rho*2.0*k/(gamma_minus_one*mh*(1.0+xh))/inverse_volume;
