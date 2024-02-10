@@ -786,7 +786,7 @@ const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
     const double T4 = 1.e-4*temp;
     const double he0 = ionization_variables.get_ionic_fraction(ION_He_n);
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-     gain += 10*AHe*ionization_variables.get_heating(HEATINGTERM_He) *
+     gain += AHe*ionization_variables.get_heating(HEATINGTERM_He) *
                         ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_He_n);
