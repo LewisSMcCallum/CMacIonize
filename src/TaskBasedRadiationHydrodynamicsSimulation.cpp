@@ -842,7 +842,7 @@ const double nenhp = ne*n*(1-h0);
                         ionization_variables.get_number_density() /
                         inverse_volume *
                         ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
-    std::cout << "Lhep = " << Lhep/inverse_volume << std::endl;
+    std::cout << "Lhep  = " << Lhep/inverse_volume << std::endl;
 
       if (gain != gain) {
         cmac_error("GAIN IS NAN");
