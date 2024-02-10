@@ -881,7 +881,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
   //double e_factor = rho*2.0*k/(gamma_minus_one*mh*(1.0+xh))/inverse_volume;
 
-  double e_factor = k*rho*inverse_volume/(mh*gamma_minus_one*mean_molecular_mass);
+  double e_factor = k*rho/(mh*gamma_minus_one*mean_molecular_mass)/inverse_volume;
 
 
 
@@ -961,9 +961,6 @@ while (clock < total_dt) {
 
   tot_dif = gain - loss;
 
-  if (current_energy < 1e-20) {
-    std::cout << "TEMP" << temp << " MMM = " << mean_molecular_mass << " efac = " << e_factor << std::endl;
-  }
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
     if (tstep < 1e-3*time_left) {
