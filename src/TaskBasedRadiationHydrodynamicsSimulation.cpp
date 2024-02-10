@@ -961,7 +961,9 @@ while (clock < total_dt) {
 
   tot_dif = gain - loss;
 
-  std::cout << "td = " << tot_dif << " current_en = " << current_energy << " timleft = " << time_left << " tstep= " << tstep << std::endl;
+  if (current_energy < 1e-20) {
+    std::cout << "TEMP" << temp << " MMM = " << mean_molecular_mass << " efac = " << e_factor << std::endl;
+  }
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
     if (tstep < 1e-3*time_left) {
