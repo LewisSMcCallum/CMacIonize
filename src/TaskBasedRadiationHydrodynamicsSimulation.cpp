@@ -877,7 +877,6 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
   const double mean_molecular_mass = (1.0)/(2.0 - h0);
 #endif
 
-  std::cout << "MMM = " << mean_molecular_mass << std::endl;
 
 
   //double e_factor = rho*2.0*k/(gamma_minus_one*mh*(1.0+xh))/inverse_volume;
@@ -937,7 +936,7 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.1;
+double max_frac = 0.01;
 double tot_dif;
 double time_left;
 double tstep;
@@ -961,6 +960,8 @@ while (clock < total_dt) {
 
 
   tot_dif = gain - loss;
+
+  std::cout << "td = " << tot_dif << " current_en = " << current_energy << " timleft = " << time_left << " tstep= " << tstep << std::endl;
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
     if (tstep < 1e-3*time_left) {
