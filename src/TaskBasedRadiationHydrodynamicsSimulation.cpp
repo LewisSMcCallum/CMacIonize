@@ -864,17 +864,20 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
   double k= PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_BOLTZMANN);
   double mh = PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_PROTON_MASS);
   const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
-  const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
-  const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+
 
 
 #ifdef HAS_HELIUM
   double AHe = abundances.get_abundance(ELEMENT_He);
+  const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+  const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+  const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
 #else
   double AHe = 0.0;
+  const double mean_molecular_mass = (1.0)/(2.0 - h0);
 #endif
 
-  const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+  
 
 
   //double e_factor = rho*2.0*k/(gamma_minus_one*mh*(1.0+xh))/inverse_volume;

@@ -957,8 +957,17 @@ public:
 
     double density =
         _density_conversion_factor * ionization_variables.get_number_density();
-    const double mean_molecular_mass =
-        0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+  //  const double mean_molecular_mass =
+  //      0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+    const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+    const double AHe = _abundances.get_abundance(ELEMENT_He);
+    const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+#else
+    const double mean_molecular_mass = 1.0/(2.0-h0);
+#endif
     double pressure = _pressure_conversion_factor * density *
                       ionization_variables.get_temperature() /
                       mean_molecular_mass;
@@ -1007,9 +1016,19 @@ public:
 
     const double density = hydro_variables.get_primitives_density();
     if (density > 0.) {
-      const double xH = ionization_variables.get_ionic_fraction(ION_H_n);
-      const double thermal_energy =
-          _u_conversion_factor * temperature / (1. + xH);
+      // const double xH = ionization_variables.get_ionic_fraction(ION_H_n);
+      // const double thermal_energy =
+      //     _u_conversion_factor * temperature / (1. + xH);
+    const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+    const double AHe = _abundances.get_abundance(ELEMENT_He);
+    const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+#else
+    const double mean_molecular_mass = 1.0/(2.0-h0);
+#endif
+      const double thermal_energy = _u_conversion_factor*temperature/mean_molecular_mass/2.0;
       const double kinetic_energy =
           0.5 * CoordinateVector<>::dot_product(
                     hydro_variables.get_primitives_velocity(),
@@ -1052,8 +1071,17 @@ public:
       return 0.;
     }
 
-    const double mean_molecular_weight =
-        0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+  //  const double mean_molecular_weight =
+//        0.5 * (1. + ionization_variables.get_ionic_fraction(ION_H_n));
+    const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
+    const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+    const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+    const double AHe = _abundances.get_abundance(ELEMENT_He);
+    const double mean_molecular_weight = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+#else
+    const double mean_molecular_weight = 1.0/(2.0-h0);
+#endif
     return _T_conversion_factor * mean_molecular_weight * _gamma_minus_one *
            inverse_density * inverse_volume * delta_energy;
   }
@@ -1093,11 +1121,17 @@ public:
 
 
     const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
     const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
     const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
-    const double AHe = 0.1;
-
+    const double AHe = _abundances.get_abundance(ELEMENT_He);
     const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+#else
+    const double mean_molecular_mass = 1.0/(2.0-h0);
+#endif
+
+
+    
 
     double new_energy = old_energy + delta_energy;
 
@@ -1274,8 +1308,16 @@ public:
           double inverse_density = 1./hydro_variables.get_primitives_density();
 
           double pressure = hydro_variables.get_primitives_pressure();
-          double mean_molecular_mass = 0.5*(1 +  ionization_variables.get_ionic_fraction(ION_H_n));
-
+          //double mean_molecular_mass = 0.5*(1 +  ionization_variables.get_ionic_fraction(ION_H_n));
+          const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+#ifdef HAS_HELIUM
+          const double hep = ionization_variables.get_ionic_fraction(ION_He_p1);
+          const double hepp = 1 - hep - ionization_variables.get_ionic_fraction(ION_He_n);
+          const double AHe = _abundances.get_abundance(ELEMENT_He);
+          const double mean_molecular_mass = (1.0 + 4.0*AHe)/(2 + AHe - h0 + AHe*hep + 2.0*AHe*hepp);
+#else
+          const double mean_molecular_mass = 1.0/(2.0-h0);
+#endif
           double temperature = _T_conversion_factor*mean_molecular_mass*pressure*inverse_density;
 
           ionization_variables.set_temperature(temperature);
