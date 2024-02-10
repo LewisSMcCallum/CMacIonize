@@ -143,6 +143,7 @@ void IonizationStateCalculator::calculate_ionization_state(
       compute_ionization_states_hydrogen_helium(alphaH, alphaHe,alphaHe2, jH, jHe, ntot,
                                                 AHe, T, h0, he0, hep, gammaH, gammaHe1,
                                                  gammaHe2);
+        std::cout << "THIS SHOULD BE PRINTING AAAAH " << std::endl;
       }
 
 
