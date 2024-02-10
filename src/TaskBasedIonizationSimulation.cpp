@@ -339,7 +339,7 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
 
   CollisionalRates* _collisional_rates = new CollisionalRates;
   DeRijckeRadiativeCooling* _radiative_cooling = nullptr;
-  if (true){
+  if (false){
     _radiative_cooling = new DeRijckeRadiativeCooling();
 
   }
