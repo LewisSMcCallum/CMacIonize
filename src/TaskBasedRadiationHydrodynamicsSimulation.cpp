@@ -2394,8 +2394,14 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                           ion, vars.get_mean_intensity(ion) / abundance);
                     }
                   }
-                }
+                
 #endif
+#ifdef HAS_HELIUM
+                vars.set_heating(HEATINGTERM_He,
+                                vars.get_heating(HEATINGTERM_He) /
+                                   abundances.get_abundance(ELEMENT_He));
+#endif
+            }
                 if (_time_dependent_ionization) {
                   if (iloop == nloop -1) {
                     temperature_calculator->calculate_temperature(
