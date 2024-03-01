@@ -145,7 +145,7 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
   if (ionization_variables.get_ionic_fraction(ION_H_n) < h0max &&
       ionization_variables.get_temperature() > tmin &&
       ionization_variables.get_temperature() < tmax &&
-       ionization_variables.get_number_density() > 0.0) {
+       ionization_variables.get_number_density() > 0.0 || true) {
     const double ntot = ionization_variables.get_number_density();
     const double nhp =
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
