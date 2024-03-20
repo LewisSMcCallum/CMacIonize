@@ -109,6 +109,8 @@ public:
           blockname.str() + "initial temperature");
       double neutral_fraction_H = blockfile.get_value< double >(
           blockname.str() + "neutral fraction H", 1.e-6);
+      double neutral_fraction_He = blockfile.get_value< double >(
+          blockname.str() + "neutral fraction He", 1.e-6);
       CoordinateVector<> velocity =
           blockfile.get_physical_vector< QUANTITY_VELOCITY >(
               blockname.str() + "initial velocity",
@@ -123,7 +125,7 @@ public:
       }
       _blocks.push_back(BlockSyntaxBlock(origin, sides, exponent, density,
                                          temperature, neutral_fraction_H,
-                                         velocity));
+                                         neutral_fraction_He, velocity));
     }
 
     std::ofstream ofile(filename + ".used-values");
@@ -167,12 +169,14 @@ public:
     double density = -1.;
     double temperature = -1.;
     double neutral_fraction_H = -1.;
+    double neutral_fraction_He = -1.;
     CoordinateVector<> velocity;
     for (size_t i = 0; i < _blocks.size(); ++i) {
       if (_blocks[i].is_inside(position)) {
         density = _blocks[i].get_number_density();
         temperature = _blocks[i].get_temperature();
         neutral_fraction_H = _blocks[i].get_neutral_fraction_H();
+        neutral_fraction_He = _blocks[i].get_neutral_fraction_He();
         velocity = _blocks[i].get_velocity();
       }
     }
@@ -193,8 +197,8 @@ public:
     values.set_temperature(temperature);
     values.set_ionic_fraction(ION_H_n, neutral_fraction_H);
 #ifdef HAS_HELIUM
-    values.set_ionic_fraction(ION_He_n, 0.999);
-    values.set_ionic_fraction(ION_He_p1, 0.001);
+    values.set_ionic_fraction(ION_He_n, neutral_fraction_He);
+    values.set_ionic_fraction(ION_He_p1, 1.0 - neutral_fraction_He);
 
 #endif
 #ifdef HAS_CARBON

@@ -61,6 +61,7 @@ enum EmissionLine {
   EMISSIONLINE_SIII_33mu,
   EMISSIONLINE_avg_T,
   EMISSIONLINE_avg_T_count,
+  EMISSIONLINE_total_cooling,
   EMISSIONLINE_avg_nH_nHe,
   EMISSIONLINE_avg_nH_nHe_count,
   EMISSIONLINE_NeII_12mu,
@@ -178,6 +179,8 @@ public:
       return "avg_T";
     case EMISSIONLINE_avg_T_count:
       return "avg_T_count";
+    case EMISSIONLINE_total_cooling:
+      return "total_cooling";
     case EMISSIONLINE_avg_nH_nHe:
       return "avg_nH_nHe";
     case EMISSIONLINE_avg_nH_nHe_count:

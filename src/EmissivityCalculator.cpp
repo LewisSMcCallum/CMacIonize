@@ -399,6 +399,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // density weighted average temperature of ionized particles
     eval.set_emissivity(EMISSIONLINE_avg_T, ne * nhp * T);
     eval.set_emissivity(EMISSIONLINE_avg_T_count, ne * nhp);
+
+    eval.set_emissivity(EMISSIONLINE_total_cooling,
+                 line_cooling_data.get_cooling(ionization_variables.get_temperature(), ne, abund));
 #ifdef HAS_HELIUM
     // average ionized hydrogen and helium density product
     eval.set_emissivity(

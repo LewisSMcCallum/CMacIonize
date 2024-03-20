@@ -52,6 +52,8 @@ private:
   /*! @brief Hydrogen neutral fraction inside the block. */
   double _neutral_fraction_H;
 
+  double _neutral_fraction_He;
+
   /*! @brief Fluid velocity inside the block (in m s^-1). */
   CoordinateVector<> _velocity;
 
@@ -60,7 +62,7 @@ public:
    * @brief Empty constructor.
    */
   inline BlockSyntaxBlock()
-      : _number_density(0.), _temperature(0.), _neutral_fraction_H(1.) {}
+      : _number_density(0.), _temperature(0.), _neutral_fraction_H(1.), _neutral_fraction_He(1.) {}
 
   /**
    * @brief Constructor.
@@ -76,11 +78,12 @@ public:
   inline BlockSyntaxBlock(const CoordinateVector<> origin,
                           const CoordinateVector<> sides, const double exponent,
                           const double number_density, const double temperature,
-                          const double neutral_fraction_H,
+                          const double neutral_fraction_H, const double neutral_fraction_He,
                           const CoordinateVector<> velocity)
       : _origin(origin), _sides(sides), _exponent(exponent),
         _number_density(number_density), _temperature(temperature),
-        _neutral_fraction_H(neutral_fraction_H), _velocity(velocity) {}
+        _neutral_fraction_H(neutral_fraction_H), _neutral_fraction_He(neutral_fraction_He), 
+        _velocity(velocity) {}
 
   /**
    * @brief Check if the given position lies inside this block.
@@ -124,6 +127,9 @@ public:
    * @return Hydrogen neutral fraction inside this block.
    */
   inline double get_neutral_fraction_H() const { return _neutral_fraction_H; }
+
+
+  inline double get_neutral_fraction_He() const { return _neutral_fraction_He; }
 
   /**
    * @brief Get the fluid velocity inside this block.
