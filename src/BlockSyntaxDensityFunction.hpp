@@ -169,14 +169,18 @@ public:
     double density = -1.;
     double temperature = -1.;
     double neutral_fraction_H = -1.;
+#ifdef HAS_HELIUM
     double neutral_fraction_He = -1.;
+#endif
     CoordinateVector<> velocity;
     for (size_t i = 0; i < _blocks.size(); ++i) {
       if (_blocks[i].is_inside(position)) {
         density = _blocks[i].get_number_density();
         temperature = _blocks[i].get_temperature();
         neutral_fraction_H = _blocks[i].get_neutral_fraction_H();
+#ifdef HAS_HELIUM
         neutral_fraction_He = _blocks[i].get_neutral_fraction_He();
+#endif
         velocity = _blocks[i].get_velocity();
       }
     }
