@@ -145,7 +145,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
   if ((ionization_variables.get_ionic_fraction(ION_H_n) < h0max &&
       ionization_variables.get_temperature() > tmin &&
       ionization_variables.get_temperature() < tmax &&
-       ionization_variables.get_number_density() > 0.0) || true) {
+       ionization_variables.get_number_density() > 0.0 && 
+       ionization_variables.get_ionic_fraction(ION_H_n) == ionization_variables.get_ionic_fraction(ION_H_n))) {
     const double ntot = ionization_variables.get_number_density();
     const double nhp =
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
@@ -399,10 +400,30 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     // density weighted average temperature of ionized particles
     eval.set_emissivity(EMISSIONLINE_avg_T, ne * nhp * T);
     eval.set_emissivity(EMISSIONLINE_avg_T_count, ne * nhp);
-    if (ne == ne){
-        eval.set_emissivity(EMISSIONLINE_total_cooling,
-                 line_cooling_data.get_cooling(ionization_variables.get_temperature(), ne, abund));
-    }
+
+
+  double tot_cool;
+  double logT = std::log(T);
+  double sqrtT = std::sqrt(T);
+  double nenhp = ne*nhp;
+  double nenhep = ne*nhep;
+
+  tot_cool = line_cooling_data.get_cooling(T, ne, abund) * ntot;
+    //get brehm cooling
+  double c = 5.5 - logT;
+  double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+  tot_cool += 1.42e-40 * gff * sqrtT * (nenhp + nenhep);
+  //get recomb cooling
+  const double Lhp = 2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(T));
+#ifdef HAS_HELIUM
+    const double Lhep = 1.55e-39 * nenhep * std::pow(T, 0.3647);
+#else
+    const double Lhep = 0.0;
+#endif
+  
+  tot_cool += (Lhp + Lhep);
+  tot_cool = std::max(0.0,tot_cool);
+  eval.set_emissivity(EMISSIONLINE_total_cooling,tot_cool);
     
 #ifdef HAS_HELIUM
     // average ionized hydrogen and helium density product

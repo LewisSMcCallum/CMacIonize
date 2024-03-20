@@ -969,10 +969,14 @@ while (clock < total_dt) {
 
   tot_dif = gain - loss;
 
+  if ((temp <= _cooling_temp_floor) && (tot_dif <= 0.0)) {
+    break;
+  }
+
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
-    if (tstep < 1e-3*time_left) {
-      tstep = 1.e-3*time_left;
+    if (tstep < 1e-3*total_dt) {
+      tstep = 1.e-3*total_dt;
     }
     dE = tot_dif*tstep;
     clock += tstep;
