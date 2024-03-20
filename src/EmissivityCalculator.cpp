@@ -130,8 +130,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     const LineCoolingData &line_cooling_data) const {
 
   const double h0max = 1.1;
-  const double tmin = 1.e1;
-  const double tmax = 1.e6;
+  const double tmin = 1.e2;
+  const double tmax = 1.e5;
 
   EmissivityValues eval;
 
