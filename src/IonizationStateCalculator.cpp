@@ -1052,7 +1052,8 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
 
 
   if (status != GSL_SUCCESS) {
-      cmac_error("Error in solver!");
+      cmac_warning("Error in solver! xn = %g",y[0]);
+     // xn = 1e-14;
   }
     
 
