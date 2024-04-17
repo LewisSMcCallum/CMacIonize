@@ -491,6 +491,28 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                                     line_strengths[SII][TRANSITION_0_to_2] +
                                     line_strengths[SIII][TRANSITION_3_to_4]));
   } else {
+
+    // if not in temp range/ionization range to do line cooling, still get total cooling from recomb and brehm
+    const double ntot = ionization_variables.get_number_density();
+    const double nhp =
+        ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
+#ifdef HAS_HELIUM
+    const double nhep =
+        ntot * (ionization_variables.get_ionic_fraction(ION_He_p1)) *
+        abundances.get_abundance(ELEMENT_He);
+    const double nhepp = ntot * (1.0 - ionization_variables.get_ionic_fraction(ION_He_n) -
+              ionization_variables.get_ionic_fraction(ION_He_p1))*abundances.get_abundance(ELEMENT_He);
+#else
+    const double nhep = 0.;
+    const double nhepp = 0.;
+#endif
+
+   const double ne = nhp + nhep + 2.*nhepp;
+   double T = ionization_variables.get_temperature();
+  double logT = std::log(T);
+  double sqrtT = std::sqrt(T);
+  double nenhp = ne*nhp;
+  double nenhep = ne*nhep;
   //get brehm cooling
   double c = 5.5 - logT;
   double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
