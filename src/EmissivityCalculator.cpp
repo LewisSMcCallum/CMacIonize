@@ -490,6 +490,22 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                                     line_strengths[SII][TRANSITION_0_to_1] +
                                     line_strengths[SII][TRANSITION_0_to_2] +
                                     line_strengths[SIII][TRANSITION_3_to_4]));
+  } else {
+  //get brehm cooling
+  double c = 5.5 - logT;
+  double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
+  double tot_cool = 1.42e-40 * gff * sqrtT * (nenhp + nenhep);
+  //get recomb cooling
+  const double Lhp = 2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(T));
+#ifdef HAS_HELIUM
+    const double Lhep = 1.55e-39 * nenhep * std::pow(T, 0.3647);
+#else
+    const double Lhep = 0.0;
+#endif
+  
+  tot_cool += (Lhp + Lhep);
+  tot_cool = std::max(0.0,tot_cool);
+  eval.set_emissivity(EMISSIONLINE_total_cooling,tot_cool);
   }
 
   return eval;
