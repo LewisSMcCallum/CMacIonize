@@ -339,7 +339,8 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
 
   CollisionalRates* _collisional_rates = new CollisionalRates;
   DeRijckeRadiativeCooling* _radiative_cooling = nullptr;
-  if (false){
+  if (_parameter_file.get_value< bool >(
+          "TemperatureCalculator:use table cooling", false)){
     _radiative_cooling = new DeRijckeRadiativeCooling();
 
   }
