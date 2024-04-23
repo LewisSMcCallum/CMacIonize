@@ -348,7 +348,7 @@ public:
             double lifetime = a0z + a1z*std::log10(mass) + a2z*(std::log10(mass)*std::log10(mass));
             lifetime = std::pow(10.0,lifetime);
             lifetime = lifetime*3.154e+7;
-            lifetime -= time_val;
+            lifetime -= (_time - time_val);
             _source_lifetimes.push_back(lifetime);
             _source_indices.push_back(_next_index);
             ++_next_index;
