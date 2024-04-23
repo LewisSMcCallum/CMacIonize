@@ -58,6 +58,10 @@ private:
 
   std::vector< double > _source_luminosities;
 
+  std::vector<int> _to_delete;
+
+
+
   std::vector < double > _cum_imf;
   std::vector < double > _mass_range;
 
@@ -102,6 +106,11 @@ private:
   double _holmes_sh;
   double _holmes_lum;
   uint_fast32_t _number_of_holmes;
+
+
+  bool _read_file;
+  std::string _filename;
+  double _time;
 
   int type1done = 0;
 
@@ -244,12 +253,16 @@ public:
       const double holmes_time=0.0,
       const double holmes_sh=3e18,
       const double holmes_lum=5e46,
-      const uint_fast32_t number_of_holmes=200)
+      const uint_fast32_t number_of_holmes=200,
+      const bool read_file=false,
+      const std::string filename="sources.txt",
+      const double time=100.)
       : _star_formation_rate(star_formation_rate), _update_interval(update_interval),
         _output_file(nullptr), _number_of_updates(1), _next_index(0),
         _sne_energy(sne_energy), _lum_adjust(lum_adjust), _scaleheight(scaleheight),
         _peak_fraction(peak_fraction),_holmes_time(holmes_time),
         _holmes_sh(holmes_sh),_holmes_lum(holmes_lum),_number_of_holmes(number_of_holmes),
+        _read_file(read_file), _filename(filename), _time(time),
         _random_generator(seed) {
 
     novahandler = new SupernovaHandler(_sne_energy);
@@ -282,6 +295,79 @@ public:
       _output_file2->flush();
 
     }
+
+    if (_read_file){
+      std::ifstream file;
+      file.open(_filename);
+      if (!file.is_open()) {
+        cmac_error("Could not open file \"%s\"!", _filename.c_str());
+      } else {
+        std::cout << "Opened file - " << _filename << std::endl;
+      }
+
+
+      double time_val,posx,posy,posz,luminosity,mass;
+      int event,index;
+
+
+      std::string dummyLine,star_type;
+
+      std::getline(file, dummyLine);
+
+      time_val = 0.0;
+
+      while (!file.eof() && time_val <= time) {
+        file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
+
+        if (event == 2) {
+          _to_delete.push_back(index);
+        }
+      }
+
+
+
+    file.close();
+
+    file.open(_filename);
+
+
+    std::getline(file, dummyLine);
+
+    double a0z = 9.955209529401348;
+    double a1z = -3.3370109454102326;
+    double a2z = 0.8116654874025604;
+    time_val = 0.0;
+    while (!file.eof() && time_val <= time) {
+      file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
+      if (event == 1) {
+        if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end() && luminosity > 0.0) {
+            _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
+
+            _source_luminosities.push_back(luminosity);
+            
+            double lifetime = a0z + a1z*std::log10(mass) + a2z*(std::log10(mass)*std::log10(mass));
+            lifetime = std::pow(10.0,lifetime);
+            lifetime = lifetime*3.154e+7;
+            lifetime -= time_val;
+            _source_lifetimes.push_back(lifetime);
+            _source_indices.push_back(_next_index);
+            ++_next_index;
+            if (_output_file != nullptr) {
+              *_output_file << _total_time << "\t" << posx << "\t" << posy
+                        << "\t" << posz << "\t1\t"
+                        << _source_indices.back() << "\t"
+                        << _source_luminosities.back() << "\t"
+                        << mass << "\t"
+                        << "OSTAR\n";
+          }
+      }
+    }
+  }
+
+
+
+  file.close();
+  }
 
 
 
@@ -344,7 +430,10 @@ public:
                 "PhotonSourceDistribution:holmes height","700 pc"),
             params.get_physical_value<QUANTITY_FREQUENCY>(
                 "PhotonSourceDistribution:holmes luminosity","5e46 s^-1"),
-            params.get_value<double>("PhotonSourceDistribution:number of holmes",200)) {}
+            params.get_value<double>("PhotonSourceDistribution:number of holmes",200),
+            params.get_value<bool>("PhotonSourceDistribution:read file",false),
+            params.get_value<std::string>("PhotonSourceDistribution:filename","SourceFile.txt"),
+            params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:time","0.0 Myr")) {}
 
   /**
    * @brief Virtual destructor.

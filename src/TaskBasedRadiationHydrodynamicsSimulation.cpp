@@ -765,7 +765,7 @@ inline static void get_thermal_gain_loss(double &gain, double &loss,
                               const double inverse_volume,
                               LineCoolingData &line_cooling_data,
                               double abund[LINECOOLINGDATA_NUMELEMENTS], double AHe,
-                              DeRijckeRadiativeCooling* radiative_cooling){
+                              DeRijckeRadiativeCooling* radiative_cooling, bool use_cooling_tables){
 
 
 double temp = ionization_variables.get_temperature();
@@ -811,7 +811,7 @@ const double nenhp = ne*n*(1-h0);
 
   gain = std::max(gain,0.0);
 
-  if (radiative_cooling == nullptr) {
+  if (!use_cooling_tables && temp < 50000 && temp > 3000) {
   //get line cooling
   loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
     //get brehm cooling
@@ -865,7 +865,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
                               Hydro &hydro, double _cooling_temp_floor,
                               double gamma_minus_one,
                               LineCoolingData &line_cooling_data,
-                              Abundances &abundances) {
+                              Abundances &abundances, bool use_cooling_tables) {
 
 
   double rho = hydro_variables.get_primitives_density();
@@ -961,7 +961,7 @@ while (clock < total_dt) {
   time_left = total_dt - clock;
 
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
-                              line_cooling_data, abund, AHe, radiative_cooling);
+                              line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
@@ -1527,12 +1527,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           "TaskBasedRadiationHydrodynamicsSimulation:use cooling tables",
           false);
   
-  if (do_rad_cool || use_cool_tables) {
-    radiative_cooling = new DeRijckeRadiativeCooling();
-    _cooling_file = new std::ofstream("CoolingProgression.txt");
-    *_cooling_file << "#time (s)\tTotal lost Energy\n";
-    _cooling_file->flush();
-  }
 
   const bool do_explicit_temp_calc = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do explicit temperature calculation",
@@ -1542,6 +1536,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
             "TaskBasedRadiationHydrodynamicsSimulation:cooling temperature floor",
             "10 K");
+    radiative_cooling = new DeRijckeRadiativeCooling();
+    _cooling_file = new std::ofstream("CoolingProgression.txt");
+    *_cooling_file << "#time (s)\tTotal lost Energy\n";
+    _cooling_file->flush();
   }
 
   double total_thermal_lost=0.0;
@@ -2852,7 +2850,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
-                          _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances);
+                          _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances,
+                          use_cool_tables);
             }
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
