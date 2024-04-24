@@ -1325,7 +1325,7 @@ public:
           const double mean_molecular_mass = 1.0/(2.0-h0);
 #endif
           double temperature = _T_conversion_factor*mean_molecular_mass*pressure*inverse_density;
-          cmac_assert_message(temperature > 0.0,"in align temp to p");
+          cmac_assert_message(temperature > 0.0,"t=%g,p=%g,mmm=%g",temperature, pressure,mean_molecular_mass);
           ionization_variables.set_temperature(temperature);
 
 
