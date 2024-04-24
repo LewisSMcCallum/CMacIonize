@@ -405,6 +405,7 @@ void CMacIonizeSnapshotDensityFunction::initialize() {
                        ", %" PRIuFAST32 ")!",
                        ix, iy, iz);
           }
+          cmac_assert(_cartesian_grid[ix][iy][iz].get_temperature() > 0.0);
         }
       }
     }
