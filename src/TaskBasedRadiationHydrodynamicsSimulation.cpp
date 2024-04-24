@@ -811,11 +811,11 @@ const double nenhp = ne*n*(1-h0);
 
   gain = std::max(gain,0.0);
 
-  if (!use_cooling_tables && temp < 50000 && temp > 3000) {
+  if (!use_cooling_tables && temp < 50000 && temp > 3000 && h0 < 0.5) {
   //get line cooling
   loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
     //get brehm cooling
-
+  loss = std::max(loss, 0.0);
   double c = 5.5 - logT;
   double gff = 1.1 + 0.34 * std::exp(-c * c / 3.);
   loss += 1.42e-40 * gff * sqrtT * (nenhp + nenhep)/inverse_volume;
@@ -869,6 +869,10 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
 
   double rho = hydro_variables.get_primitives_density();
+  if (rho == 0.0) {
+    //dont heat or cool vacuum cells
+    return;
+  }
   double k= PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_BOLTZMANN);
   double mh = PhysicalConstants::get_physical_constant(PHYSICALCONSTANT_PROTON_MASS);
   const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
