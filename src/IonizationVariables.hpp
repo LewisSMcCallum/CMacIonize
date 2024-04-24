@@ -281,6 +281,9 @@ public:
    * @param temperature New temperature (in K).
    */
   inline void set_temperature(const double temperature) {
+    if (temperature == 0.0) {
+      cmac_error("NO ZERO TEMPY");
+    }
     _temperature = temperature;
   }
 
