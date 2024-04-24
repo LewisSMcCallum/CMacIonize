@@ -985,7 +985,7 @@ public:
     }
 
 
-    cmac_assert_message(pressure > 0.0,"p=%g,t=%g,mmm=%g",pressure, temperature,mean_molecular_mass);
+    cmac_assert_message(pressure > 0.0,"p=%g,t=%g,mmm=%g",pressure, ionization_variables.get_temperature(),mean_molecular_mass);
 
     cmac_assert(density == density);
     cmac_assert(pressure == pressure);
