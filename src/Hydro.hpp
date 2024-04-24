@@ -325,6 +325,8 @@ public:
 
     hydro_state.set_primitives_density(density);
     hydro_state.set_primitives_velocity(velocity);
+    cmac_assert_message(pressure > 0.0,"ABOUT TO SET P=0, energy=%g,kin=%g",hydro_state.get_conserved_total_energy(),0.5 * CoordinateVector<>::dot_product(
+                         velocity, hydro_state.get_conserved_momentum()));
     hydro_state.set_primitives_pressure(pressure);
 
     set_conserved_variables(hydro_state, 1./inverse_volume);
