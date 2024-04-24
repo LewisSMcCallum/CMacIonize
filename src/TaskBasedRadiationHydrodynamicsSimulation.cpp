@@ -814,6 +814,8 @@ const double nenhp = ne*n*(1-h0);
   if (!use_cooling_tables && temp < 50000 && temp > 3000 && h0 < 0.5) {
   //get line cooling
   loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
+
+  cmac_assert_message(loss==loss, "loss=%g,T=%g,h0=%g,ne=%g",loss,temp,h0,ne);
     //get brehm cooling
   loss = std::max(loss, 0.0);
   double c = 5.5 - logT;
@@ -853,6 +855,8 @@ const double nenhp = ne*n*(1-h0);
   // }
   } else {
     loss = radiative_cooling->get_cooling_rate(temp)*n*n/inverse_volume;
+
+    cmac_assert_message(loss==loss, "loss=%g,T=%g,n=%g",loss,temp,n);
   }
 
 }
@@ -988,6 +992,8 @@ while (clock < total_dt) {
     dE = tot_dif*time_left;
     clock = total_dt;
   }
+
+  cmac_assert_message(dE == dE, "dE=%g, T=%g, gain=%g,loss=%g",dE,temp,gain,loss);
 
   hydro.update_energy_variables(ionization_variables, hydro_variables, inverse_volume, dE);
 
