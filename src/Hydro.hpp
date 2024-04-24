@@ -984,6 +984,9 @@ public:
       }
     }
 
+
+    cmac_assert_message(pressure > 0.0,"p=%g,t=%g,mmm=%g",pressure, temperature,mean_molecular_mass);
+
     cmac_assert(density == density);
     cmac_assert(pressure == pressure);
 
@@ -1037,7 +1040,6 @@ public:
           volume * density * thermal_energy + kinetic_energy;
       const double pressure = _gamma_minus_one * density * thermal_energy;
 
-     cmac_assert_message(temperature > 0.0,"in set temp hydro");
 
       ionization_variables.set_temperature(temperature);
       hydro_variables.set_primitives_pressure(pressure);
