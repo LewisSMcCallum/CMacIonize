@@ -197,7 +197,7 @@ public:
       cmac_assert(_hydro_variables[i].get_conserved_mass() >= 0.);
       cmac_assert(_hydro_variables[i].get_conserved_total_energy() >= 0.);
 #endif
-    cmac_assert_message(_hydro_variables[i].get_conserved_total_energy() > 0.5*CoordinateVector<>::dot_product(_hydro_variables[i].get_conserved_momentum(), _hydro_variables[i].get_primitives_velocity()),
+    cmac_assert_message(_hydro_variables[i].get_conserved_total_energy() > 0.5*CoordinateVector<>::dot_product(_hydro_variables[i].get_conserved_momentum(), _hydro_variables[i].get_conserved_momentum())/_hydro_variables[i].get_conserved_mass(),
     "about to set kinetic greater than total energy....");
     }
   }
