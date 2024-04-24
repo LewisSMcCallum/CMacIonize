@@ -966,7 +966,8 @@ double temp;
 
 double current_energy;
 
-std::cout << "Tempy = " << ionization_variables.get_temperature() << std::endl;
+
+cmac_assert(ionization_variables.get_temperature() > 0.0);
 
 while (clock < total_dt) {
 

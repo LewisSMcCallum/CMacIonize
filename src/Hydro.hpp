@@ -1150,6 +1150,10 @@ public:
                         "old_energy: %g, delta_energy: %g, new_energy: %g",
                         old_energy, delta_energy, new_energy);
 
+    cmac_assert_message(new_temperature > 0.0,
+                        "old_temp: %g, new_temp: %g, de=%g",
+                        ionization_variables.get_temperature(), new_temperature,delta_energy);
+
 #ifdef SAFE_HYDRO_VARIABLES
     new_pressure = std::max(new_pressure, 0.);
     new_energy = std::max(new_energy, 0.);
