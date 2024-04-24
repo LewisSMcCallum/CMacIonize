@@ -1037,6 +1037,8 @@ public:
           volume * density * thermal_energy + kinetic_energy;
       const double pressure = _gamma_minus_one * density * thermal_energy;
 
+     cmac_assert_message(temperature > 0.0,"in set temp hydro");
+
       ionization_variables.set_temperature(temperature);
       hydro_variables.set_primitives_pressure(pressure);
       hydro_variables.set_conserved_total_energy(total_energy);
@@ -1323,7 +1325,7 @@ public:
           const double mean_molecular_mass = 1.0/(2.0-h0);
 #endif
           double temperature = _T_conversion_factor*mean_molecular_mass*pressure*inverse_density;
-
+          cmac_assert_message(temperature > 0.0,"in align temp to p");
           ionization_variables.set_temperature(temperature);
 
 
