@@ -27,7 +27,6 @@
 #define HYDRO_HPP
 
 #include "HLLCRiemannSolver.hpp"
-#include "ExactRiemannSolver.hpp"
 #include "HydroBoundary.hpp"
 #include "HydroVariables.hpp"
 #include "IonizationVariables.hpp"
@@ -93,7 +92,7 @@ private:
   const double _u_conversion_factor;
 
   /*! @brief Riemann solver used to solve the Riemann problem. */
-  const ExactRiemannSolver _riemann_solver;
+  const HLLCRiemannSolver _riemann_solver;
 
   /**
    * @brief Per face slope limiter for a single quantity.
