@@ -41,7 +41,7 @@
 #define SAFE_HYDRO_VARIABLES
 
 /*! @brief Uncomment this to activate the flux limiter. */
-#define FLUX_LIMITER 2.
+//#define FLUX_LIMITER 2.
 
 /**
  * @brief Hydro related functionality.
@@ -944,7 +944,6 @@ public:
     state.set_primitives_density(rho_new);
     state.set_primitives_velocity(v_new);
     state.set_primitives_pressure(P_new);
-    set_conserved_variables(state,1.401e52);
   }
 
   /**
