@@ -944,6 +944,7 @@ public:
     state.set_primitives_density(rho_new);
     state.set_primitives_velocity(v_new);
     state.set_primitives_pressure(P_new);
+    set_conserved_variables(state,1.401e52);
   }
 
   /**
