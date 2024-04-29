@@ -138,6 +138,12 @@ public:
                                   _hydro_variables[i]);
       }
       hydro.set_conserved_variables(_hydro_variables[i], _cell_volume);
+
+      double kin = 0.5*CoordinateVector<>::dot_product(_hydro_variables[i].get_conserved_momentum(), _hydro_variables[i].get_conserved_momentum())/_hydro_variables[i].get_conserved_mass();
+      double tot = _hydro_variables[i].get_conserved_total_energy();
+      if (kin > 0.999*tot) {
+        cmac_error("At least 3 orders of magnitude more in kinetic than thermal.");
+      }
       timestep = std::min(timestep, hydro.get_timestep(_hydro_variables[i],
                                                        _ionization_variables[i],
                                                        _cell_volume));
