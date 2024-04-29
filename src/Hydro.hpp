@@ -38,7 +38,7 @@
 
 /*! @brief Uncomment this to enable hard resets for unphysical hydro
  *  variables. */
-//#define SAFE_HYDRO_VARIABLES
+#define SAFE_HYDRO_VARIABLES
 
 /*! @brief Uncomment this to activate the flux limiter. */
 #define FLUX_LIMITER 2.
@@ -939,6 +939,9 @@ public:
     cmac_assert(rho_new >= 0.);
     cmac_assert(P_new >= 0.);
 #endif
+
+    cmac_assert(rho_new > 0.);
+    cmac_assert(P_new > 0.);
 
     state.set_primitives_density(rho_new);
     state.set_primitives_velocity(v_new);
