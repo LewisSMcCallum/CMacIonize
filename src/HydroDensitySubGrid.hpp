@@ -141,9 +141,6 @@ public:
 
       double kin = 0.5*CoordinateVector<>::dot_product(_hydro_variables[i].get_conserved_momentum(), _hydro_variables[i].get_conserved_momentum())/_hydro_variables[i].get_conserved_mass();
       double tot = _hydro_variables[i].get_conserved_total_energy();
-      if (kin > tot) {
-        cmac_error("This is bad.");
-      }
       timestep = std::min(timestep, hydro.get_timestep(_hydro_variables[i],
                                                        _ionization_variables[i],
                                                        _cell_volume));
