@@ -38,7 +38,7 @@
 
 /*! @brief Uncomment this to enable hard resets for unphysical hydro
  *  variables. */
-#define SAFE_HYDRO_VARIABLES
+//#define SAFE_HYDRO_VARIABLES
 
 /*! @brief Uncomment this to activate the flux limiter. */
 #define FLUX_LIMITER 2.
