@@ -969,6 +969,10 @@ double current_energy;
 
 cmac_assert(ionization_variables.get_temperature() > 0.0);
 
+if (ionization_variables.get_temperature() ==  0.0) {
+  cmac_error("Temp = 0 before cooling step");
+}
+
 while (clock < total_dt) {
 
   time_left = total_dt - clock;
