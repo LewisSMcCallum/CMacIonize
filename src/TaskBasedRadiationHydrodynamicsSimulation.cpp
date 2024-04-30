@@ -970,7 +970,7 @@ double current_energy;
 cmac_assert(ionization_variables.get_temperature() > 0.0);
 
 if (ionization_variables.get_temperature() ==  0.0) {
-  cmac_error("Temp = 0 before cooling step");
+  cmac_error("why is T == 0....!");
 }
 
 while (clock < total_dt) {
@@ -979,14 +979,6 @@ while (clock < total_dt) {
 
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
-
-  if (gain != gain){
-    cmac_error("NANS in gain  t = %g",ionization_variables.get_temperature());
-  }
-
-    if (loss != loss){
-    cmac_error("NANS in loss  t = %g",ionization_variables.get_temperature());
-  }
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
@@ -2875,6 +2867,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             }
             if (do_explicit_temp_calc) {
               if (ionization_variables.get_temperature() <  _cooling_temp_floor) {
+                std::cout << "SETTING TEMP TO " << _cooling_temp_floor << std::endl;
                  hydro.set_temperature(
                   cellit.get_ionization_variables(),
                   cellit.get_hydro_variables(), cellit.get_volume(),
