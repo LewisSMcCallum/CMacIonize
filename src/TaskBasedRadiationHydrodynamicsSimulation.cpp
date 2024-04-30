@@ -976,6 +976,14 @@ while (clock < total_dt) {
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
+  if (gain != gain || loss != loss){
+    cmac_error("NANS in gain or loss")
+  }
+
+  if (loss == 0) {
+    cmac_error("Cooling is zero.")
+  }
+
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
 
