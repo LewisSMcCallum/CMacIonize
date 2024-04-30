@@ -954,7 +954,7 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.01;
+double max_frac = 0.001;
 double tot_dif;
 double time_left;
 double tstep;
@@ -988,8 +988,8 @@ while (clock < total_dt) {
 
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
-    if (tstep < 1e-3*total_dt) {
-      tstep = 1.e-3*total_dt;
+    if (tstep < 1e-5*total_dt) {
+      tstep = 1.e-5*total_dt;
     }
     dE = tot_dif*tstep;
     clock += tstep;
