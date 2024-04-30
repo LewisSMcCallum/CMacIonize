@@ -1049,9 +1049,8 @@ public:
       ionization_variables.set_temperature(temperature);
       hydro_variables.set_primitives_pressure(pressure);
       hydro_variables.set_conserved_total_energy(total_energy);
-      if (temperature == 0) {
-        cmac_error("Setting zero in the function."); 
-             }
+    } else {
+      cmac_error("Density zero in set_temp.");
     }
   }
 
