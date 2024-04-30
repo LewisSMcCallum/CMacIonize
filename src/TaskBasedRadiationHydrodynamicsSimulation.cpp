@@ -2870,6 +2870,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
             }
             if (do_explicit_temp_calc) {
+              if (ionization_variables.get_temperature() <  _cooling_temp_floor) {
+                 hydro.set_temperature(
+                  cellit.get_ionization_variables(),
+                  cellit.get_hydro_variables(), cellit.get_volume(),
+                  _cooling_temp_floor);
+            }
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
