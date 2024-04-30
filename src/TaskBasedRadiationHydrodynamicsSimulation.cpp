@@ -976,12 +976,12 @@ while (clock < total_dt) {
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
-  if (gain != gain || loss != loss){
-    cmac_error("NANS in gain or loss")
+  if (gain != gain){
+    cmac_error("NANS in gain  t = %g",ionization_variables.get_temperature());
   }
 
-  if (loss == 0) {
-    cmac_error("Cooling is zero.")
+    if (loss != loss){
+    cmac_error("NANS in loss  t = %g",ionization_variables.get_temperature());
   }
 
   temp = ionization_variables.get_temperature();
