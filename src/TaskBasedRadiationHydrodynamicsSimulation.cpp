@@ -978,15 +978,7 @@ while (clock < total_dt) {
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
   
-  if (gain != gain) {
-    std::cout << ionization_variables.get_temperature() << " and " << ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
-    std::cout << ionization_variables.get_ionic_fraction(ION_He_n) << " and " << ionization_variables.get_ionic_fraction(ION_He_p1) << std::endl;
 
-    cmac_error("NAN GAIN");
-  }
-  if (loss != loss) {
-    cmac_error("Nan loss");
-  }
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
@@ -996,6 +988,16 @@ while (clock < total_dt) {
 
   if ((temp <= _cooling_temp_floor) && (tot_dif <= 0.0)) {
     break;
+  }
+
+  if (gain != gain) {
+    std::cout << ionization_variables.get_temperature() << " and " << ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
+    std::cout << ionization_variables.get_ionic_fraction(ION_He_n) << " and " << ionization_variables.get_ionic_fraction(ION_He_p1) << std::endl;
+
+    cmac_error("NAN GAIN");
+  }
+  if (loss != loss) {
+    cmac_error("Nan loss");
   }
 
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
