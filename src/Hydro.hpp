@@ -323,7 +323,7 @@ public:
       }
     }
     if (density == 0) {
-      cmac_error("Density gone zero mate.");
+      cmac_warning("Density gone zero mate. Simulation is likely dying.");
     }
     hydro_state.set_primitives_density(density);
     hydro_state.set_primitives_velocity(velocity);
@@ -1049,11 +1049,6 @@ public:
       ionization_variables.set_temperature(temperature);
       hydro_variables.set_primitives_pressure(pressure);
       hydro_variables.set_conserved_total_energy(total_energy);
-      if (pressure == 0 || temperature == 0) {
-        cmac_error("AAAH");
-      } 
-    } else {
-      cmac_error("Density zero in set_temp.");
     }
   }
 

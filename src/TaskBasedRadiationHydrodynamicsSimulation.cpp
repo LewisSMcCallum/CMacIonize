@@ -974,6 +974,7 @@ while (clock < total_dt) {
 
 
   if (ionization_variables.get_temperature() == 0) {
+    cmac_warning("A cell's temperature went to zero in the heating/cooling function! Hopefully not too many of these.")
     break;
 
   }
@@ -996,15 +997,8 @@ while (clock < total_dt) {
     break;
   }
 
-  if (gain != gain) {
-    std::cout << ionization_variables.get_temperature() << " and " << ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
-    std::cout << ionization_variables.get_ionic_fraction(ION_He_n) << " and " << ionization_variables.get_ionic_fraction(ION_He_p1) << std::endl;
-
-    cmac_error("NAN GAIN");
-  }
-  if (loss != loss) {
-    cmac_error("Nan loss");
-  }
+  cmac_assert(gain == gain);
+  cmac_assert(loss == loss);
 
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
@@ -1019,7 +1013,6 @@ while (clock < total_dt) {
   }
 
   cmac_assert_message(dE == dE, "dE=%g, T=%g, gain=%g,loss=%g",dE,temp,gain,loss);
-  
   hydro.update_energy_variables(ionization_variables, hydro_variables, inverse_volume, dE);
 
 }
@@ -2883,21 +2876,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             }
             if (do_explicit_temp_calc) {
               if (ionization_variables.get_temperature() <  _cooling_temp_floor) {
-                std::cout << "SETTING TEMP TO " << _cooling_temp_floor << std::endl;
                  hydro.set_temperature(
                   cellit.get_ionization_variables(),
                   cellit.get_hydro_variables(), cellit.get_volume(),
                   _cooling_temp_floor);
-                  
-                  if (ionization_variables.get_temperature() == 0){
-                  std::cout << "Temp was set to " << ionization_variables.get_temperature() << std::endl;
-                  std::cout << "rho = " << hydro_variables.get_primitives_density() << " press = " << hydro_variables.get_primitives_pressure() <<  std::endl;
-                  cmac_error("even worse");
-                  }
             }
-              if (ionization_variables.get_temperature() == 0){
-                cmac_error("T0000 out here");
-              }
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
