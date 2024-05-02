@@ -975,7 +975,7 @@ while (clock < total_dt) {
 
   if (ionization_variables.get_temperature() == 0) {
     break;
-    
+
   }
 
   time_left = total_dt - clock;
@@ -1019,13 +1019,9 @@ while (clock < total_dt) {
   }
 
   cmac_assert_message(dE == dE, "dE=%g, T=%g, gain=%g,loss=%g",dE,temp,gain,loss);
-  if (ionization_variables.get_temperature() == 0) {
-    cmac_error("Zero temp before update energy variables.");
-  }
+  
   hydro.update_energy_variables(ionization_variables, hydro_variables, inverse_volume, dE);
-    if (ionization_variables.get_temperature() == 0) {
-    cmac_error("Zero temp AFTER update energy variables.");
-  }
+
 }
 
 
