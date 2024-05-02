@@ -979,6 +979,9 @@ while (clock < total_dt) {
 
   
   if (gain != gain) {
+    std::cout << ionization_variables.get_temperature() << " and " << ionization_variables.get_ionic_fraction(ION_H_n) << std::endl;
+    std::cout << ionization_variables.get_ionic_fraction(ION_He_n) << " and " << ionization_variables.get_ionic_fraction(ION_He_p1) << std::endl;
+
     cmac_error("NAN GAIN");
   }
   if (loss != loss) {
