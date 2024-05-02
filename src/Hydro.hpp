@@ -1049,6 +1049,9 @@ public:
       ionization_variables.set_temperature(temperature);
       hydro_variables.set_primitives_pressure(pressure);
       hydro_variables.set_conserved_total_energy(total_energy);
+      if (pressure == 0 || temperature == 0) {
+        cmac_error("AAAH");
+      } 
     } else {
       cmac_error("Density zero in set_temp.");
     }
