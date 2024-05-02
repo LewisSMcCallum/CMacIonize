@@ -975,6 +975,7 @@ while (clock < total_dt) {
 
   if (ionization_variables.get_temperature() == 0) {
     break;
+    
   }
 
   time_left = total_dt - clock;
