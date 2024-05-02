@@ -2872,7 +2872,15 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables(),
                   cellit.get_hydro_variables(), cellit.get_volume(),
                   _cooling_temp_floor);
+                  std::cout << "Temp was set to " << ionization_variables.get_temperature() << std::endl;
+                  if (ionization_variables.get_temperature() == 0){
+                    
+                  cmac_error("even worse");
+                  }
             }
+              if (ionization_variables.get_temperature() == 0){
+                cmac_error("T0000 out here");
+              }
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
