@@ -875,7 +875,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
 
   double rho = hydro_variables.get_primitives_density();
-  if (rho == 0.0 || ionization_variables.get_temperature() == 0) {
+  if (rho == 0.0) {
     //dont heat or cool vacuum cells, or weird zero temp cells
     return;
   }
@@ -971,6 +971,11 @@ cmac_assert(ionization_variables.get_temperature() > 0.0);
 
 
 while (clock < total_dt) {
+
+
+  if (ionization_variables.get_temperature() == 0) {
+    break;
+  }
 
   time_left = total_dt - clock;
 
