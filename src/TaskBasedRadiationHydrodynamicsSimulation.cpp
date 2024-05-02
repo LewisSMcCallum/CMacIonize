@@ -2872,9 +2872,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables(),
                   cellit.get_hydro_variables(), cellit.get_volume(),
                   _cooling_temp_floor);
-                  std::cout << "Temp was set to " << ionization_variables.get_temperature() << std::endl;
+                  
                   if (ionization_variables.get_temperature() == 0){
-                    
+                  std::cout << "Temp was set to " << ionization_variables.get_temperature() << std::endl;
+                  std::cout << "rho = " << hydro_variables.get_primitives_density() << " press = " << hydro_variables.get_primitives_pressure() <<  std::endl;
                   cmac_error("even worse");
                   }
             }
