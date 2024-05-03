@@ -985,7 +985,12 @@ while (clock < total_dt) {
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
   
-
+  if (gain != gain || loss != loss){
+    cmac_warning("Nans in the gain/loss - T=%g,xh=%g,xhe=%g,rho=%g",ionization_variables.get_temperature(),
+          ionization_variables.get_ionic_fraction(ION_H_n),ionization_variables.get_ionic_fraction(ION_He_n),
+          hydro_variables.get_primitives_density());
+    break;
+  }
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
