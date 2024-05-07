@@ -1143,6 +1143,20 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   h0 = std::max(y[0],1e-14);
   he0 = std::max(y[1],1e-14);
   hep = std::max(y[2],1e-14);
+  
+  if (h0 != h0) {
+    cmac_warning("Nan H0 in solver. Setting 0.999");
+    h0 = 0.999;
+  }
+  if (he0 != he0) {
+    cmac_warning("Nan He0 in solver. Setting 0.999");
+    he0 = 0.999;
+  }
+  if (hep != hep) {
+    cmac_warning("Nan Hep in solver. Setting 0.001");
+    hep = 0.001;
+  }
+
 
 }
 

@@ -813,7 +813,7 @@ const double nenhp = ne*n*(1-h0);
 
   cmac_assert_message(gain==gain, "gain=%g,T=%g,h0=%g,ne=%g",gain,temp,h0,ne);
 
-  if (!use_cooling_tables && temp < 50000 && temp > 3000 && h0 < 0.5) {
+  if (!use_cooling_tables && temp < 50000 && temp > 3000 && h0 < 0.9) {
   //get line cooling
   loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
 
