@@ -32,12 +32,18 @@
 #include "RandomGenerator.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
+#include "WMBasicPhotonSourceSpectrum.hpp"
+#include "PowerLawPhotonSourceSpectrum.hpp"
+#include "Pegase3PhotonSourceSpectrum.hpp"
+#include "PhotonSourceSpectrum.hpp"
 
 #include <algorithm>
 #include <cinttypes>
 #include <fstream>
 #include <unistd.h>
 #include <vector>
+
+
 
 /**
  * @brief Disc patch PhotonSourceDistribution.
@@ -75,6 +81,9 @@ private:
 
   /*! @brief Indices of the sources (if output is enabled). */
   std::vector< uint_fast32_t > _source_indices;
+
+  std::vector<int> _spectrum_index;
+  std::vector<PhotonSourceSpectrum*> _all_spectra;
 
   /*! @brief Index of the next source to add (if output is enabled). */
   uint_fast32_t _next_index;
@@ -124,6 +133,8 @@ private:
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
+
+  Log *_log;
 
 
     static double kroupa_imf(double mass) {
@@ -256,16 +267,26 @@ public:
       const uint_fast32_t number_of_holmes=200,
       const bool read_file=false,
       const std::string filename="sources.txt",
-      const double time=100.)
+      const double time=100.,
+      Log *log=nullptr)
       : _star_formation_rate(star_formation_rate), _update_interval(update_interval),
         _output_file(nullptr), _number_of_updates(1), _next_index(0),
         _sne_energy(sne_energy), _lum_adjust(lum_adjust), _scaleheight(scaleheight),
         _peak_fraction(peak_fraction),_holmes_time(holmes_time),
         _holmes_sh(holmes_sh),_holmes_lum(holmes_lum),_number_of_holmes(number_of_holmes),
         _read_file(read_file), _filename(filename), _time(time),
-        _random_generator(seed) {
+        _random_generator(seed), _log(log){
 
     novahandler = new SupernovaHandler(_sne_energy);
+
+    
+
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+    _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+  //_all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+  //_all_spectra.push_back(new PowerLawPhotonSourceSpectrum(3.,log));
+
+
 
 
     // form cumulative IMF
@@ -351,15 +372,29 @@ public:
             lifetime -= (_time - time_val);
             _source_lifetimes.push_back(lifetime);
             _source_indices.push_back(_next_index);
+            if (star_type == "HOLMES") {
+              _spectrum_index.push_back(1);
+              if (_output_file != nullptr) {
+                *_output_file << _total_time << "\t" << posx << "\t" << posy
+                          << "\t" << posz << "\t1\t"
+                          << _source_indices.back() << "\t"
+                          << _source_luminosities.back() << "\t"
+                          << mass << "\t"
+                          << "HOLMES\n";
+              }
+            } else {
+              _spectrum_index.push_back(0);
+              if (_output_file != nullptr) {
+                *_output_file << _total_time << "\t" << posx << "\t" << posy
+                          << "\t" << posz << "\t1\t"
+                          << _source_indices.back() << "\t"
+                          << _source_luminosities.back() << "\t"
+                          << mass << "\t"
+                          << "OSTAR\n";
+              }
+            }
             ++_next_index;
-            if (_output_file != nullptr) {
-              *_output_file << _total_time << "\t" << posx << "\t" << posy
-                        << "\t" << posz << "\t1\t"
-                        << _source_indices.back() << "\t"
-                        << _source_luminosities.back() << "\t"
-                        << mass << "\t"
-                        << "OSTAR\n";
-          }
+
       }
     }
   }
@@ -433,7 +468,8 @@ public:
             params.get_value<double>("PhotonSourceDistribution:number of holmes",200),
             params.get_value<bool>("PhotonSourceDistribution:read file",false),
             params.get_value<std::string>("PhotonSourceDistribution:filename","SourceFile.txt"),
-            params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:time","0.0 Myr")) {}
+            params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:time","0.0 Myr"),
+            log) {}
 
   /**
    * @brief Virtual destructor.
@@ -560,6 +596,14 @@ public:
   }
 
 
+  double get_photon_frequency(RandomGenerator &random_generator,
+  photonsourcenumber_t index) {
+
+    return _all_spectra[_spectrum_index[index]]->get_random_frequency(random_generator,0.0);
+
+}
+
+
   /**
    * @brief Update the distribution after the system moved to the given time.
    *
@@ -585,14 +629,14 @@ public:
         // remove the element
         if (_output_file != nullptr) {
           *_output_file << _total_time << "\t0.\t0.\t0.\t2\t"
-                        << _source_indices[i] << "\t0\t0\tSNe\n";
-          _source_indices.erase(_source_indices.begin() + i);
+                        << _source_indices[i] << "\t0\t0\tSNe\n";    
         }
-
         _to_do_feedback.push_back(_source_positions[i]);
         _source_positions.erase(_source_positions.begin() + i);
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _source_luminosities.erase(_source_luminosities.begin() + i);
+        _spectrum_index.erase(_spectrum_index.begin() + i);
+        _source_indices.erase(_source_indices.begin() + i);
         _num_sne = _num_sne + 1;
         updated = true;
 

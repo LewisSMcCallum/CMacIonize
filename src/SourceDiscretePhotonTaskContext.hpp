@@ -177,7 +177,8 @@ public:
 
       if (typeid(TextFilePhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ||
           typeid(ArepoSnapshotPhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ||
-          typeid(HDF5PhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ) {
+          typeid(HDF5PhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() || 
+          typeid(MixedDrivingPhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ) {
         frequency = _photon_source_distribution.get_photon_frequency(
           _random_generators[thread_id], _photon_source.get_index(source_index));
         //photon.set_weight(_photon_source_distribution.get_photon_weighting(_photon_source.get_index(source_index)));
