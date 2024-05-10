@@ -884,9 +884,10 @@ public:
               _random_generator.get_uniform_random_double() * _update_interval;
         _source_lifetimes.push_back(lifetime-offset);
         _source_luminosities.push_back(lum_from_mass(m_cur));
+        _source_indices.push_back(_next_index);
+        ++_next_index;
+        _spectrum_index.push_back(0);
         if (_output_file != nullptr) {
-          _source_indices.push_back(_next_index);
-          ++_next_index;
           const CoordinateVector<> &pos = _source_positions.back();
           *_output_file << _total_time << "\t" << pos.x() << "\t" << pos.y()
                         << "\t" << pos.z() << "\t1\t"
