@@ -986,9 +986,11 @@ while (clock < total_dt) {
 
   
   if (gain != gain || loss != loss){
+#ifdef HAS_HELIUM
     cmac_warning("Nans in the gain/loss - T=%g,xh=%g,xhe=%g,rho=%g",ionization_variables.get_temperature(),
           ionization_variables.get_ionic_fraction(ION_H_n),ionization_variables.get_ionic_fraction(ION_He_n),
           hydro_variables.get_primitives_density());
+#endif
     break;
   }
 
