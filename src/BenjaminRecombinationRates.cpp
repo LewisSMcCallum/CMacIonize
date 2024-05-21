@@ -428,32 +428,44 @@ double BenjaminRecombinationRates::get_recombination_rate(
 #ifdef HAS_SULPHUR
   case ION_S_p1: {
     // Mazzotta et al. (1998), equation 7, validity range not specified
-    const double T_in_eV = temperature / 1.16045221e4;
-    if (temperature > 60000) {
-      rate = get_recombination_rate_benjamin(ion,temperature);
+    // const double T_in_eV = temperature / 1.16045221e4;
+    // if (temperature > 60000) {
+    //   rate = get_recombination_rate_benjamin(ion,temperature);
 
+    // } else {
+    // rate = get_recombination_rate_benjamin(ion,temperature) +
+    //        1.37e-9 * std::exp(-14.95 / T_in_eV) * std::pow(T_in_eV, -1.5);
+    // }
+    // Kaur et al. 2018, need to double check ranges
+    const double T_inv = 1. / temperature;
+    if (temperature > 9e7) {
+      rate = get_recombination_rate_benjamin(ion,temperature);
     } else {
     rate = get_recombination_rate_benjamin(ion,temperature) +
-           1.37e-9 * std::exp(-14.95 / T_in_eV) * std::pow(T_in_eV, -1.5);
-        }
+           (3.04e-7 * std::exp(-5.016e1 * T_inv) +
+            4.393e-7 * std::exp(-3.266e2 * T_inv) +
+            1.609e-6 * std::exp(-3.102e3 * T_inv) +
+            4.98e-6 * std::exp(-1.21e4 * T_inv) +
+            3.457e-5 * std::exp(-4.969e4 * T_inv) +
+            8.617e-3 * std::exp(-2.01e5 * T_inv) +
+            9.284e-4 * std::exp(-2.575e5 * T_inv)) *
+               std::pow(temperature, -1.5);
+    }
     break;
   }
   case ION_S_p2: {
     // Mazzotta et al. (1998), equation 7, validity range not specified
-    const double T_in_eV = temperature / 1.16045221e4;
-    const double T_in_eV_inv = 1. / T_in_eV;
-    if (temperature > 60000) {
-      rate = get_recombination_rate_benjamin(ion,temperature);
-    } else {
-    rate = get_recombination_rate_benjamin(ion,temperature) +
-           (8.0729e-9 * std::exp(-17.56 * T_in_eV_inv) +
-            1.1012e-10 * std::exp(-7.07 * T_in_eV_inv)) *
-               std::pow(T_in_eV, -1.5);
-      }
-    break;
-  }
-  case ION_S_p3: {
-    // Abdel-Naby et al. (2012), equation 3, validity range [90 K; 9x10^7 K].
+    // const double T_in_eV = temperature / 1.16045221e4;
+    // const double T_in_eV_inv = 1. / T_in_eV;
+    // if (temperature > 60000) {
+    //   rate = get_recombination_rate_benjamin(ion,temperature);
+    // } else {
+    // rate = get_recombination_rate_benjamin(ion,temperature) +
+    //        (8.0729e-9 * std::exp(-17.56 * T_in_eV_inv) +
+    //         1.1012e-10 * std::exp(-7.07 * T_in_eV_inv)) *
+    //            std::pow(T_in_eV, -1.5);
+    // }
+    // Abdel-Naby et al. 2012, S3+
     const double T_inv = 1. / temperature;
     if (temperature > 9e7) {
       rate = get_recombination_rate_benjamin(ion,temperature);
@@ -466,7 +478,37 @@ double BenjaminRecombinationRates::get_recombination_rate(
             1.875e-3 * std::exp(-1.235e5 * T_inv) +
             2.097e-2 * std::exp(-2.07e5 * T_inv)) *
                std::pow(temperature, -1.5);
-      }
+    }
+    break;
+  }
+  case ION_S_p3: {
+    // Abdel-Naby et al. (2012), equation 3, validity range [90 K; 9x10^7 K].
+    // const double T_inv = 1. / temperature;
+    // if (temperature > 9e7) {
+    //   rate = get_recombination_rate_benjamin(ion,temperature);
+    // } else {
+    // rate = get_recombination_rate_benjamin(ion,temperature) +
+    //        (5.817e-7 * std::exp(-362.8 * T_inv) +
+    //         1.391e-6 * std::exp(-1058. * T_inv) +
+    //         1.123e-5 * std::exp(-7160. * T_inv) +
+    //         1.521e-4 * std::exp(-3.26e4 * T_inv) +
+    //         1.875e-3 * std::exp(-1.235e5 * T_inv) +
+    //         2.097e-2 * std::exp(-2.07e5 * T_inv)) *
+    //            std::pow(temperature, -1.5);
+    // }
+    // Altun et al. 2007
+    const double T_inv = 1. / temperature;
+    if (temperature > 9e7) {
+      rate = get_recombination_rate_benjamin(ion,temperature);
+    } else {
+    rate = get_recombination_rate_benjamin(ion,temperature) +
+           (9.571e-6 * std::exp(-1.18e3 * T_inv) +
+            6.268e-5 * std::exp(-6.443e3 * T_inv) +
+            3.807e-4 * std::exp(-2.264e4 * T_inv) +
+            1.874e-2 * std::exp(-1.53e5 * T_inv) +
+            5.526e-3 * std::exp(-3.564e5 * T_inv)) *
+               std::pow(temperature, -1.5);
+    }
     break;
   }
 #endif
