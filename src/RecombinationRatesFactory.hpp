@@ -73,7 +73,6 @@ public:
       return new BenjaminRecombinationRates();
     } else if (type == "Chianti") {
       return new ChiantiRecombinationRates();
-    }
     } else {
       cmac_error("Unknown RecombinationRates type: \"%s\"!", type.c_str());
       return nullptr;
