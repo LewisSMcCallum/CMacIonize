@@ -185,6 +185,7 @@ set(LIBSHAREDENGINE_SOURCES
   BimodalCrossSections.hpp
   BenjaminRecombinationRates.cpp
   ChargeTransferRates.cpp
+  ChiantiRecombinationRates.cpp
   CollisionalRates.cpp
   CommandLineOption.cpp
   CommandLineParser.cpp
