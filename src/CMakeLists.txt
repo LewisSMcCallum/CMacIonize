@@ -102,11 +102,11 @@ configure_file(${PROJECT_SOURCE_DIR}/src/WMBasicDataLocation.hpp.in
 
 
 # CollisionalRatesDataLocation.hpp
-set(COLLISIONALDATA ${PROJECT_SOURCE_DIR}/data/col_rates)
+set(COLLISIONALDATA ${PROJECT_SOURCE_DIR}/data/chianti_col_rates)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${COLLISIONALDATA}
-                ${PROJECT_BINARY_DIR}/data/col_rates)
-set(COLLISIONALDATALOCATION ${PROJECT_BINARY_DIR}/data/col_rates/)
+                ${PROJECT_BINARY_DIR}/data/chianti_col_rates)
+set(COLLISIONALDATALOCATION ${PROJECT_BINARY_DIR}/data/chianti_col_rates/)
 message(STATUS "CollisionalRatesDataLocation.hpp: ${COLLISIONALDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/CollisionalRatesDataLocation.hpp.in
                 ${PROJECT_BINARY_DIR}/src/CollisionalRatesDataLocation.hpp @ONLY)
@@ -114,14 +114,25 @@ configure_file(${PROJECT_SOURCE_DIR}/src/CollisionalRatesDataLocation.hpp.in
 
 
 # BenjaminRecombinationRatesDataLocation.hpp
-set(BENJAMINRECOMBDATA ${PROJECT_SOURCE_DIR}/data/rrrates)
+set(BENJAMINRECOMBDATA ${PROJECT_SOURCE_DIR}/data/benjamin_rrrates)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${BENJAMINRECOMBDATA}
-                    ${PROJECT_BINARY_DIR}/data/rrrates)
-set(BENJAMINRECOMBDATALOCATION ${PROJECT_BINARY_DIR}/data/rrrates/)
+                    ${PROJECT_BINARY_DIR}/data/benjamin_rrrates)
+set(BENJAMINRECOMBDATALOCATION ${PROJECT_BINARY_DIR}/data/benjamin_rrrates/)
 message(STATUS "BenjaminRecombinationRatesDataLocation.hpp: ${BENJAMINRECOMBDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/BenjaminRecombinationRatesDataLocation.hpp.in
                 ${PROJECT_BINARY_DIR}/src/BenjaminRecombinationRatesDataLocation.hpp @ONLY)
+
+
+# ChiantiRecombinationRatesDataLocation.hpp
+set(CHIANTIRECOMBDATA ${PROJECT_SOURCE_DIR}/data/chianti_rrates)
+
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CHIANTIRECOMBDATA}
+                                    ${PROJECT_BINARY_DIR}/data/chianti_rrates)
+set(CHIANTIRECOMBDATALOCATION ${PROJECT_BINARY_DIR}/data/chianti_rrates/)
+message(STATUS "ChiantiRecombinationRatesDataLocation.hpp: ${CHIANTIRECOMBDATALOCATION}")
+configure_file(${PROJECT_SOURCE_DIR}/src/ChiantiRecombinationRatesDataLocation.hpp.in
+                    ${PROJECT_BINARY_DIR}/src/ChiantiRecombinationRatesDataLocation.hpp @ONLY)
 
 # Pegase3DataLocation.hpp
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/data/Pegase3)
@@ -235,7 +246,7 @@ endif(HAVE_HDF5)
 if(HAVE_GSL)
     target_link_libraries(SharedEngine ${GSL_LIBRARIES})
 endif(HAVE_GSL)
-  
+
 
 # link to MPI, if we have found it
 if(HAVE_MPI)

@@ -199,7 +199,7 @@ double BenjaminRecombinationRates::get_recombination_rate(
   switch (ion) {
 
   case ION_H_n: {
-    // Benjamin & Ferland (1996) formula (4) with values from Table 1 (HI).
+    // Verner & Ferland (1996) formula (4) with values from Table 1 (HI).
     const double T1 = temperature / 3.148;
     const double T2 = temperature / 7.036e5;
     rate = 7.982e-11 / (std::sqrt(T1) * std::pow(1. + std::sqrt(T1), 0.252) *
@@ -209,7 +209,7 @@ double BenjaminRecombinationRates::get_recombination_rate(
 
 #ifdef HAS_HELIUM
   case ION_He_n: {
-    // Benjamin & Ferland (1996) formula (4) with values from Table 1 (HeIa).
+    // Verner & Ferland (1996) formula (4) with values from Table 1 (HeIa).
     // Note that we use the second version, which is valid in the range
     // [3 K, 10^10 K].
     const double T1 = temperature / 4.266e-2;
@@ -220,7 +220,7 @@ double BenjaminRecombinationRates::get_recombination_rate(
   }
 
   case ION_He_p1: {
-    // Benjamin & Ferland (1996) formula (4) with values from Table 1 (HeII).
+    // Verner & Ferland (1996) formula (4) with values from Table 1 (HeII).
     // Note that we use the first version, which is only valid in the range
     // [3 K, 10^9 K].
     const double T1 = temperature / 0.937;
