@@ -71,7 +71,7 @@ public:
       return new VernerRecombinationRates();
     } else if (type == "Benjamin") {
       return new BenjaminRecombinationRates();
-    } else if (type == 'Chianti') {
+    } else if (type == "Chianti") {
       return new ChiantiRecombinationRates();
     }
     } else {
