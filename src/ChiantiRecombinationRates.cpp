@@ -108,7 +108,7 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
  * @param T Temperature (in K).
  * @return Recombination rate (in cm^3s^-1).
  */
-double ChiantiRecombinationRates::get_recombination_rate_Chianti(const int ion, const double temperature) const {
+double ChiantiRecombinationRates::get_recombination_rate_chianti(const int ion, const double temperature) const {
 
 
 
