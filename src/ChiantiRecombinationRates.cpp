@@ -147,10 +147,10 @@ double ChiantiRecombinationRates::get_recombination_rate_chianti(const int ion, 
         while ((ihigh - ilow) != 1) {
 
           uint_fast32_t imid = (ilow + ihigh) >> 1;
-          if (imid > 249 || imid<0) {
+          if (imid > 349 || imid<0) {
             ilow = 0;
-            ihigh = 249;
-            imid = 125;
+            ihigh = 349;
+            imid = 175;
           }
           if (temperature >= _temperatures[imid]) {
             ilow = imid;

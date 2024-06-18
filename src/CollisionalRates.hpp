@@ -20,7 +20,7 @@ private:
   std::vector<double> _temperatures;
 
   /*! @brief Collisional rate values (in m^-3 s^-1). */
-  //double _collisional_rates[NUMBER_OF_IONNAMES][250];
+  //double _collisional_rates[NUMBER_OF_IONNAMES][350];
 
 
   std::vector<std::vector<double>> _collisional_rates;
@@ -54,9 +54,9 @@ public:
       // we will linearly extrapolate
       return 0.0;
     } else if (temperature >=
-               _temperatures[250 - 1]) {
-      ilow = 250 - 2;
-      ihigh = 250 - 1;
+               _temperatures[350 - 1]) {
+      ilow = 350 - 2;
+      ihigh = 350 - 1;
     } else {
 
       // normal case
@@ -67,7 +67,7 @@ public:
         ihigh = ilow;
         ilow = 0;
       } else {
-        ihigh = 250 - 1;
+        ihigh = 350 - 1;
       }
 
 
@@ -78,10 +78,10 @@ public:
       while ((ihigh - ilow) != 1) {
 
         uint_fast32_t imid = (ilow + ihigh) >> 1;
-        if (imid > 249 || imid<0) {
+        if (imid > 349 || imid<0) {
           ilow = 0;
-          ihigh = 249;
-          imid = 125;
+          ihigh = 349;
+          imid = 175;
         }
         if (temperature >= _temperatures[imid]) {
           ilow = imid;
@@ -121,7 +121,7 @@ public:
    */
   double get_minimum_temperature() const { return _temperatures[0]; }
 
-  double get_maximum_temperature() const { return _temperatures[250 - 1]; }
+  double get_maximum_temperature() const { return _temperatures[350 - 1]; }
 };
 
 #endif // DERIJCKERADIATIVECOOLING_HPP
