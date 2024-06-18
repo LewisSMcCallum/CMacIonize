@@ -42,6 +42,7 @@
  * Reads in the data file.
  */
 ChiantiRecombinationRates::ChiantiRecombinationRates() {
+  std::cout << "Setting up recombination rates from CHIANTI" << std::endl;
   std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
     _recomb_rates.resize(NUMBER_OF_IONNAMES);
