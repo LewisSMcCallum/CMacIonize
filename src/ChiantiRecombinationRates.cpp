@@ -57,7 +57,7 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
 
 
       std::stringstream filenamestream;
-      filenamestream << ChiantiRECOMBDATALOCATION
+      filenamestream << CHIANTIRECOMBDATALOCATION
                      << get_ion_recombination_filename(i);
 
 
