@@ -11,7 +11,7 @@
  * @brief Constructor.
  */
 CollisionalRates::CollisionalRates() {
-
+std::cout << "Setting up collisional rates from " << COLLISIONALDATALOCATION << std::endl;
 std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
   _collisional_rates.resize(NUMBER_OF_IONNAMES);
