@@ -34,7 +34,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
-#include "VernerRecombinationRates.hpp"
+
 
 /**
  * @brief Constructor.
@@ -93,8 +93,6 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
         (std::log(_temperatures[250 - 1]) -
          _min_logT);
 
-
-  _verner = new VernerRecombinationRates();
 
 
 }

@@ -53,7 +53,6 @@ private:
    *  temperature values (in 1 / log(T / K)). */
   double _inverse_avg_dlogT;
 
-  RecombinationRates* _verner;
 
 public:
   ChiantiRecombinationRates();
