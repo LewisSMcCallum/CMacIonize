@@ -15,14 +15,14 @@ std::cout << "Setting up collisional rates from " << COLLISIONALDATALOCATION << 
 std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
   _collisional_rates.resize(NUMBER_OF_IONNAMES);
-  _temperatures.resize(250);
+  _temperatures.resize(350);
 
 
   for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
 
     std::cout << "Setting up data from file - " << get_ion_collisional_filename(i) << std::endl;
 
-    _collisional_rates[i].resize(250);
+    _collisional_rates[i].resize(350);
 
 
     std::stringstream filenamestream;
@@ -39,7 +39,7 @@ std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
     std::getline(drfile, line);
     std::getline(drfile, line);
     // now parse the remaining lines
-    for (uint_fast32_t j = 0; j < 250; ++j) {
+    for (uint_fast32_t j = 0; j < 350; ++j) {
       std::getline(drfile, line);
 
       std::istringstream linestream(line);
@@ -61,8 +61,8 @@ std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
   _min_logT = std::log(_temperatures[0]);
   _inverse_avg_dlogT =
-      250. /
-      (std::log(_temperatures[250 - 1]) -
+      350. /
+      (std::log(_temperatures[350 - 1]) -
        _min_logT);
 
 }

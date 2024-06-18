@@ -46,14 +46,14 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
   std::cout << "HAS " << NUMBER_OF_IONNAMES << " different ions." << std::endl;
 
     _recomb_rates.resize(NUMBER_OF_IONNAMES);
-    _temperatures.resize(250);
+    _temperatures.resize(350);
 
 
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
 
       std::cout << "Setting up data from file - " << get_ion_recombination_filename(i) << std::endl;
 
-      _recomb_rates[i].resize(250);
+      _recomb_rates[i].resize(350);
 
 
       std::stringstream filenamestream;
@@ -70,7 +70,7 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
       std::getline(drfile, line);
       std::getline(drfile, line);
       // now parse the remaining lines
-      for (uint_fast32_t j = 0; j < 250; ++j) {
+      for (uint_fast32_t j = 0; j < 350; ++j) {
         std::getline(drfile, line);
 
         std::istringstream linestream(line);
@@ -89,8 +89,8 @@ ChiantiRecombinationRates::ChiantiRecombinationRates() {
 
     _min_logT = std::log(_temperatures[0]);
     _inverse_avg_dlogT =
-        250. /
-        (std::log(_temperatures[250 - 1]) -
+        350. /
+        (std::log(_temperatures[350 - 1]) -
          _min_logT);
 
 
@@ -123,9 +123,9 @@ double ChiantiRecombinationRates::get_recombination_rate_Chianti(const int ion, 
         ilow = 0;
         ihigh = 1;
       } else if (temperature >=
-                 _temperatures[250 - 1]) {
-        ilow = 250 - 2;
-        ihigh = 250 - 1;
+                 _temperatures[350 - 1]) {
+        ilow = 350 - 2;
+        ihigh = 350 - 1;
       } else {
 
         // normal case
@@ -136,7 +136,7 @@ double ChiantiRecombinationRates::get_recombination_rate_Chianti(const int ion, 
           ihigh = ilow;
           ilow = 0;
         } else {
-          ihigh = 250 - 1;
+          ihigh = 350 - 1;
         }
 
 
@@ -300,9 +300,6 @@ double ChiantiRecombinationRates::get_recombination_rate(
   // convert cm^3s^-1 to m^3s^-1
   rate *= 1.e-6;
 
-  if (temperature < 20000.) {
-    rate = _verner->get_recombination_rate(ion,temperature);
-  }
 
   // some rates become negative for large T: make sure we don't use these
   // values
