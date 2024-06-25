@@ -100,7 +100,7 @@ public:
     const double fac = (temperature - _temperatures[ilow]) /
                        (_temperatures[ihigh] - _temperatures[ilow]);
 
-        const double col_rate =
+        double col_rate =
         (1. - fac) * _collisional_rates[ion][ilow] + fac * _collisional_rates[ion][ihigh];
 
 

@@ -169,7 +169,7 @@ double ChiantiRecombinationRates::get_recombination_rate_chianti(const int ion, 
       const double fac = (temperature - _temperatures[ilow]) /
                          (_temperatures[ihigh] - _temperatures[ilow]);
 
-          const double rate =
+          double rate =
           (1. - fac) * _recomb_rates[ion][ilow] + fac * _recomb_rates[ion][ihigh];
 
 
