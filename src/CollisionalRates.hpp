@@ -107,7 +107,7 @@ public:
     if (temperature >=
                  _temperatures[350 - 1]) {
 
-      col_rate = _recomb_rates[ion][350 - 1];
+      col_rate = _collisional_rates[ion][350 - 1];
 
     }
 
