@@ -164,13 +164,21 @@ double ChiantiRecombinationRates::get_recombination_rate_chianti(const int ion, 
         cmac_assert(temperature >= _temperatures[ilow]);
       }
 
-
+      
       // we now have the appropriate interval for linear inter/extrapolation
       const double fac = (temperature - _temperatures[ilow]) /
                          (_temperatures[ihigh] - _temperatures[ilow]);
 
           const double rate =
           (1. - fac) * _recomb_rates[ion][ilow] + fac * _recomb_rates[ion][ihigh];
+
+
+      if (temperature >=
+                 _temperatures[350 - 1]) {
+
+      rate = _recomb_rates[ion][350 - 1];
+
+      }
 
 
 

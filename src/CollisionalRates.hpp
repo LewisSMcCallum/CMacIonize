@@ -104,6 +104,14 @@ public:
         (1. - fac) * _collisional_rates[ion][ilow] + fac * _collisional_rates[ion][ihigh];
 
 
+    if (temperature >=
+                 _temperatures[350 - 1]) {
+
+      col_rate = _recomb_rates[ion][350 - 1];
+
+    }
+
+
 
 
 
