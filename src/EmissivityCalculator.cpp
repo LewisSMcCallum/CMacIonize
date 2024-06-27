@@ -495,9 +495,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                                     line_strengths[SII][TRANSITION_0_to_1] +
                                     line_strengths[SII][TRANSITION_0_to_2] +
                                     line_strengths[SIII][TRANSITION_3_to_4]));
-  } else {
-
-    // if not in temp range/ionization range to do line cooling, still get total cooling from recomb and brehm
+  } else if (false) {
+    // ^ turn off for now, just slowing things down for no reason...
+    // but when on... if not in temp range/ionization range to do line cooling, still get total cooling from recomb and brehm
     const double ntot = ionization_variables.get_number_density();
     const double nhp =
         ntot * (1. - ionization_variables.get_ionic_fraction(ION_H_n));
