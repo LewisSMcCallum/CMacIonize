@@ -166,6 +166,8 @@ public:
       return "NeIII_3968";
     case EMISSIONLINE_SII_6725:
       return "SII_6725";
+    case EMISSIONLINE_SII_6716:
+      return "SII_6716";
     case EMISSIONLINE_SII_4072:
       return "SII_4072";
     case EMISSIONLINE_SIII_9405:
