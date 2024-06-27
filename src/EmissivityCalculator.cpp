@@ -336,6 +336,11 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                         ntot * (line_strengths[SII][TRANSITION_0_to_1] +
                                 line_strengths[SII][TRANSITION_0_to_2]));
 
+    // also we need just the 6716!
+    eval.set_emissivity(EMISSIONLINE_SII_6716,
+                        ntot * line_strengths[SII][TRANSITION_0_to_2]);
+
+
     // SIII
     // Osterbrock & Ferland (2006), table 3.12
     // ground state: 3P0
