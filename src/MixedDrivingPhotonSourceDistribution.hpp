@@ -362,6 +362,7 @@ public:
       file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
       if (event == 1) {
         if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end()) {
+            
             _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
 
             _source_luminosities.push_back(luminosity);
@@ -369,7 +370,9 @@ public:
             double lifetime = a0z + a1z*std::log10(mass) + a2z*(std::log10(mass)*std::log10(mass));
             lifetime = std::pow(10.0,lifetime);
             lifetime = lifetime*3.154e+7;
+            std::cout << "LIVING STAR MASS = " << mass << " lifetime = " << lifetime/3.154e+7 << " but born at " << time_val/3.154e+7 << " for remaining life of " 
             lifetime -= (_time - time_val);
+            std::cout << lifetime/3.154e+7 << std::endl;
             _source_lifetimes.push_back(lifetime);
             _source_indices.push_back(_next_index);
             if (star_type == "HOLMES") {
