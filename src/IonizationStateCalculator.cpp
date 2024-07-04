@@ -1102,6 +1102,17 @@ int hydrogen_helium_ode_system(double t, const double y[], double f[], void *par
     f[1] = -gammaHe1*ne*he0 - jHe*he0 + alphaHe*ne*hep;
     f[2] = gammaHe1*ne*he0 + jHe*he0 + alphaHe2*ne*hepp - alphaHe*ne*hep - gammaHe2*ne*hep;
 
+    for (int i = 0; i < 3; ++i) {
+    // Preventing negative growth for negative values
+      if (y[i] < 1e-14) {
+          f[i] = std::max(f[i], 0.0);
+      } 
+      // Preventing positive growth for values greater than 1
+      else if (y[i] > 1.0) {
+              f[i] = std::min(f[i], 0.0);
+      }
+    }
+
     return GSL_SUCCESS;
 }
 
@@ -1146,6 +1157,11 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   h0 = std::max(y[0],1e-14);
   he0 = std::max(y[1],1e-14);
   hep = std::max(y[2],1e-14);
+
+
+  h0 = std::min(h0,1.);
+  he0 = std::min(he0,1.);
+  hep = std::min(hep,1.);
 
   if (h0 != h0) {
     cmac_warning("Nan H0 in solver. Setting 0.999");
