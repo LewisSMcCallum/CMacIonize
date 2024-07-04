@@ -970,6 +970,11 @@ double current_energy;
 cmac_assert(ionization_variables.get_temperature() > 0.0);
 
 
+if (ionization_variables.get_ionic_fraction(ION_H_n) == 0){
+  cmac_warning("Zero neutral faction... Shouldn't be happening...");
+}
+
+
 while (clock < total_dt) {
 
 
@@ -1000,7 +1005,7 @@ while (clock < total_dt) {
 
   tot_dif = gain - loss;
 
-  if ((temp <= _cooling_temp_floor) && (tot_dif <= 0.0)) {
+  if ((temp < _cooling_temp_floor) && (tot_dif <= 0.0)) {
     break;
   }
 
@@ -2882,12 +2887,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
             }
             if (do_explicit_temp_calc) {
-              if (ionization_variables.get_temperature() <  _cooling_temp_floor) {
-                 hydro.set_temperature(
-                  cellit.get_ionization_variables(),
-                  cellit.get_hydro_variables(), cellit.get_volume(),
-                  _cooling_temp_floor);
-            }
+            //   if (ionization_variables.get_temperature() <  _cooling_temp_floor) {
+            //      hydro.set_temperature(
+            //       cellit.get_ionization_variables(),
+            //       cellit.get_hydro_variables(), cellit.get_volume(),
+            //       _cooling_temp_floor);
+            // }
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,

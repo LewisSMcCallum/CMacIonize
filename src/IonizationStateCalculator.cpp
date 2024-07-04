@@ -162,11 +162,11 @@ void IonizationStateCalculator::calculate_ionization_state(
     }
 #endif
 
-    ionization_variables.set_ionic_fraction(ION_H_n, h0);
+    ionization_variables.set_ionic_fraction(ION_H_n, std::min(1.0, std::max(h0, 1e-14)));
 
 #ifdef HAS_HELIUM
-    ionization_variables.set_ionic_fraction(ION_He_n, he0);
-    ionization_variables.set_ionic_fraction(ION_He_p1,hep);
+    ionization_variables.set_ionic_fraction(ION_He_n, std::min(1.0, std::max(he0, 1e-14)));
+    ionization_variables.set_ionic_fraction(ION_He_p1,std::min(1.0, std::max(hep, 1e-14)));
 #endif
 
     // do the coolants
@@ -1219,6 +1219,17 @@ inline int metals_ode_system(double t, const double y[], double f[], void *param
         -coefficients[i][3]*y[i] + coefficients[i][4]*y[i+1] + coefficients[i-1][3]*y[i-1] - coefficients[i-1][4]*y[i];
     }
 
+    for (int i = 0; i < levels; ++i) {
+    // Preventing negative growth for negative values
+      if (y[i] < 1e-14) {
+          f[i] = std::max(f[i], 0.0);
+      } 
+      // Preventing positive growth for values greater than 1
+      else if (y[i] > 1.0) {
+              f[i] = std::min(f[i], 0.0);
+      }
+    }
+
     return GSL_SUCCESS;
 }
 
@@ -1309,8 +1320,8 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_C_p1, std::max(y[0],1e-14));
-      ionization_variables.set_ionic_fraction(ION_C_p2, std::max(y[1],1e-14));
+      ionization_variables.set_ionic_fraction(ION_C_p1, std::min(1.0,std::max(y[0],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_C_p2, std::min(1.0,std::max(y[1],1e-14)));
 }    
 #endif
 
@@ -1369,9 +1380,9 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_N_n, std::max(y[0],1e-14));
-      ionization_variables.set_ionic_fraction(ION_N_p1, std::max(y[1],1e-14));
-      ionization_variables.set_ionic_fraction(ION_N_p2, std::max(y[2],1e-14));
+      ionization_variables.set_ionic_fraction(ION_N_n, std::min(1.0,std::max(y[0],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_N_p1, std::min(1.0,std::max(y[1],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_N_p2, std::min(1.0,std::max(y[2],1e-14)));
 }
 #endif
 
@@ -1435,10 +1446,10 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_O_n, std::max(y[0],1e-14));
-      ionization_variables.set_ionic_fraction(ION_O_p1, std::max(y[1],1e-14));
-      ionization_variables.set_ionic_fraction(ION_O_p2, std::max(y[2],1e-14));
-      ionization_variables.set_ionic_fraction(ION_O_p3, std::max(y[3],1e-14));
+      ionization_variables.set_ionic_fraction(ION_O_n, std::min(1.0,std::max(y[0],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_O_p1, std::min(1.0,std::max(y[1],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_O_p2, std::min(1.0,std::max(y[2],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_O_p3, std::min(1.0,std::max(y[3],1e-14)));
 }
 #endif
 
@@ -1497,10 +1508,10 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_Ne_n, std::max(y[0],1e-14));
-      ionization_variables.set_ionic_fraction(ION_Ne_p1, std::max(y[1],1e-14));
-      ionization_variables.set_ionic_fraction(ION_Ne_p2, std::max(y[2],1e-14));
-      ionization_variables.set_ionic_fraction(ION_Ne_p3, std::max(y[3],1e-14));
+      ionization_variables.set_ionic_fraction(ION_Ne_n, std::min(1.0,std::max(y[0],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_Ne_p1, std::min(1.0,std::max(y[1],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_Ne_p2, std::min(1.0,std::max(y[2],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_Ne_p3, std::min(1.0,std::max(y[3],1e-14)));
 }
 #endif
 
@@ -1561,9 +1572,9 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_S_p1, std::max(y[0],1e-14));
-      ionization_variables.set_ionic_fraction(ION_S_p2, std::max(y[1],1e-14));
-      ionization_variables.set_ionic_fraction(ION_S_p3, std::max(y[2],1e-14));
+      ionization_variables.set_ionic_fraction(ION_S_p1, std::min(1.0,std::max(y[0],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_S_p2, std::min(1.0,std::max(y[1],1e-14)));
+      ionization_variables.set_ionic_fraction(ION_S_p3, std::min(1.0,std::max(y[2],1e-14)));
 
 }
 #endif
