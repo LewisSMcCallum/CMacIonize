@@ -1219,7 +1219,7 @@ inline int metals_ode_system(double t, const double y[], double f[], void *param
         -coefficients[i][3]*y[i] + coefficients[i][4]*y[i+1] + coefficients[i-1][3]*y[i-1] - coefficients[i-1][4]*y[i];
     }
 
-    for (int i = 0; i < levels; ++i) {
+    for (size_t i = 0; i < levels; ++i) {
     // Preventing negative growth for negative values
       if (y[i] < 1e-14) {
           f[i] = std::max(f[i], 0.0);
