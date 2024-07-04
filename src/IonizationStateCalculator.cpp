@@ -1134,6 +1134,9 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
 
 
   if (status != GSL_SUCCESS) {
+      std::cout << h0 << " " << he0 << " " << hep << std::endl;
+      std::cout <<  alphaH << " " << alphaHe " " << alphaHe2 << " " << jH << " "  << jHe << " "  << gammaH << " "  << gammaHe1 << " "  << gammaHe2 << std::endl;
+      std::cout << nH << " "  << AHe << " "  << T << " "  << std::endl;
       cmac_error("Error in solver!");
   }
     
@@ -1143,7 +1146,7 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   h0 = std::max(y[0],1e-14);
   he0 = std::max(y[1],1e-14);
   hep = std::max(y[2],1e-14);
-  
+
   if (h0 != h0) {
     cmac_warning("Nan H0 in solver. Setting 0.999");
     h0 = 0.999;

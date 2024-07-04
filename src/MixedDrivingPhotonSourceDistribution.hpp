@@ -361,7 +361,7 @@ public:
     while (!file.eof() && time_val <= time) {
       file >> time_val >> posx >> posy >> posz >> event >> index >> luminosity >> mass >> star_type;
       if (event == 1) {
-        if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end() && luminosity > 0.0) {
+        if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end()) {
             _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
 
             _source_luminosities.push_back(luminosity);
