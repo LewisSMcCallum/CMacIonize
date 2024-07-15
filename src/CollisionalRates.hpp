@@ -43,8 +43,7 @@ public:
    */
   inline double get_collisional_rate(const int ion, const double temperature) const {
 
-
-
+    return 0.0;
     // we need to find the index of the lower limit and the upper limit of
     // the temperature interval that contains the given temperature
     uint_fast32_t ilow, ihigh;
