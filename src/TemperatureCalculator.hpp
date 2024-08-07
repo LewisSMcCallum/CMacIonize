@@ -114,6 +114,8 @@ private:
    *  (in K). */
   const double _minimum_ionized_temperature;
 
+  const bool _leave_hot_gas_alone;
+
   
 
   /*! @brief Log to write logging info to. */
@@ -125,7 +127,7 @@ public:
       double luminosity, const Abundances &abundances,
       double epsilon_convergence, uint_fast32_t maximum_number_of_iterations,
       double pahfac, double crfac, double crlim, double crscale,
-      const double minimum_ionized_temperature,
+      const double minimum_ionized_temperature, bool leave_hot_gas,
       const LineCoolingData &line_cooling_data,
       const RecombinationRates &recombination_rates,
       const ChargeTransferRates &charge_transfer_rates,

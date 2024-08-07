@@ -80,7 +80,6 @@ void IonizationStateCalculator::calculate_ionization_state(
 
 
 
-
   // normalize the mean intensity integrals
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
   //cmac_assert_message(jH >= 0., "jH: %g, jfac: %g, mean_intensity: %g", jH,
@@ -234,9 +233,6 @@ void IonizationStateCalculator::calculate_ionization_state(
 
       }
   }
-
-
-
 
 
   } else {
@@ -422,7 +418,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
                   ION_C_p2, T4));
   const double C31 = C32 * C21;
   const double sumC_inv = 1. / (1. + C21 + C31);
-  ionization_variables.set_ionic_fraction(ION_C_p1, 1.0 - C21 * sumC_inv - C31 * sumC_inv);
+  ionization_variables.set_ionic_fraction(ION_C_p1, 1.0 - (C21 * sumC_inv) - (C31 * sumC_inv));
   ionization_variables.set_ionic_fraction(ION_C_p2, C21 * sumC_inv);
 #endif
 
@@ -451,7 +447,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   const double N31 = N32 * N21;
   const double N41 = N43 * N31;
   const double sumN_inv = 1. / (1. + N21 + N31 + N41);
-  ionization_variables.set_ionic_fraction(ION_N_n, 1 - N21 * sumN_inv - N31 * sumN_inv - N41 * sumN_inv);
+  ionization_variables.set_ionic_fraction(ION_N_n, 1 - (N21 * sumN_inv) - (N31 * sumN_inv) - (N41 * sumN_inv));
   ionization_variables.set_ionic_fraction(ION_N_p1, N21 * sumN_inv);
   ionization_variables.set_ionic_fraction(ION_N_p2, N31 * sumN_inv);
 #endif
@@ -500,10 +496,12 @@ void IonizationStateCalculator::compute_ionization_states_metals(
 
 
 
-  ionization_variables.set_ionic_fraction(ION_O_n, 1.0 - O21 * sumO_inv - O31 * sumO_inv - O41 * sumO_inv - O51 * sumO_inv);
+  ionization_variables.set_ionic_fraction(ION_O_n, 1.0 - (O21 * sumO_inv) - (O31 * sumO_inv) - (O41 * sumO_inv) - (O51 * sumO_inv));
   ionization_variables.set_ionic_fraction(ION_O_p1, O21 * sumO_inv);
   ionization_variables.set_ionic_fraction(ION_O_p2, O31 * sumO_inv);
   ionization_variables.set_ionic_fraction(ION_O_p3, O41 * sumO_inv);
+
+
 #endif
 
 #ifdef HAS_NEON
@@ -535,7 +533,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   //  std::cout << "COL RATE " << collisional_rates.get_collisional_rate(ION_Ne_n, T) << std::endl;
   //}
 
-  ionization_variables.set_ionic_fraction(ION_Ne_n, 1.0 - Ne21 * sumNe_inv - Ne31 * sumNe_inv - Ne41 * sumNe_inv - Ne51 * sumNe_inv);
+  ionization_variables.set_ionic_fraction(ION_Ne_n, 1.0 - (Ne21 * sumNe_inv) - (Ne31 * sumNe_inv) - (Ne41 * sumNe_inv) - (Ne51 * sumNe_inv));
   ionization_variables.set_ionic_fraction(ION_Ne_p1, Ne21 * sumNe_inv);
   ionization_variables.set_ionic_fraction(ION_Ne_p2, Ne31 * sumNe_inv);
   ionization_variables.set_ionic_fraction(ION_Ne_p3, Ne41 *sumNe_inv);
@@ -565,7 +563,7 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   const double S31 = S32 * S21;
   const double S41 = S43 * S31;
   const double sumS_inv = 1. / (1. + S21 + S31 + S41);
-  ionization_variables.set_ionic_fraction(ION_S_p1, 1.0 - S21 * sumS_inv - S31 * sumS_inv - S41 * sumS_inv);
+  ionization_variables.set_ionic_fraction(ION_S_p1, 1.0 - (S21 * sumS_inv) - (S31 * sumS_inv) - (S41 * sumS_inv));
   ionization_variables.set_ionic_fraction(ION_S_p2, S21 * sumS_inv);
   ionization_variables.set_ionic_fraction(ION_S_p3, S31 * sumS_inv);
 #endif

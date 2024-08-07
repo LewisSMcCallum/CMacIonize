@@ -75,6 +75,7 @@ TemperatureCalculator::TemperatureCalculator(
     double luminosity, const Abundances &abundances, double epsilon_convergence,
     uint_fast32_t maximum_number_of_iterations, double pahfac, double crfac,
     double crlim, double crscale, const double minimum_ionized_temperature,
+    const bool leave_hot_gas,
     const LineCoolingData &line_cooling_data,
     const RecombinationRates &recombination_rates,
     const ChargeTransferRates &charge_transfer_rates,
@@ -93,7 +94,8 @@ TemperatureCalculator::TemperatureCalculator(
       _epsilon_convergence(epsilon_convergence),
       _maximum_number_of_iterations(maximum_number_of_iterations),
       _minimum_iteration_number(minimum_iteration_number),
-      _minimum_ionized_temperature(minimum_ionized_temperature), _log(log) {
+      _minimum_ionized_temperature(minimum_ionized_temperature),
+      _leave_hot_gas_alone(leave_hot_gas), _log(log) {
 
 
 
@@ -168,6 +170,7 @@ TemperatureCalculator::TemperatureCalculator(
               "1.33333 kpc"),
           params.get_physical_value< QUANTITY_TEMPERATURE >(
               "TemperatureCalculator:minimum ionized temperature", "4000. K"),
+          params.get_value< bool >("TemperatureCalculator:leave hot gas", false),
           line_cooling_data, recombination_rates, charge_transfer_rates,
           collisional_rates, radiative_cooling,log) {}
 
@@ -591,6 +594,10 @@ void TemperatureCalculator::calculate_temperature(
     IonizationVariables &ionization_variables, const double jfac,
     const double hfac, const CoordinateVector<> cell_midpoint, double timestep) const {
 
+  if (_leave_hot_gas_alone && ionization_variables.get_temperature() > 1e5) {
+    return;
+  }
+
   const double jH = jfac * ionization_variables.get_mean_intensity(ION_H_n);
 #ifdef HAS_HELIUM
   const double jHe = jfac * ionization_variables.get_mean_intensity(ION_He_n);
@@ -607,31 +614,36 @@ void TemperatureCalculator::calculate_temperature(
 
 #ifdef HAS_HELIUM
     ionization_variables.set_ionic_fraction(ION_He_n, 1.);
+    ionization_variables.set_ionic_fraction(ION_He_p1, 1.);
 #endif
 
 #ifdef HAS_CARBON
-    ionization_variables.set_ionic_fraction(ION_C_p1, 0.);
+    ionization_variables.set_ionic_fraction(ION_C_p1, 1.);
     ionization_variables.set_ionic_fraction(ION_C_p2, 0.);
 #endif
 
 #ifdef HAS_NITROGEN
-    ionization_variables.set_ionic_fraction(ION_N_n, 0.);
+    ionization_variables.set_ionic_fraction(ION_N_n, 1.);
     ionization_variables.set_ionic_fraction(ION_N_p1, 0.);
     ionization_variables.set_ionic_fraction(ION_N_p2, 0.);
 #endif
 
 #ifdef HAS_OXYGEN
-    ionization_variables.set_ionic_fraction(ION_O_n, 0.);
+    ionization_variables.set_ionic_fraction(ION_O_n, 1.);
     ionization_variables.set_ionic_fraction(ION_O_p1, 0.);
+    ionization_variables.set_ionic_fraction(ION_O_p2, 0.);
+    ionization_variables.set_ionic_fraction(ION_O_p3, 0.);
 #endif
 
 #ifdef HAS_NEON
-    ionization_variables.set_ionic_fraction(ION_Ne_n, 0.);
+    ionization_variables.set_ionic_fraction(ION_Ne_n, 1.);
     ionization_variables.set_ionic_fraction(ION_Ne_p1, 0.);
+    ionization_variables.set_ionic_fraction(ION_Ne_p2, 0.);
+    ionization_variables.set_ionic_fraction(ION_Ne_p3, 0.);
 #endif
 
 #ifdef HAS_SULPHUR
-    ionization_variables.set_ionic_fraction(ION_S_p1, 0.);
+    ionization_variables.set_ionic_fraction(ION_S_p1, 1.);
     ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
     ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
 #endif
@@ -682,31 +694,36 @@ void TemperatureCalculator::calculate_temperature(
 
 #ifdef HAS_HELIUM
       ionization_variables.set_ionic_fraction(ION_He_n, 1.);
+      ionization_variables.set_ionic_fraction(ION_He_p1, 0.);
 #endif
 
 #ifdef HAS_CARBON
-      ionization_variables.set_ionic_fraction(ION_C_p1, 0.);
+      ionization_variables.set_ionic_fraction(ION_C_p1, 1.);
       ionization_variables.set_ionic_fraction(ION_C_p2, 0.);
 #endif
 
 #ifdef HAS_NITROGEN
-      ionization_variables.set_ionic_fraction(ION_N_n, 0.);
+      ionization_variables.set_ionic_fraction(ION_N_n, 1.);
       ionization_variables.set_ionic_fraction(ION_N_p1, 0.);
       ionization_variables.set_ionic_fraction(ION_N_p2, 0.);
 #endif
 
 #ifdef HAS_OXYGEN
-      ionization_variables.set_ionic_fraction(ION_O_n, 0.);
+      ionization_variables.set_ionic_fraction(ION_O_n, 1.);
       ionization_variables.set_ionic_fraction(ION_O_p1, 0.);
+      ionization_variables.set_ionic_fraction(ION_O_p2, 0.);
+      ionization_variables.set_ionic_fraction(ION_O_p3, 0.);
 #endif
 
 #ifdef HAS_NEON
-      ionization_variables.set_ionic_fraction(ION_Ne_n, 0.);
+      ionization_variables.set_ionic_fraction(ION_Ne_n, 1.);
       ionization_variables.set_ionic_fraction(ION_Ne_p1, 0.);
+      ionization_variables.set_ionic_fraction(ION_Ne_p2, 0.);
+      ionization_variables.set_ionic_fraction(ION_Ne_p3, 0.);
 #endif
 
 #ifdef HAS_SULPHUR
-      ionization_variables.set_ionic_fraction(ION_S_p1, 0.);
+      ionization_variables.set_ionic_fraction(ION_S_p1, 1.);
       ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
       ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
 #endif
