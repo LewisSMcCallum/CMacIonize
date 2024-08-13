@@ -39,10 +39,14 @@
 class SingleStarPhotonSourceDistribution : public PhotonSourceDistribution {
 private:
   /*! @brief Position of the single stellar source (in m). */
-  const CoordinateVector<> _position;
+  CoordinateVector<> _position;
 
   /*! @brief Luminosity of the single stellar source (in s^-1). */
   const double _luminosity;
+
+  // sources can move now
+  const CoordinateVector<> _velocity;
+
 
 public:
   /**
@@ -53,14 +57,16 @@ public:
    * @param log Log to write logging information to.
    */
   SingleStarPhotonSourceDistribution(CoordinateVector<> position,
-                                     double luminosity, Log *log = nullptr)
-      : _position(position), _luminosity(luminosity) {
+                                     double luminosity, CoordinateVector<> velocity,
+                                    Log *log = nullptr)
+      : _position(position), _luminosity(luminosity), _velocity(velocity) {
 
     if (log) {
       log->write_status(
           "Created SingleStarPhotonSourceDistribution at position [",
           _position.x(), " m, ", _position.y(), " m, ", _position.z(),
-          " m], with luminosity ", _luminosity, " s^-1.");
+          " m], velocity vector of []", _velocity.x(), " m/s, ", _velocity.y(), " m/s, ",
+          _velocity.z(), " m/s] with luminosity ", _luminosity, " s^-1.");
     }
   }
 
@@ -81,6 +87,8 @@ public:
                 "PhotonSourceDistribution:position", "[0. pc, 0. pc, 0. pc]"),
             params.get_physical_value< QUANTITY_FREQUENCY >(
                 "PhotonSourceDistribution:luminosity", "4.26e49 s^-1"),
+            params.get_physical_value< QUANTITY_VELOCITY>(
+                 "PhotonSourceDistribution:velocity", "[0. km s^-1, 0. km s^-1, 0. km s^-1]"),
             log) {}
 
   /**
@@ -116,6 +124,15 @@ public:
    * @return Luminosity (in s^-1).
    */
   virtual double get_total_luminosity() const { return _luminosity; }
+
+
+  virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {
+
+     _position[0] += _velocity[0]*timestep;
+     _position[1] += _velocity[1]*timestep;
+     _position[2] += _velocity[2]*timestep;
+
+  }
 
   /**
    * @brief Write the distribution to the given restart file.
