@@ -77,12 +77,12 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
 
 
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(33000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(35000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(37000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(38000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
     _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
