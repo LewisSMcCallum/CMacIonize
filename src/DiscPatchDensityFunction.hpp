@@ -242,17 +242,17 @@ public:
    */
   virtual DensityValues operator()(const Cell &cell) {
 
-
-    const double abs_z = std::abs(cell.get_cell_midpoint().z() - _disc_z)/3.086e+19;
-    const double nH = 0.47*std::exp(-0.5*std::pow(abs_z/0.09,2)) + 0.13*std::exp(-0.5*std::pow(abs_z/0.225,2))
-         + 0.077*std::exp(-1*(abs_z/0.403)) +
-           0.025*std::exp(-abs_z);
-  //  const double dz = cell.get_cell_midpoint().z() - _disc_z;
-  //  const double cosh = std::cosh(dz * _b_inv);
-  //  const double nH = _density_norm * std::pow(cosh, _exponent);
+   // HEY FUTURE ME! If you're gonna swap this back remember this equation is in cm^-3 not m^-3.
+    // const double abs_z = std::abs(cell.get_cell_midpoint().z() - _disc_z)/3.086e+19;
+    // const double nH = 0.47*std::exp(-0.5*std::pow(abs_z/0.09,2)) + 0.13*std::exp(-0.5*std::pow(abs_z/0.225,2))
+    //      + 0.077*std::exp(-1*(abs_z/0.403)) +
+    //        0.025*std::exp(-abs_z);
+   const double dz = cell.get_cell_midpoint().z() - _disc_z;
+   const double cosh = std::cosh(dz * _b_inv);
+   const double nH = _density_norm * std::pow(cosh, _exponent);
 
     DensityValues values;
-    values.set_number_density(nH*1.e6);
+    values.set_number_density(nH);
     values.set_temperature(_temperature);
     values.set_ionic_fraction(ION_H_n, _neutral_fraction);
 
