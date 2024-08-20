@@ -53,6 +53,7 @@ private:
 
   /*! @brief Positions of the sources (in m). */
   std::vector< CoordinateVector<> > _source_positions;
+  std::vector< CoordinateVector<>> _source_velocities;
 
   /*! @brief Remaining lifetime of the sources (in s). */
   std::vector< double > _source_lifetimes;
@@ -290,6 +291,7 @@ public:
                     _random_generator.get_uniform_random_double());
 
       _source_positions.push_back(CoordinateVector<double>(x,y,z));
+      _source_velocities.push_back(CoordinateVector<double>(0.0,0.0,0.0));
 
 
       double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
@@ -550,6 +552,24 @@ public:
 
 
     return changed;
+  }
+
+    virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {
+
+
+
+    for (size_t i=0;i<_source_lifetimes.size();i++){
+      //float sources
+      HydroDensitySubGrid subgrid = *grid_creator->get_subgrid(_source_positions[i]);
+      auto cell = subgrid.get_hydro_cell(_source_positions[i]);
+      CoordinateVector<double> accel = cell.get_hydro_variables().get_gravitational_acceleration();
+      _source_velocities[i] += accel*timestep;
+      _source_positions[i] = _source_positions[i] + _source_velocities[i]*timestep;
+    }
+
+
+
+
   }
 
 
