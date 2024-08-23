@@ -94,6 +94,8 @@ private:
 
   const double _lum_adjust;
 
+  double _total_time = 0.0;
+
 
   SupernovaHandler *novahandler;
 
@@ -293,8 +295,13 @@ public:
       _source_positions.push_back(CoordinateVector<double>(x,y,z));
       _source_velocities.push_back(CoordinateVector<double>(0.0,0.0,0.0));
 
+      double a0z = 9.955209529401348;
+      double a1z = -3.3370109454102326;
+      double a2z = 0.8116654874025604;
 
-      double lifetime = 1.e10 * std::pow(m_cur,-2.5) * 3.154e+7;
+      double lifetime = a0z + a1z*std::log10(m_cur) + a2z*(std::log10(m_cur)*std::log10(m_cur));
+      lifetime = std::pow(10.0,lifetime);
+      lifetime = lifetime*3.154e+7;
 
 
       _source_lifetimes.push_back(lifetime);
@@ -498,16 +505,16 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) override {
+   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
 
-    double total_time = _number_of_updates*_update_interval;
+    _total_time += actual_timestep;
 
-    std::cout << "TOTAL TIME  = " << total_time << std::endl;
+    std::cout << "TOTAL TIME  = " << _total_time << std::endl;
     std::cout << "NUM UP" << _number_of_updates << " interv = " << _update_interval << std::endl;
 
     if (_output_file2 != nullptr) {
       double totallum = get_total_luminosity();
-      *_output_file2 << total_time << "\t" << totallum << "\t" << _num_sne << "\n";
+      *_output_file2 << _total_time << "\t" << totallum << "\t" << _num_sne << "\n";
       _output_file2->flush();
 
     }
@@ -518,11 +525,11 @@ public:
     // clear out sources which no longer exist and add them to SNe todo list
     size_t i = 0;
     while (i < _source_lifetimes.size()) {
-      _source_lifetimes[i] -= _update_interval;
+      _source_lifetimes[i] -= actual_timestep;
       if (_source_lifetimes[i] <= 0.) {
         // remove the element
         if (_output_file != nullptr) {
-          *_output_file << total_time << "\t0.\t0.\t0.\t2\t"
+          *_output_file << _total_time << "\t0.\t0.\t0.\t2\t"
                         << _source_indices[i] << "\t0\tSNe\n";
           _source_indices.erase(_source_indices.begin() + i);
         }
