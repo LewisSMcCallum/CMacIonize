@@ -61,10 +61,10 @@
  * @param log Log to write logging information to.
  */
 HDF5DensityFunction::HDF5DensityFunction(
-    std::string name, CoordinateVector< uint_fast32_t > ncell,
+    std::string name, CoordinateVector< uint_fast32_t > ncell, bool read_temps,
                 const double dust_gas_ratio, const double fraction_silicates,
                 const Box<> &simulation_box, Log *log)
-    : _ncell(ncell), _dust_gas_ratio(dust_gas_ratio),
+    : _ncell(ncell), _read_temps(read_temps), _dust_gas_ratio(dust_gas_ratio),
          _fraction_silicates(fraction_silicates),_log(log)  {
 
 
@@ -88,6 +88,13 @@ HDF5DensityFunction::HDF5DensityFunction(
   HDF5Tools::HDF5Group maingroup = HDF5Tools::open_group(file, "/PartType0");
   // read the positions, masses
   _densities = HDF5Tools::read_dataset< double >(maingroup, "NumberDensity");
+
+  if (_read_temps) {
+    _temperatures = HDF5Tools::read_dataset< double >(maingroup, "Temperature");
+  }
+  
+
+  
 
 
 
@@ -144,6 +151,7 @@ HDF5DensityFunction::HDF5DensityFunction(
             params.get_value< CoordinateVector< uint_fast32_t > >(
                 "DensityGrid:number of cells",
                 CoordinateVector< uint_fast32_t >(64)),
+            params.get_value<bool>("DensityFunction:read temperature", false),
             params.get_value<double>("DensityFunction:dust to gas",0.01),
             params.get_value<double>("DensityFunction:fraction silicates",1.0),
             Box<>(params.get_physical_vector< QUANTITY_LENGTH >(
@@ -191,8 +199,12 @@ DensityValues HDF5DensityFunction::operator()(const Cell &cell) {
    values.set_dust_gas_ratio(_dust_gas_ratio);
 
    values.set_fraction_silicates(_fraction_silicates);
-
-   values.set_temperature(10000);
+  if (_read_temps){
+    values.set_temperature(_temperatures[ind1d]);
+  } else {
+    values.set_temperature(10000);
+  }
+   
    values.set_ionic_fraction(ION_H_n,1e-3);
 
 

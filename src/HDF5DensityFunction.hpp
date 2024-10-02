@@ -48,9 +48,13 @@ private:
    /*! @brief Densities of the Voronoi cells in the snapshot (in kg m^-3).*/
 
    std::vector<  double >  _densities;
+   std::vector<  double >  _temperatures;
+  
 
    double _cell_vol;
   CoordinateVector< uint_fast32_t > _ncell;
+
+  bool _read_temps;
 
   double _dust_gas_ratio;
 
@@ -75,6 +79,7 @@ private:
 public:
   HDF5DensityFunction(std::string name,
                            CoordinateVector< uint_fast32_t > ncell,
+                           bool read_temps,
                              const double dust_gas_ratio,
                              const double fraction_silicates,
                                 const Box<> &simulation_box,
