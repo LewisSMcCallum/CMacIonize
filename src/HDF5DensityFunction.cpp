@@ -205,7 +205,7 @@ DensityValues HDF5DensityFunction::operator()(const Cell &cell) {
     values.set_temperature(10000);
   }
    
-   values.set_ionic_fraction(ION_H_n,1e-3);
+   values.set_ionic_fraction(ION_H_n,0.999);
 
 
 
