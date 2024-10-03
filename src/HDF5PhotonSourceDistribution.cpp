@@ -367,7 +367,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
   }
 
 
-  bool HDF5PhotonSourceDistribution::update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator) {
+  bool HDF5PhotonSourceDistribution::update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) {
 
     bool changed = false;
 
@@ -375,7 +375,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
     // clear out sources which no longer exist and add them to SNe todo list
     size_t i = 0;
     while (i < _source_lifetimes.size()) {
-      _source_lifetimes[i] -= _update_interval;
+      _source_lifetimes[i] -= actual_timestep;
       if (_source_lifetimes[i] <= 0.) {
         // remove the element
         _to_do_feedback.push_back(_positions[i]);
