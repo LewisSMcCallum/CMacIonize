@@ -136,11 +136,11 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
     CoordinateVector<> position = positions[i];
     if (box.inside(position)) {
       double UV_luminosity = read_lums[i];
-      if (UV_luminosity > 0.) {
-        _positions.push_back(position);
-        _luminosities.push_back(UV_luminosity);
-        _total_luminosity += UV_luminosity;
-      }
+      
+      _positions.push_back(position);
+      _luminosities.push_back(UV_luminosity);
+      _total_luminosity += UV_luminosity;
+      
     }
   }
 
@@ -317,8 +317,6 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
        for (uint_fast32_t i = 0; i < _to_do_feedback.size(); ++i) {
 
-        std::cout << "GET RADII LOOP ENTERED" << std::endl;
-
         double r_inj,r_st,nbar,num_inj;
 
 
@@ -343,7 +341,6 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
 
 
-      std::cout << "INJECT LOOP ENTERED" << std::endl;
       novahandler->inject_sne(subgrid, hydro, _to_do_feedback[i], _r_inj[i],_r_st[i],_nbar[i],_num_cells_injected[i]);
 
 
@@ -380,18 +377,12 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
       _source_lifetimes[i] -= actual_timestep;
       if (_source_lifetimes[i] <= 0.) {
 
-        std::cout << "ABOUT TO ADD TO DO FEEDBACK" << std::endl;
         // remove the element
         _to_do_feedback.push_back(_positions[i]);
-        std::cout << "ADDED. ABOUT TO DELETE POS" << std::endl;
         _positions.erase(_positions.begin() + i);
-        std::cout << "TO DEL LIFETIMES" << std::endl;
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
-        std::cout << "TO DEL LUM" << std::endl;
         _luminosities.erase(_luminosities.begin() + i);
-        std::cout << "TO DEL SPEC" << std::endl;
         _spectrum_index.erase(_spectrum_index.begin() + i);
-        std::cout << "EVERYTHING DELETED" << std::endl;
         changed = true;
 
       } else {
