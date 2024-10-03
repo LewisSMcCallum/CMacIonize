@@ -103,7 +103,6 @@ public:
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator);
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro);
   virtual void done_stellar_feedback();
-  virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator);
   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep);
 };
 
