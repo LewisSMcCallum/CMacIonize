@@ -385,6 +385,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
         _spectrum_index.erase(_spectrum_index.begin() + i);
 
         changed = true;
+        ++i;
 
       } else {
         // check the next element
