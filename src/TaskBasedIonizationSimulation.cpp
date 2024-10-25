@@ -685,9 +685,9 @@ void TaskBasedIonizationSimulation::run(
 
     // define photon scattering stats
 
-    std::cout << 'hi1' << std::endl;
+    std::cout << "hi1" << std::endl;
     PhotonPacketStatistics statistics(5);
-    std::cout << 'hi2' << std::endl;
+    std::cout << "hi2" << std::endl;
     if (_trackers != nullptr && iloop == _number_of_iterations - 1) {
       if (_log) {
         _log->write_status("Adding trackers...");
