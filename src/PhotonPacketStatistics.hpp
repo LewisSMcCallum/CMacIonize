@@ -66,11 +66,11 @@ public:
    */
   inline PhotonPacketStatistics(uint_fast32_t max_scatter)
       : _scatter_histogram(max_scatter + 2) {
-
+        std::cout << "hi3" << std::endl;
         _num_abs.set(0);
         _num_escape.set(0);
 
-        
+        std::cout << "hi4" << std::endl;
         for (uint_fast32_t i = 0; i < numbins; ++i) {
           _frequencies[i] =
             min_frequency + i * (max_frequency - min_frequency) /
@@ -78,6 +78,7 @@ public:
           _ingoing_spectrum[i].set(0.0);
           _outgoing_spectrum[i].set(0.0);
         }
+        std::cout << "hi5" << std::endl;
       }
   /**
    * @brief parameter file constructor
