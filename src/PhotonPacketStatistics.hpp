@@ -176,7 +176,7 @@ public:
   {
     std::ofstream output_stats("input_spectrum.txt");
     output_stats << "# Frequency\t Spectrum \n";
-    for (uint_fast32_t i = 0; i < _scatter_histogram.size(); i++) {
+    for (uint_fast32_t i = 0; i < _frequencies.size(); i++) {
       output_stats << _frequencies[i] << "\t" << _ingoing_spectrum[i].value() << "\n";
     }
   }
