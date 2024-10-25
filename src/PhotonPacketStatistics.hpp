@@ -49,10 +49,12 @@ private:
   AtomicValue<uint_fast32_t> _num_abs;
   AtomicValue<uint_fast32_t> _num_escape;
 
+
+  const uint_fast32_t numbins = 200;
+
   std::vector<double> _frequencies;
   std::vector<AtomicValue<uint_fast32_t>> _ingoing_spectrum;
   std::vector<AtomicValue<uint_fast32_t>> _outgoing_spectrum;
-  uint_fast32_t numbins = 200;
   const double min_frequency = 3.289e15;
   const double max_frequency = 4. * min_frequency;
   const double _bin_width = (max_frequency - min_frequency) / numbins;
@@ -65,7 +67,8 @@ public:
    * @param max_scatter maximum number of scatters recorded by the statistics
    */
   inline PhotonPacketStatistics(uint_fast32_t max_scatter)
-      : _scatter_histogram(max_scatter + 2) {
+      : _scatter_histogram(max_scatter + 2), _frequencies(numbins),_ingoing_spectrum(numbins),
+      _outgoing_spectrum(numbins) {
         _num_abs.set(0);
         _num_escape.set(0);
 
