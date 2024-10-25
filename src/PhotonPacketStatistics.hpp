@@ -50,7 +50,7 @@ private:
   AtomicValue<uint_fast32_t> _num_escape;
 
 
-  const uint_fast32_t numbins = 200;
+  const uint_fast32_t numbins = 1000;
 
   std::vector<double> _frequencies;
   std::vector<AtomicValue<uint_fast32_t>> _ingoing_spectrum;
