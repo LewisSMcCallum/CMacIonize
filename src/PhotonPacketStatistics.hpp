@@ -103,6 +103,7 @@ public:
 
   inline void injected_photon(const PhotonPacket &packet) {
     double photon_energy = packet.get_energy();
+    std::cout << photon_energy << " " << min_frequency << " " << max_frequency << std::endl;
     if (photon_energy >= min_frequency && photon_energy < max_frequency) {
       // Determine the bin index for this energy
       uint_fast32_t bin_index = static_cast<uint_fast32_t>((photon_energy - min_frequency) / _bin_width);
