@@ -72,19 +72,13 @@ public:
         _num_abs.set(0);
         _num_escape.set(0);
 
-        std::cout << "hi4" << std::endl;
-        std::cout << numbins << std::endl;
         for (uint_fast32_t i = 0; i < numbins; ++i) {
-          std::cout << numbins << std::endl;
           _frequencies[i] =
             min_frequency + i * (max_frequency - min_frequency) /
                             (numbins - 1.);
-          std::cout << "set frequencies yaya" << std::endl;
           _ingoing_spectrum[i].set(0.0);
           _outgoing_spectrum[i].set(0.0);
-          std::cout << "spectra set zero" << std::endl;
         }
-        std::cout << "hi5" << std::endl;
       }
   /**
    * @brief parameter file constructor
