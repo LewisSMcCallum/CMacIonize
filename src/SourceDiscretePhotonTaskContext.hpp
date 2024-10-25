@@ -73,6 +73,9 @@ private:
 
   PhotonSourceDistribution &_photon_source_distribution;
 
+  /*! @brief Statistical information about photon packets. */
+  PhotonPacketStatistics *_statistics;
+
 public:
   /**
    * @brief Constructor.
@@ -96,14 +99,16 @@ public:
       const Abundances &abundances, CrossSections &cross_sections,
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
       ThreadSafeVector< Task > &tasks,
-      PhotonSourceDistribution &photon_source_distribution)
+      PhotonSourceDistribution &photon_source_distribution,
+      PhotonPacketStatistics *statistics)
       : _photon_source(photon_source), _buffers(buffers),
         _random_generators(random_generators),
         _discrete_photon_weight(discrete_photon_weight),
         _photon_source_spectrum(photon_source_spectrum),
         _abundances(abundances), _cross_sections(cross_sections),
         _grid_creator(grid_creator), _tasks(tasks),
-        _photon_source_distribution(photon_source_distribution) {}
+        _photon_source_distribution(photon_source_distribution),
+        _statistics(statistics) {}
 
   /**
    * @brief Execute a discrete photon source task.
@@ -196,6 +201,9 @@ public:
 
 
       photon.set_energy(frequency);
+      if (_statistics != nullptr) {
+          _statistics->injected_photon(photon);
+        }
       for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
         double sigma = _cross_sections.get_cross_section(ion, frequency);
 #ifndef VARIABLE_ABUNDANCES

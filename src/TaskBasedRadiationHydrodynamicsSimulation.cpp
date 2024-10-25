@@ -2293,7 +2293,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               new SourceDiscretePhotonTaskContext< HydroDensitySubGrid >(
                   photon_source, *buffers, random_generators, 1., *spectrum,
                   abundances, *cross_sections, *grid_creator, *tasks,
-                   *sourcedistribution);
+                   *sourcedistribution,nullptr);
 
 
           if (reemission_handler) {

@@ -814,7 +814,8 @@ void TaskBasedIonizationSimulation::run(
           new SourceDiscretePhotonTaskContext< DensitySubGrid >(
               *photon_source, *_buffers, _random_generators,
               discrete_photon_weight, *_photon_source_spectrum, _abundances,
-              *_cross_sections, *_grid_creator, *_tasks,*_photon_source_distribution);
+              *_cross_sections, *_grid_creator, *_tasks,*_photon_source_distribution,
+              &statistics);
     }
 
 

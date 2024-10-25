@@ -49,6 +49,14 @@ private:
   AtomicValue<uint_fast32_t> _num_abs;
   AtomicValue<uint_fast32_t> _num_escape;
 
+  std::vector<double> _frequencies;
+  std::vector<AtomicValue<uint_fast32_t>> _ingoing_spectrum;
+  std::vector<AtomicValue<uint_fast32_t>> _outgoing_spectrum;
+  uint_fast32_t numbins = 200;
+  const double min_frequency = 3.289e15;
+  const double max_frequency = 4. * min_frequency;
+  const double _bin_width = (max_frequency - min_frequency) / numbins;
+
 
 public:
   /**
@@ -61,6 +69,15 @@ public:
 
         _num_abs.set(0);
         _num_escape.set(0);
+
+        
+        for (uint_fast32_t i = 0; i < numbins; ++i) {
+          _frequencies[i] =
+            min_frequency + i * (max_frequency - min_frequency) /
+                            (numbins - 1.);
+          _ingoing_spectrum[i].set(0.0);
+          _outgoing_spectrum[i].set(0.0);
+        }
       }
   /**
    * @brief parameter file constructor
@@ -83,6 +100,18 @@ public:
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
   }
+
+  inline void injected_photon(const PhotonPacket &packet) {
+    double photon_energy = packet.get_energy();
+    if (photon_energy >= min_frequency && photon_energy < max_frequency) {
+      // Determine the bin index for this energy
+      uint_fast32_t bin_index = static_cast<uint_fast32_t>((photon_energy - min_frequency) / _bin_width);
+      // Increment the count in the corresponding bin
+      _ingoing_spectrum[bin_index].pre_increment();
+    }
+  }
+
+
   /**
    * @brief Function that implements photon escape termination
    *
@@ -93,6 +122,13 @@ public:
     size_t scatter_counter = packet.get_scatter_counter();
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
+    double photon_energy = packet.get_energy();
+    if (photon_energy >= min_frequency && photon_energy < max_frequency) {
+      // Determine the bin index for this energy
+      uint_fast32_t bin_index = static_cast<uint_fast32_t>((photon_energy - min_frequency) / _bin_width);
+      // Increment the count in the corresponding bin
+      _outgoing_spectrum[bin_index].pre_increment();
+    }
   }
 
 
@@ -109,11 +145,17 @@ public:
   inline void reset_counters() {
     _num_abs.set(0);
     _num_escape.set(0);
+    for (uint_fast32_t i = 0; i < numbins; ++i) {
+      _ingoing_spectrum[i].set(0.0);
+      _outgoing_spectrum[i].set(0.0);
+    }
   }
   /**
    * @brief function that outputs re-emission statistics of photons
    */
   inline void print_stats() {
+// histogram thing
+  {
     std::ofstream output_stats("photon_statistics.txt");
     output_stats << "# Scattering statistics for photons\n";
     output_stats << "# Nscatter\t BinCount  \n";
@@ -121,6 +163,24 @@ public:
       output_stats << i << "\t" << _scatter_histogram[i].value() << "\n";
     }
   }
+// outgoing spectrum
+  {
+    std::ofstream output_stats("leaking_spectrum.txt");
+    output_stats << "# Frequency\t Spectrum \n";
+    for (uint_fast32_t i = 0; i < _frequencies.size(); i++) {
+      output_stats << _frequencies[i] << "\t" << _outgoing_spectrum[i].value() << "\n";
+    }
+  }  
+//ingoing spectrum
+  {
+    std::ofstream output_stats("input_spectrum.txt");
+    output_stats << "# Frequency\t Spectrum \n";
+    for (uint_fast32_t i = 0; i < _scatter_histogram.size(); i++) {
+      output_stats << _frequencies[i] << "\t" << _ingoing_spectrum[i].value() << "\n";
+    }
+  }
+
+}
 };
 
 #endif // PHOTONPACKETSTATISTICS_HPP
