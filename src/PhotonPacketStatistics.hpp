@@ -49,6 +49,9 @@ private:
   AtomicValue<uint_fast32_t> _num_abs;
   AtomicValue<uint_fast32_t> _num_escape;
 
+  AtomicValue<uint_fast32_t> _num_abs_dust;
+
+
   AtomicValue<uint_fast32_t> _num_abs_dens;
   AtomicValue<uint_fast32_t> _num_abs_dif;
 
@@ -75,6 +78,8 @@ public:
       _outgoing_spectrum(numbins) {
         _num_abs.set(0);
         _num_escape.set(0);
+        _num_abs_dens.set(0);
+        _num_abs_dif.set(0);
 
         for (uint_fast32_t i = 0; i < numbins; ++i) {
           _frequencies[i] =
@@ -99,13 +104,20 @@ public:
    *
    * @param packet photon packet retrieved to be terminated
    */
-  inline void absorb_photon(const PhotonPacket &packet, bool dense) {
+  inline void absorb_photon(bool dense) {
     _num_abs.pre_increment();
     if (dense){
       _num_abs_dens.pre_increment();
     } else {
       _num_abs_dif.pre_increment();
     }
+  }
+
+  inline void absorb_photon_dust() {
+      _num_abs_dust.pre_increment();
+  }
+  inline void absorb_photon(const PhotonPacket &packet) {
+    _num_abs.pre_increment();
     size_t scatter_counter = packet.get_scatter_counter();
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
@@ -157,6 +169,10 @@ public:
 
   inline uint_fast32_t get_num_abs_dif() {
     return _num_abs_dif.value();
+  }
+
+  inline uint_fast32_t get_num_abs_dust() {
+    return _num_abs_dust.value();
   }
 
 

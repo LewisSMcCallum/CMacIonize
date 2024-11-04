@@ -147,14 +147,7 @@ public:
       if (!traversal_thread_context.store_photon(result, photon) &&
           _statistics != nullptr) {
         if (result == 0) {
-          double density;
-          density = this_grid.get_cell(photon.get_position()).get_ionization_variables().get_number_density()/1e6;
-          if (density > 1e-1){
-            _statistics->absorb_photon(photon, true);
-
-          } else {
-            _statistics->absorb_photon(photon, false);
-          }
+            _statistics->absorb_photon(photon);
         } else {
           _statistics->escape_photon(photon);
         }

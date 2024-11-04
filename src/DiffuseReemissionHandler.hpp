@@ -28,6 +28,7 @@
 
 #include "DensityGrid.hpp"
 #include "AtomicValue.hpp"
+#include "PhotonPacketStatistics.hpp"
 
 class RandomGenerator;
 class PhotonPacket;
@@ -103,7 +104,8 @@ public:
                         RandomGenerator &random_generator,
                         PhotonType &type,
                         AtomicValue< uint_fast32_t > &num_abs_gas,
-                        AtomicValue< uint_fast32_t > &num_abs_dust) const {return 0;}
+                        AtomicValue< uint_fast32_t > &num_abs_dust,
+                        PhotonPacketStatistics *statistics) const {return 0;}
 };
 
 #endif // DIFFUSEREEMISSIONHANDLER_HPP

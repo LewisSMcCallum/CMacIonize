@@ -60,7 +60,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
     const IonizationVariables &ionization_variables,
     RandomGenerator &random_generator, PhotonType &type,
     AtomicValue<uint_fast32_t> &num_abs_gas,
-    AtomicValue<uint_fast32_t> &num_abs_dust) const {
+    AtomicValue<uint_fast32_t> &num_abs_dust,
+    PhotonPacketStatistics *statistics) const {
 
       
   const bool destroy_carbon = false;
@@ -123,7 +124,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
         // photon absorbed
         type = PHOTONTYPE_ABSORBED;
-        num_abs_dust.pre_increment();
+        //num_abs_dust.pre_increment();
+        statistics->absorb_photon_dust();
 
       }
 
@@ -152,7 +154,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
       // photon absorbed
       type = PHOTONTYPE_ABSORBED;
-      num_abs_gas.pre_increment();
+    //  num_abs_gas.pre_increment();
+      statistics->absorb_photon(true);
     }
 
   } else {
@@ -198,7 +201,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
         // photon absorbed
         type = PHOTONTYPE_ABSORBED;
-        num_abs_gas.pre_increment();
+      //  num_abs_gas.pre_increment();
+        statistics->absorb_photon(true);
       }
 
     } else if (x <= ionization_variables.get_reemission_probability(
@@ -237,7 +241,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
-          num_abs_gas.pre_increment();
+         // num_abs_gas.pre_increment();
+          statistics->absorb_photon(true);
         }
 
       } else {
@@ -255,7 +260,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
 
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
-          num_abs_gas.pre_increment();
+        //  num_abs_gas.pre_increment();
+          statistics->absorb_photon(true);
         }
       }
 
@@ -264,7 +270,8 @@ double PhysicalDiffuseReemissionHandler::reemit(
       // photon absorbed
       // this code should never be called, as the total probabilities sum to 1
       type = PHOTONTYPE_ABSORBED;
-      num_abs_gas.pre_increment();
+    //  num_abs_gas.pre_increment();
+      statistics->absorb_photon(true);
     }
   }
 }

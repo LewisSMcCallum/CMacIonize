@@ -837,7 +837,8 @@ void TaskBasedIonizationSimulation::run(
       task_contexts[TASKTYPE_PHOTON_REEMIT] =
           new PhotonReemitTaskContext< DensitySubGrid >(
               *_buffers, _random_generators, *_reemission_handler, _abundances,
-              *_cross_sections, *_grid_creator, *_tasks, num_photon_done,num_abs_gas,num_abs_dust);
+              *_cross_sections, *_grid_creator, *_tasks, num_photon_done,num_abs_gas,num_abs_dust,
+              &statistics);
     }
 
 
@@ -1122,6 +1123,8 @@ void TaskBasedIonizationSimulation::run(
     //std::cout << "Number of photons absorbed = " << statistics.get_num_absorbed() << std::endl;
     std::cout << "Number of photons absorbed (dense gas) = " << statistics.get_num_abs_dens() << std::endl;
     std::cout << "Number of photons absorbed (diffuse gas) = " << statistics.get_num_abs_dif() << std::endl;
+    std::cout << "Number of photons absorbed (all gas new) = " << statistics.get_num_absorbed() << std::endl;
+    std::cout << "Number of photons absorbed (dust new) = " << statistics.get_num_abs_dust() << std::endl;
 
   } // photoionization loop
   _time_log.end("photoionization loop");

@@ -2301,7 +2301,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 new PhotonReemitTaskContext< HydroDensitySubGrid >(
                     *buffers, random_generators, *reemission_handler,
                     abundances, *cross_sections, *grid_creator, *tasks,
-                    num_photon_done,num_abs_gas,num_abs_dust);
+                    num_photon_done,num_abs_gas,num_abs_dust,nullptr);
           }
 
           task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =
