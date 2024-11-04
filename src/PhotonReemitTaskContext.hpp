@@ -69,8 +69,7 @@ private:
   /*! @brief Number of photon packets that has been terminated. */
   AtomicValue< uint_fast32_t > &_num_photon_done;
 
-  AtomicValue<uint_fast32_t> &_num_abs_gas;
-  AtomicValue<uint_fast32_t> &_num_abs_dust;
+
 
   PhotonPacketStatistics *_statistics;
 
@@ -94,14 +93,11 @@ public:
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
       ThreadSafeVector< Task > &tasks,
       AtomicValue< uint_fast32_t > &num_photon_done,
-      AtomicValue< uint_fast32_t > &num_abs_gas,
-      AtomicValue< uint_fast32_t > &num_abs_dust,
       PhotonPacketStatistics *statistics)
       : _buffers(buffers), _random_generators(random_generators),
         _reemission_handler(reemission_handler), _abundances(abundances),
         _cross_sections(cross_sections), _grid_creator(grid_creator),
-        _tasks(tasks), _num_photon_done(num_photon_done),_num_abs_gas(num_abs_gas),
-        _num_abs_dust(num_abs_dust),_statistics(statistics) {}
+        _tasks(tasks), _num_photon_done(num_photon_done),_statistics(statistics) {}
 
   /**
    * @brief Execute a photon reemission task.
@@ -147,7 +143,7 @@ public:
       const double new_frequency =
           _reemission_handler.reemit(old_photon, AHe, ionization_variables,
                                      _random_generators[thread_id], new_type,
-                                    _num_abs_gas,_num_abs_dust, _statistics);
+                                     _statistics);
       if (new_frequency > 0.) {
         PhotonPacket &new_photon = buffer[index];
         new_photon.set_type(new_type);

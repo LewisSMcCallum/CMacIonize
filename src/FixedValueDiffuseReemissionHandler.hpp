@@ -115,8 +115,7 @@ public:
                         const double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type, AtomicValue<uint_fast32_t> &num_abs_gas,
-                        AtomicValue<uint_fast32_t> &num_abs_dust,
+                        PhotonType &type,
                         PhotonPacketStatistics *statistics) const {
 
     const double u = random_generator.get_uniform_random_double();

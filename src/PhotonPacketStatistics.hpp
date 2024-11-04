@@ -50,6 +50,7 @@ private:
   AtomicValue<uint_fast32_t> _num_escape;
 
   AtomicValue<uint_fast32_t> _num_abs_dust;
+  
 
 
   AtomicValue<uint_fast32_t> _num_abs_dens;
@@ -159,7 +160,7 @@ public:
     return _num_escape.value();
   }
 
-  inline uint_fast8_t get_num_absorbed() {
+  inline uint_fast32_t get_num_absorbed() {
     return _num_abs.value();
   }
 
@@ -179,6 +180,9 @@ public:
   inline void reset_counters() {
     _num_abs.set(0);
     _num_escape.set(0);
+    _num_abs_dust.set(0);
+    _num_abs_dens.set(0);
+    _num_abs_dif.set(0);
     for (uint_fast32_t i = 0; i < numbins; ++i) {
       _ingoing_spectrum[i].set(0.0);
       _outgoing_spectrum[i].set(0.0);

@@ -59,8 +59,6 @@ double PhysicalDiffuseReemissionHandler::reemit(
     const PhotonPacket &photon, const double helium_abundance,
     const IonizationVariables &ionization_variables,
     RandomGenerator &random_generator, PhotonType &type,
-    AtomicValue<uint_fast32_t> &num_abs_gas,
-    AtomicValue<uint_fast32_t> &num_abs_dust,
     PhotonPacketStatistics *statistics) const {
 
       
@@ -125,7 +123,9 @@ double PhysicalDiffuseReemissionHandler::reemit(
         // photon absorbed
         type = PHOTONTYPE_ABSORBED;
         //num_abs_dust.pre_increment();
-        statistics->absorb_photon_dust();
+        if (statistics != nullptr){
+          statistics->absorb_photon_dust();
+        }
 
       }
 
@@ -155,7 +155,14 @@ double PhysicalDiffuseReemissionHandler::reemit(
       // photon absorbed
       type = PHOTONTYPE_ABSORBED;
     //  num_abs_gas.pre_increment();
-      statistics->absorb_photon(true);
+      if (statistics != nullptr){
+        if (ionization_variables.get_number_density() > dens_thresh){
+          statistics->absorb_photon(true);
+        } else {
+          statistics->absorb_photon(false);
+        }
+      }
+      
     }
 
   } else {
@@ -202,7 +209,13 @@ double PhysicalDiffuseReemissionHandler::reemit(
         // photon absorbed
         type = PHOTONTYPE_ABSORBED;
       //  num_abs_gas.pre_increment();
-        statistics->absorb_photon(true);
+      if (statistics != nullptr){
+        if (ionization_variables.get_number_density() > dens_thresh){
+          statistics->absorb_photon(true);
+        } else {
+          statistics->absorb_photon(false);
+        }
+      }
       }
 
     } else if (x <= ionization_variables.get_reemission_probability(
@@ -242,7 +255,13 @@ double PhysicalDiffuseReemissionHandler::reemit(
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
          // num_abs_gas.pre_increment();
-          statistics->absorb_photon(true);
+        if (statistics != nullptr){
+          if (ionization_variables.get_number_density() > dens_thresh){
+            statistics->absorb_photon(true);
+          } else {
+            statistics->absorb_photon(false);
+          }
+        }
         }
 
       } else {
@@ -261,7 +280,13 @@ double PhysicalDiffuseReemissionHandler::reemit(
           // photon absorbed
           type = PHOTONTYPE_ABSORBED;
         //  num_abs_gas.pre_increment();
-          statistics->absorb_photon(true);
+        if (statistics != nullptr){
+          if (ionization_variables.get_number_density() > dens_thresh){
+            statistics->absorb_photon(true);
+          } else {
+            statistics->absorb_photon(false);
+          }
+        }
         }
       }
 
@@ -271,7 +296,13 @@ double PhysicalDiffuseReemissionHandler::reemit(
       // this code should never be called, as the total probabilities sum to 1
       type = PHOTONTYPE_ABSORBED;
     //  num_abs_gas.pre_increment();
-      statistics->absorb_photon(true);
+      if (statistics != nullptr){
+        if (ionization_variables.get_number_density() > dens_thresh){
+          statistics->absorb_photon(true);
+        } else {
+          statistics->absorb_photon(false);
+        }
+      }
     }
   }
 }

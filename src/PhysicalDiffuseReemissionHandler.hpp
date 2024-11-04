@@ -57,6 +57,8 @@ private:
   /*! @brief Helium 2-photon continuum spectrum. */
   const HeliumTwoPhotonContinuumSpectrum _He2pc_spectrum;
 
+  const double dens_thresh = 1e5;
+
 
 
 
@@ -128,8 +130,7 @@ public:
                         const double helium_abundance,
                         const IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
-                        PhotonType &type, AtomicValue<uint_fast32_t> &num_abs_gas,
-                        AtomicValue<uint_fast32_t> &num_abs_dust,
+                        PhotonType &type,
                         PhotonPacketStatistics *statistics) const;
 };
 

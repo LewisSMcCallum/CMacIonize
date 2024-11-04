@@ -2284,8 +2284,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
           bool global_run_flag = true;
           AtomicValue< uint_fast32_t > num_photon_done(0);
-          AtomicValue< uint_fast32_t > num_abs_gas(0);
-          AtomicValue< uint_fast32_t > num_abs_dust(0);
+
 
           // create task contexts
          TaskContext *task_contexts[TASKTYPE_NUMBER] = {nullptr};
@@ -2301,7 +2300,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 new PhotonReemitTaskContext< HydroDensitySubGrid >(
                     *buffers, random_generators, *reemission_handler,
                     abundances, *cross_sections, *grid_creator, *tasks,
-                    num_photon_done,num_abs_gas,num_abs_dust,nullptr);
+                    num_photon_done,nullptr);
           }
 
           task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =

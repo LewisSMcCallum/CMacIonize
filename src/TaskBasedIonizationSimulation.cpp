@@ -802,8 +802,6 @@ void TaskBasedIonizationSimulation::run(
     bool global_run_flag = true;
     AtomicValue< uint_fast32_t > num_photon_done(0);
 
-    AtomicValue<uint_fast32_t> num_abs_gas(0);
-    AtomicValue<uint_fast32_t> num_abs_dust(0);
 
 
     // create task contexts
@@ -837,7 +835,7 @@ void TaskBasedIonizationSimulation::run(
       task_contexts[TASKTYPE_PHOTON_REEMIT] =
           new PhotonReemitTaskContext< DensitySubGrid >(
               *_buffers, _random_generators, *_reemission_handler, _abundances,
-              *_cross_sections, *_grid_creator, *_tasks, num_photon_done,num_abs_gas,num_abs_dust,
+              *_cross_sections, *_grid_creator, *_tasks, num_photon_done,
               &statistics);
     }
 
@@ -1116,11 +1114,10 @@ void TaskBasedIonizationSimulation::run(
     for (int_fast32_t itask = 0; itask < TASKTYPE_NUMBER; ++itask) {
       delete task_contexts[itask];
     }
-    std::cout << "Number of photons absorbed (dust) = " << num_abs_dust.value() << std::endl;
-    std::cout << "Number of photons absorbed (gas) = " << num_abs_gas.value() << std::endl;
+
 
     std::cout << "Number of photons escaped = " << statistics.get_num_escaped() << std::endl;
-    //std::cout << "Number of photons absorbed = " << statistics.get_num_absorbed() << std::endl;
+
     std::cout << "Number of photons absorbed (dense gas) = " << statistics.get_num_abs_dens() << std::endl;
     std::cout << "Number of photons absorbed (diffuse gas) = " << statistics.get_num_abs_dif() << std::endl;
     std::cout << "Number of photons absorbed (all gas new) = " << statistics.get_num_absorbed() << std::endl;
