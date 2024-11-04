@@ -1120,6 +1120,8 @@ void TaskBasedIonizationSimulation::run(
 
     std::cout << "Number of photons escaped = " << statistics.get_num_escaped() << std::endl;
     //std::cout << "Number of photons absorbed = " << statistics.get_num_absorbed() << std::endl;
+    std::cout << "Number of photons absorbed (dense gas) = " << statistics.get_num_abs_dens() << std::endl;
+    std::cout << "Number of photons absorbed (diffuse gas) = " << statistics.get_num_abs_dif() << std::endl;
 
   } // photoionization loop
   _time_log.end("photoionization loop");

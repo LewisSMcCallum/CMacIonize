@@ -49,6 +49,10 @@ private:
   AtomicValue<uint_fast32_t> _num_abs;
   AtomicValue<uint_fast32_t> _num_escape;
 
+  AtomicValue<uint_fast32_t> _num_abs_dens;
+  AtomicValue<uint_fast32_t> _num_abs_dif;
+
+
 
   const uint_fast32_t numbins = 1000;
 
@@ -95,8 +99,13 @@ public:
    *
    * @param packet photon packet retrieved to be terminated
    */
-  inline void absorb_photon(const PhotonPacket &packet) {
+  inline void absorb_photon(const PhotonPacket &packet, bool dense) {
     _num_abs.pre_increment();
+    if (dense){
+      _num_abs_dens.pre_increment();
+    } else {
+      _num_abs_dif.pre_increment();
+    }
     size_t scatter_counter = packet.get_scatter_counter();
     _scatter_histogram[std::min(scatter_counter, _scatter_histogram.size() - 1)]
         .pre_increment();
@@ -140,6 +149,14 @@ public:
 
   inline uint_fast8_t get_num_absorbed() {
     return _num_abs.value();
+  }
+
+  inline uint_fast32_t get_num_abs_dens() {
+    return _num_abs_dens.value();
+  }
+
+  inline uint_fast32_t get_num_abs_dif() {
+    return _num_abs_dif.value();
   }
 
 
