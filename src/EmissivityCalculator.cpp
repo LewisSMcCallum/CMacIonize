@@ -131,7 +131,7 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
 
   const double h0max = 1.0;
   const double tmin = 3000;
-  const double tmax = 50000;
+  const double tmax = 1e99;
 
   EmissivityValues eval;
 
