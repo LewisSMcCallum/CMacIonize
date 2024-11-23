@@ -253,7 +253,12 @@ public:
   /**
    * @brief Finalise adding stellar feedback to a distributed grid.
    */
-  virtual void done_stellar_feedback() { _has_exploded = true; }
+  virtual void done_stellar_feedback() { 
+
+    std::cout << "\n SNe INJECTION HERE: R_inj = " << _r_inj << " R_st = " <<  _r_st
+       << " num_cells = " <<  _num_cells_injected << " nbar = "  << _nbar << "\n";
+    
+    _has_exploded = true; }
 
   /**
    * @brief Write the distribution to the given restart file.
