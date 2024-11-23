@@ -793,77 +793,89 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
     double grid_spacingz = (_box.get_sides()[2]) / (_subgrid_number_of_cells[2] * _number_of_subgrids[2]);
 
     CoordinateVector<double> anchor = _box.get_anchor();
+
     CoordinateVector<double> grid_spacing(grid_spacingx, grid_spacingy, grid_spacingz);
 
-    CoordinateVector<int> num_cells_per_axis(
-        _subgrid_number_of_cells[0] * _number_of_subgrids[0],
-        _subgrid_number_of_cells[1] * _number_of_subgrids[1],
-        _subgrid_number_of_cells[2] * _number_of_subgrids[2]
-    );
+    // Box dimensions for periodic boundaries
+    CoordinateVector<double> box_sides = _box.get_sides();
 
     // Calculate the minimum and maximum indices for each axis
-    CoordinateVector<int> min_idx, max_idx;
+    CoordinateVector<int> min_idx;
+    CoordinateVector<int> max_idx;
 
     for (uint_fast32_t i = 0; i < 3; i++) {
         min_idx[i] = floor((midpoint[i] - radius - anchor[i]) / grid_spacing[i]);
         max_idx[i] = ceil((midpoint[i] + radius - anchor[i]) / grid_spacing[i]);
 
+        // Clamp indices for non-periodic boundaries
         if (!_periodicity[i]) {
-            // Clip indices to the grid bounds for non-periodic axes
-            if (min_idx[i] < 0) min_idx[i] = 0;
-            if (max_idx[i] > num_cells_per_axis[i] - 1) max_idx[i] = num_cells_per_axis[i] - 1;
+            if (min_idx[i] < 0) {
+                min_idx[i] = 0;
+            }
+            if (max_idx[i] >= _subgrid_number_of_cells[i] * _number_of_subgrids[i]) {
+                max_idx[i] = _subgrid_number_of_cells[i] * _number_of_subgrids[i] - 1;
+            }
         }
     }
 
-    // Loop through the subgrids within the bounds
-    for (int x_offset = -1; x_offset <= 1; ++x_offset) {
-        for (int y_offset = -1; y_offset <= 1; ++y_offset) {
-            for (int z_offset = -1; z_offset <= 1; ++z_offset) {
-                for (int x_idx = min_idx.x(); x_idx <= max_idx.x(); ++x_idx) {
-                    for (int y_idx = min_idx.y(); y_idx <= max_idx.y(); ++y_idx) {
-                        for (int z_idx = min_idx.z(); z_idx <= max_idx.z(); ++z_idx) {
-                            // Handle periodic wrapping
-                            int x_wrapped = (_periodicity[0]) ? (x_idx + x_offset * num_cells_per_axis.x()) % num_cells_per_axis.x() : x_idx;
-                            int y_wrapped = (_periodicity[1]) ? (y_idx + y_offset * num_cells_per_axis.y()) % num_cells_per_axis.y() : y_idx;
-                            int z_wrapped = (_periodicity[2]) ? (z_idx + z_offset * num_cells_per_axis.z()) % num_cells_per_axis.z() : z_idx;
 
-                            // Ensure positive indices after wrapping
-                            if (_periodicity[0] && x_wrapped < 0) x_wrapped += num_cells_per_axis.x();
-                            if (_periodicity[1] && y_wrapped < 0) y_wrapped += num_cells_per_axis.y();
-                            if (_periodicity[2] && z_wrapped < 0) z_wrapped += num_cells_per_axis.z();
+    // Loop through the subgrids within the bounds, including periodic wrapping
+    for (int x_idx = min_idx.x(); x_idx <= max_idx.x(); ++x_idx) {
+        for (int y_idx = min_idx.y(); y_idx <= max_idx.y(); ++y_idx) {
+            for (int z_idx = min_idx.z(); z_idx <= max_idx.z(); ++z_idx) {
+                // Wrap indices for periodic dimensions
+                int wrapped_x_idx = x_idx;
+                int wrapped_y_idx = y_idx;
+                int wrapped_z_idx = z_idx;
 
-                            // Compute cell midpoint
-                            CoordinateVector<double> cell_midpoint(
-                                x_wrapped * grid_spacing[0], 
-                                y_wrapped * grid_spacing[1], 
-                                z_wrapped * grid_spacing[2]
-                            );
+                double x_offset = 0.0, y_offset = 0.0, z_offset = 0.0;
 
-                            cell_midpoint += anchor;
-                            cell_midpoint[0] += grid_spacing[0] / 2.;
-                            cell_midpoint[1] += grid_spacing[1] / 2.;
-                            cell_midpoint[2] += grid_spacing[2] / 2.;
-
-                            // Calculate periodic-aware distance
-                            CoordinateVector<double> delta = midpoint - cell_midpoint;
-                            for (uint_fast32_t i = 0; i < 3; i++) {
-                                if (_periodicity[i]) {
-                                    double box_length = _box.get_sides()[i];
-                                    if (delta[i] > box_length / 2.) delta[i] -= box_length;
-                                    if (delta[i] < -box_length / 2.) delta[i] += box_length;
-                                }
-                            }
-
-                            double distance = delta.norm();
-                            if (distance <= radius) {
-                                uint_fast32_t subgrid_idx = this->get_subgrid(cell_midpoint).get_index();
-                                HydroDensitySubGrid& subgrid = *this->get_subgrid(subgrid_idx);
-                                uint_fast32_t cell_idx = subgrid.get_cell(cell_midpoint).get_index();
-
-                                result.emplace_back(subgrid_idx, cell_idx);
-                            }
-                        }
+                if (_periodicity[0]) {
+                    if (x_idx < 0) {
+                        wrapped_x_idx = x_idx + _subgrid_number_of_cells[0] * _number_of_subgrids[0];
+                        x_offset = -box_sides[0];
+                    } else if (x_idx >= _subgrid_number_of_cells[0] * _number_of_subgrids[0]) {
+                        wrapped_x_idx = x_idx - _subgrid_number_of_cells[0] * _number_of_subgrids[0];
+                        x_offset = box_sides[0];
                     }
+                }
+                if (_periodicity[1]) {
+                    if (y_idx < 0) {
+                        wrapped_y_idx = y_idx + _subgrid_number_of_cells[1] * _number_of_subgrids[1];
+                        y_offset = -box_sides[1];
+                    } else if (y_idx >= _subgrid_number_of_cells[1] * _number_of_subgrids[1]) {
+                        wrapped_y_idx = y_idx - _subgrid_number_of_cells[1] * _number_of_subgrids[1];
+                        y_offset = box_sides[1];
+                    }
+                }
+                if (_periodicity[2]) {
+                    if (z_idx < 0) {
+                        wrapped_z_idx = z_idx + _subgrid_number_of_cells[2] * _number_of_subgrids[2];
+                        z_offset = -box_sides[2];
+                    } else if (z_idx >= _subgrid_number_of_cells[2] * _number_of_subgrids[2]) {
+                        wrapped_z_idx = z_idx - _subgrid_number_of_cells[2] * _number_of_subgrids[2];
+                        z_offset = box_sides[2];
+                    }
+                }
+
+                CoordinateVector<double> cell_midpoint(wrapped_x_idx * grid_spacing[0],
+                                                       wrapped_y_idx * grid_spacing[1],
+                                                       wrapped_z_idx * grid_spacing[2]);
+
+                cell_midpoint += anchor;
+                cell_midpoint[0] += grid_spacing[0] / 2. + x_offset;
+                cell_midpoint[1] += grid_spacing[1] / 2. + y_offset;
+                cell_midpoint[2] += grid_spacing[2] / 2. + z_offset;
+
+                // Check if the cell is within the specified radius
+                double distance = (midpoint - cell_midpoint).norm();
+                if (distance <= radius) {
+                    uint_fast32_t subgrid_idx = this->get_subgrid(cell_midpoint).get_index();
+                    HydroDensitySubGrid& subgrid = *this->get_subgrid(subgrid_idx);
+                    uint_fast32_t cell_idx = subgrid.get_cell(cell_midpoint).get_index();
+
+                    // Add the pair of indices to the result vector
+                    result.emplace_back(subgrid_idx, cell_idx);
                 }
             }
         }
@@ -871,6 +883,7 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
 
     return result;
 }
+
 
   // std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(CoordinateVector<double> midpoint, double radius) {
   //   std::vector<std::pair<uint_fast32_t, uint_fast32_t>> result;
