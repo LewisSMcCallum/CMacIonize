@@ -858,21 +858,27 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
                     }
                 }
 
-                CoordinateVector<double> cell_midpoint(wrapped_x_idx * grid_spacing[0],
-                                                       wrapped_y_idx * grid_spacing[1],
-                                                       wrapped_z_idx * grid_spacing[2]);
+                // Wrapped position for subgrid lookup
+                CoordinateVector<double> wrapped_midpoint(wrapped_x_idx * grid_spacing[0],
+                                                          wrapped_y_idx * grid_spacing[1],
+                                                          wrapped_z_idx * grid_spacing[2]);
+                wrapped_midpoint += anchor;
+                wrapped_midpoint[0] += grid_spacing[0] / 2.;
+                wrapped_midpoint[1] += grid_spacing[1] / 2.;
+                wrapped_midpoint[2] += grid_spacing[2] / 2.;
 
-                cell_midpoint += anchor;
-                cell_midpoint[0] += grid_spacing[0] / 2. + x_offset;
-                cell_midpoint[1] += grid_spacing[1] / 2. + y_offset;
-                cell_midpoint[2] += grid_spacing[2] / 2. + z_offset;
+                // Unwrapped position for distance calculation
+                CoordinateVector<double> unwrapped_midpoint = wrapped_midpoint;
+                unwrapped_midpoint[0] += x_offset;
+                unwrapped_midpoint[1] += y_offset;
+                unwrapped_midpoint[2] += z_offset;
 
                 // Check if the cell is within the specified radius
-                double distance = (midpoint - cell_midpoint).norm();
+                double distance = (midpoint - unwrapped_midpoint).norm();
                 if (distance <= radius) {
-                    uint_fast32_t subgrid_idx = this->get_subgrid(cell_midpoint).get_index();
+                    uint_fast32_t subgrid_idx = this->get_subgrid(wrapped_midpoint).get_index();
                     HydroDensitySubGrid& subgrid = *this->get_subgrid(subgrid_idx);
-                    uint_fast32_t cell_idx = subgrid.get_cell(cell_midpoint).get_index();
+                    uint_fast32_t cell_idx = subgrid.get_cell(wrapped_midpoint).get_index();
 
                     // Add the pair of indices to the result vector
                     result.emplace_back(subgrid_idx, cell_idx);
