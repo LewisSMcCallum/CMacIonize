@@ -253,7 +253,7 @@ public:
   //  const double nH = _density_norm * std::pow(cosh, _exponent);
 
     DensityValues values;
-    values.set_number_density(nH/1e6);
+    values.set_number_density(nH*1e6);
     values.set_temperature(_temperature);
     values.set_ionic_fraction(ION_H_n, _neutral_fraction);
 
