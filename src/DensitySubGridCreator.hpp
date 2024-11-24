@@ -803,10 +803,13 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
     CoordinateVector<int> min_idx;
     CoordinateVector<int> max_idx;
 
+    std::cout << "SNE LOC = " << midpoint[0] << " , " << midpoint[1] << " , " << midpoint[2] << std::endl;
+   std::cout << "rad lookin at = " << radius << std::endl;
     for (uint_fast32_t i = 0; i < 3; i++) {
         min_idx[i] = floor((midpoint[i] - radius - anchor[i]) / grid_spacing[i]);
         max_idx[i] = ceil((midpoint[i] + radius - anchor[i]) / grid_spacing[i]);
-
+        std::cout << i << " axis min = " << min_idx[i] << " and max = " << max_idx[i] << std::endl;
+        std::cout << _periodicity[i] << std::endl;
         // // Clamp indices for non-periodic boundaries
         // if (!_periodicity[i]) {
         //     if (min_idx[i] < 0) {
