@@ -1508,7 +1508,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   if (_throttle_ion_state || _time_dependent_ionization) {
     maximum_neutral_fraction = 1.e-3;
-    maximum_neutral_fraction = -1.;
   } else {
       maximum_neutral_fraction = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
