@@ -64,6 +64,8 @@ private:
   /*! @brief Whether or not to store absorbed photon packets for reemission. */
   const bool _do_reemission;
 
+  const double _max_photon_distance = 1.e20;
+
 public:
   /**
    * @brief Constructor.
@@ -144,7 +146,7 @@ public:
                           "fail");
 
       // add the photon to an output buffer, if it still exists
-      if (!traversal_thread_context.store_photon(result, photon) &&
+      if (!traversal_thread_context.store_photon(result, photon, _max_photon_distance) &&
           _statistics != nullptr) {
         if (result == 0) {
             _statistics->absorb_photon(photon);

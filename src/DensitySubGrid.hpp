@@ -617,7 +617,7 @@ protected:
    */
   inline void update_intensity_counters(const int_fast32_t active_cell,
                                         const double distance,
-                                        const PhotonPacket &photon) {
+                                        PhotonPacket &photon) {
     subgrid_cell_lock_lock(active_cell);
     double dmean_intensity[NUMBER_OF_IONNAMES];
     for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
@@ -642,6 +642,8 @@ protected:
     }
 
     subgrid_cell_lock_unlock(active_cell);
+
+    photon.add_distance_travelled(distance);
   }
 
 public:

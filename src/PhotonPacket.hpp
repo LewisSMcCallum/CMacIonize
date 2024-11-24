@@ -74,6 +74,8 @@ private:
   /*! @brief Tracer for the number of scatterings the photon experiences */
   uint_fast32_t _scatter_counter;
 
+  double _distance_travelled = 0.0;
+
 public:
 #ifdef HAVE_MPI
   /**
@@ -237,6 +239,14 @@ public:
   inline double get_si_opacity() const {return _si_opacity;}
 
   inline double get_c_opacity() const {return _c_opacity;}
+
+
+  inline double get_distance_travelled() const {return _distance_travelled;}
+
+  inline void add_distance_travelled(const double distance) {
+    _distance_travelled+= distance;
+  }
+
 
   /**
    * @brief Set the photoionization cross section for the given ion for the
