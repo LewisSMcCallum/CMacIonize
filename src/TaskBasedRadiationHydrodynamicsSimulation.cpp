@@ -2404,6 +2404,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           {
             AtomicValue< size_t > igrid(0);
             start_parallel_timing_block();
+    std::cout << "PHOTONS SHOT. UPDATING GRID" << std::endl;
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
 #endif
