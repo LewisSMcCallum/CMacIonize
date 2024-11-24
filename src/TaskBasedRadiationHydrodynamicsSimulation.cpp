@@ -1642,8 +1642,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   uint_fast64_t numphoton = params->get_value< uint_fast64_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of photons", 1e6);
 
-  const double _max_photon_distance = params->get_value< uint_fast64_t >(
-      "TaskBasedRadiationHydrodynamicsSimulation:max photon distance", -1);
+  const double _max_photon_distance = params->get_physical_value< QUANTITY_LENGTH >(
+      "TaskBasedRadiationHydrodynamicsSimulation:max photon distance", "-1 kpc");
 
   const double CFL = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:CFL", 0.2);
