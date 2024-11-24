@@ -807,15 +807,17 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
         min_idx[i] = floor((midpoint[i] - radius - anchor[i]) / grid_spacing[i]);
         max_idx[i] = ceil((midpoint[i] + radius - anchor[i]) / grid_spacing[i]);
 
-        // Clamp indices for non-periodic boundaries
-        if (!_periodicity[i]) {
-            if (min_idx[i] < 0) {
-                min_idx[i] = 0;
-            }
-            if (max_idx[i] >= _subgrid_number_of_cells[i] * _number_of_subgrids[i]) {
-                max_idx[i] = _subgrid_number_of_cells[i] * _number_of_subgrids[i] - 1;
-            }
-        }
+        // // Clamp indices for non-periodic boundaries
+        // if (!_periodicity[i]) {
+        //     if (min_idx[i] < 0) {
+        //       std::cout << "SNe leaking from axis " << i << " in the negative direction" << std::endl;
+        //         min_idx[i] = 0;
+        //     }
+        //     if (max_idx[i] >= _subgrid_number_of_cells[i] * _number_of_subgrids[i]) {
+        //       std::cout << "SNe leaking from axis " << i << " in the positive direction" << std::endl;
+        //         max_idx[i] = _subgrid_number_of_cells[i] * _number_of_subgrids[i] - 1;
+        //     }
+        // }
     }
 
 
@@ -838,6 +840,12 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
                         wrapped_x_idx = x_idx - _subgrid_number_of_cells[0] * _number_of_subgrids[0];
                         x_offset = box_sides[0];
                     }
+                } else {
+                  if (x_idx < 0) {
+                    continue;
+                  } else if (x_idx >= _subgrid_number_of_cells[0] * _number_of_subgrids[0]) {
+                    continue;
+                  }
                 }
                 if (_periodicity[1]) {
                     if (y_idx < 0) {
@@ -847,6 +855,12 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
                         wrapped_y_idx = y_idx - _subgrid_number_of_cells[1] * _number_of_subgrids[1];
                         y_offset = box_sides[1];
                     }
+                } else {
+                  if (y_idx < 0) {
+                    continue;
+                  } else if (y_idx >= _subgrid_number_of_cells[1] * _number_of_subgrids[1]) {
+                    continue;
+                  }
                 }
                 if (_periodicity[2]) {
                     if (z_idx < 0) {
@@ -856,6 +870,12 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
                         wrapped_z_idx = z_idx - _subgrid_number_of_cells[2] * _number_of_subgrids[2];
                         z_offset = box_sides[2];
                     }
+                } else {
+                  if (z_idx < 0) {
+                    continue;
+                  } else if (z_idx >= _subgrid_number_of_cells[2] * _number_of_subgrids[2]) {
+                    continue;
+                  }
                 }
 
                 // Wrapped position for subgrid lookup
