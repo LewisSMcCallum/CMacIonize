@@ -844,7 +844,7 @@ void TaskBasedIonizationSimulation::run(
     task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =
         new PhotonTraversalTaskContext< DensitySubGrid >(
             *_buffers, *_grid_creator, *_tasks, num_photon_done, &statistics,
-            _reemission_handler != nullptr);
+            _reemission_handler != nullptr,-1.);
 
     PrematureLaunchTaskContext< DensitySubGrid > premature_launch(
         *_buffers, *_grid_creator, *_tasks, _queues, *_shared_queue);

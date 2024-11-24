@@ -64,7 +64,7 @@ private:
   /*! @brief Whether or not to store absorbed photon packets for reemission. */
   const bool _do_reemission;
 
-  const double _max_photon_distance = 1.e20;
+  const double _max_photon_distance;
 
 public:
   /**
@@ -83,10 +83,11 @@ public:
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
       ThreadSafeVector< Task > &tasks,
       AtomicValue< uint_fast32_t > &num_photon_done,
-      PhotonPacketStatistics *statistics, const bool do_reemission)
+      PhotonPacketStatistics *statistics, const bool do_reemission,
+      const double max_photon_distance)
       : _buffers(buffers), _grid_creator(grid_creator), _tasks(tasks),
         _num_photon_done(num_photon_done), _statistics(statistics),
-        _do_reemission(do_reemission) {}
+        _do_reemission(do_reemission),_max_photon_distance(max_photon_distance) {}
 
   /**
    * @brief Execute a photon traversal task.

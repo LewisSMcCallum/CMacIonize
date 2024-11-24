@@ -102,7 +102,7 @@ public:
   inline bool store_photon(const int_fast32_t output_direction,
                            const PhotonPacket &photon, const double max_photon_distance) {
     
-    if (photon.get_distance_travelled() >= max_photon_distance){
+    if (max_photon_distance > 0 && photon.get_distance_travelled() >= max_photon_distance){
       std::cout << "Killing photon as too many laps." << std::endl;
       return false;
     }

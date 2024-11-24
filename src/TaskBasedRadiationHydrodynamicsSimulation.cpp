@@ -1642,6 +1642,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   uint_fast64_t numphoton = params->get_value< uint_fast64_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of photons", 1e6);
 
+  const double _max_photon_distance = params->get_value< uint_fast64_t >(
+      "TaskBasedRadiationHydrodynamicsSimulation:max photon distance", -1);
+
   const double CFL = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:CFL", 0.2);
 
@@ -2306,7 +2309,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           task_contexts[TASKTYPE_PHOTON_TRAVERSAL] =
               new PhotonTraversalTaskContext< HydroDensitySubGrid >(
                   *buffers, *grid_creator, *tasks, num_photon_done, nullptr,
-                  reemission_handler != nullptr);
+                  reemission_handler != nullptr, _max_photon_distance);
 
           PrematureLaunchTaskContext< HydroDensitySubGrid > premature_launch(
               *buffers, *grid_creator, *tasks, queues, *shared_queue);
