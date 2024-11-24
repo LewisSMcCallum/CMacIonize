@@ -679,7 +679,10 @@ public:
                      std::log(_random_generator.get_uniform_random_double())) *
            std::cos(2. * M_PI *
                     _random_generator.get_uniform_random_double());
-      _to_do_feedback.push_back(CoordinateVector<double>(x,y,z));
+      if (grid_creator->get_box().inside(CoordinateVector<double>(x,y,z))) {
+              _to_do_feedback.push_back(CoordinateVector<double>(x,y,z));
+      }
+
       //dotype1
       type1done += 1;
     }
