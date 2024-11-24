@@ -371,7 +371,7 @@ public:
             lifetime = std::pow(10.0,lifetime);
             lifetime = lifetime*3.154e+7;
             lifetime -= (_time - time_val);
-            _source_lifetimes.push_back(lifetime);
+            _source_lifetimes.push_back(lifetime*_random_generator.get_uniform_random_double());
             _source_indices.push_back(_next_index);
             if (star_type == "HOLMES") {
               _spectrum_index.push_back(1);
