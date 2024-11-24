@@ -140,7 +140,7 @@ public:
 
       // traverse the photon through the active subgrid
       const int_fast32_t result =
-          this_grid.interact(photon, photon_buffer.get_direction());
+          this_grid.interact(photon, photon_buffer.get_direction(), _max_photon_distance);
 
       // check that the photon ended up in a valid output buffer
       cmac_assert_message(result >= 0 && result < TRAVELDIRECTION_NUMBER,

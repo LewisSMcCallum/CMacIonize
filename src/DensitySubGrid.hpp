@@ -1162,7 +1162,7 @@ public:
    * @return TravelDirection of the photon after it has traversed this grid.
    */
   inline int_fast32_t interact(PhotonPacket &photon,
-                               const int_fast32_t input_direction) {
+                               const int_fast32_t input_direction, const double max_photon_ditance) {
 
     cmac_assert_message(input_direction >= 0 &&
                             input_direction < TRAVELDIRECTION_NUMBER,
@@ -1267,6 +1267,9 @@ public:
       }
       // add the pathlength to the intensity counter
       update_intensity_counters(active_cell, lmin, photon);
+      if (max_photon_distance > 0 && photon.get_distance_travelled() >= max_photon_distance){
+        return TRAVELDIRECTION_INSIDE;
+      }
       // update the photon position
       // we use the complicated syntax below to make sure the positions we
       // know are 100% accurate (only important for our assertions)
