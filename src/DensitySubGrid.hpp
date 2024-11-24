@@ -1162,7 +1162,7 @@ public:
    * @return TravelDirection of the photon after it has traversed this grid.
    */
   inline int_fast32_t interact(PhotonPacket &photon,
-                               const int_fast32_t input_direction, const double max_photon_ditance) {
+                               const int_fast32_t input_direction, const double max_photon_distance) {
 
     cmac_assert_message(input_direction >= 0 &&
                             input_direction < TRAVELDIRECTION_NUMBER,
