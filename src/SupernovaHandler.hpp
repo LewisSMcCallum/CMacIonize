@@ -147,16 +147,16 @@ public:
                cellit.get_hydro_variables().set_primitives_velocity(vel_new);
 
 
-               double density = cellit.get_hydro_variables().get_primitives_density();
+           //    double density = cellit.get_hydro_variables().get_primitives_density();
 
-               double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
+             //  double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
 
 
-               double pressure = 8254.397014*1.e4*density*2./(1.+xH);
+              // double pressure = 8254.397014*1.e4*density*2./(1.+xH);
 
-              cellit.get_ionization_variables().set_temperature(1.e4);
+              //cellit.get_ionization_variables().set_temperature(1.e4);
 
-              cellit.get_hydro_variables().set_primitives_pressure(pressure);
+             // cellit.get_hydro_variables().set_primitives_pressure(pressure);
 
               hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
 
