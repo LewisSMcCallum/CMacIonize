@@ -355,6 +355,9 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
                         ntot * line_strengths[SIII][TRANSITION_1_to_2]);
     eval.set_emissivity(EMISSIONLINE_SIII_33mu,
                         ntot * line_strengths[SIII][TRANSITION_0_to_1]);
+    // Adding in solo 9069!
+    eval.set_emissivity(EMISSIONLINE_SIII_9069,
+                        ntot * line_strengths[SIII][TRANSITION_1_to_3]);
 
     // CII
     // Osterbrock & Ferland (2006), table 3.9
