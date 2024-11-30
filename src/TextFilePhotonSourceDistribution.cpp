@@ -41,6 +41,57 @@
  * @param filename Name of the text file to read.
  * @param log Log to write logging info to.
  */
+
+
+// Function to perform linear interpolation
+double interpolate(double x, const std::vector<double>& xVals, const std::vector<double>& yVals) {
+    // Ensure inputs are valid
+    if (xVals.size() != yVals.size() || xVals.empty()) {
+        throw std::invalid_argument("Invalid input: xVals and yVals must have the same size and cannot be empty.");
+    }
+
+    // Find the interval containing x
+    auto it = std::lower_bound(xVals.begin(), xVals.end(), x);
+    if (it == xVals.begin()) {
+        // x is below the range, return the first value
+        return yVals.front();
+    }
+    if (it == xVals.end()) {
+        // x is above the range, return the last value
+        return yVals.back();
+    }
+
+    // Perform linear interpolation
+    size_t idx = std::distance(xVals.begin(), it);
+    double x1 = xVals[idx - 1];
+    double x2 = xVals[idx];
+    double y1 = yVals[idx - 1];
+    double y2 = yVals[idx];
+
+    // Calculate interpolated value
+    return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+}
+
+
+size_t findClosestIndex(double value, const std::vector<double>& values) {
+    if (values.empty()) {
+        throw std::invalid_argument("The values vector cannot be empty.");
+    }
+
+    size_t closestIndex = 0;
+    double minDifference = std::abs(value - values[0]);
+
+    for (size_t i = 1; i < values.size(); ++i) {
+        double difference = std::abs(value - values[i]);
+        if (difference < minDifference) {
+            minDifference = difference;
+            closestIndex = i;
+        }
+    }
+
+    return closestIndex;
+}
+
 TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
     std::string filename, double time, Log *log)
     : _log(log) {
@@ -49,12 +100,21 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
 
 
-  _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-  _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
-  //_all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-  //_all_spectra.push_back(new PowerLawPhotonSourceSpectrum(3.,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(37000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+    _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
 
+    std::vector<double> stellarMasses = {57.95, 46.94, 38.08, 34.39, 30.98, 28.0, 25.29, 22.90, 20.76, 18.80, 17.08, 15.55};
+    std::vector<double> temperatures = {44852, 42857, 40862, 39865, 38867, 37870, 36872, 35874, 34877, 33879, 32882, 31884};
 
+    std::vector<double> avail_temps = {32000, 34000, 34000, 36000, 36000, 37000, 39000, 39000, 40000};
 
   std::ifstream file;
   file.open(filename);
@@ -102,9 +162,12 @@ TextFilePhotonSourceDistribution::TextFilePhotonSourceDistribution(
 
         _luminosities.push_back(luminosity);
         if (star_type == "HOLMES") {
-          _spectrum_index.push_back(1);
+          _spectrum_index.push_back(9);
         } else {
-          _spectrum_index.push_back(0);
+          double interpolatedTemp = interpolate(mass, stellarMasses, temperatures);
+          size_t closestIndex = findClosestIndex(interpolatedTemp, avail_temps);
+          std::cout << "Adding star of mass " << mass << " temp of " << interpolatedTemp << " for spec index " << closestIndex << std::endl;
+          _spectrum_index.push_back(closestIndex);
         }
       }
 
