@@ -88,7 +88,7 @@ private:
   std::vector<double> stellarMasses = {57.95, 46.94, 38.08, 34.39, 30.98, 28.0, 25.29, 22.90, 20.76, 18.80, 17.08, 15.55};
   std::vector<double> temperatures = {44852, 42857, 40862, 39865, 38867, 37870, 36872, 35874, 34877, 33879, 32882, 31884};
 
-  std::vector<double> avail_temps = {32000, 34000, 34000, 36000, 36000, 37000, 39000, 39000, 40000};
+  std::vector<double> avail_temps = {32000, 34000, 34000, 36000, 36000, 37000, 39000, 39000, 40000, 41000,42000,43000,44000,45000};
 
   /*! @brief Index of the next source to add (if output is enabled). */
   uint_fast32_t _next_index;
@@ -232,54 +232,37 @@ size_t findClosestIndex(double value, const std::vector<double>& values) {
 }
 
     double lum_from_mass(double mass) {
-      double lum;
-      if (mass < 11.0) {
-        lum=0.0;
-      } else if (mass < 14.0) {
-        lum = std::pow(10,46.3);
-      } else if (mass < 17.0) {
-        lum = std::pow(10,47.0);
-      } else if (mass < 19.3) {
-        lum = std::pow(10,47.5);
-      } else if (mass < 21.2) {
-        lum=std::pow(10,47.865);
-      } else if (mass < 23.3) {
-        lum=std::pow(10,48.14);
-      } else if (mass < 25.4) {
-        lum=std::pow(10,48.365);
-      } else if (mass < 28.0) {
-        lum=std::pow(10,48.54);
-      } else if (mass < 30.8) {
-        lum=std::pow(10,48.68);
-      } else if (mass < 34.1) {
-        lum=std::pow(10,48.835);
-      } else if (mass < 37.7) {
-        lum=std::pow(10,48.99);
-      } else if (mass < 41.0) {
-        lum=std::pow(10,49.12);
-      } else if (mass < 45.2) {
-        lum=std::pow(10,49.235);
-      } else if (mass < 50.4) {
-        lum=std::pow(10,49.34);
-      } else if (mass < 56.6) {
-        lum=std::pow(10,49.44);
-      } else if (mass < 62.3) {
-        lum=std::pow(10,49.54);
-      } else if (mass < 68.9) {
-        lum=std::pow(10,49.635);
-      } else if (mass < 87.6) {
-        lum=std::pow(10,49.775);
-      } else {
-        lum=std::pow(10,49.87);
+
+      std::vector<double> tablemasses= {57.95, 46.94, 38.08, 34.39, 30.98, 28.0, 25.29, 22.90, 20.76, 18.80, 17.08, 15.55,11};
+      std::vector<double> tablelums = {49.64,49.44,49.22,49.10,48.99,48.88,48.75,48.61,48.44,48.27,48.06,47.88,0};
+      double lum = 0.0;
+
+      if (mass > tablemasses.front()){
+        lum = tablelums.front();
+        lum = std::pow(10,lum);
+        lum = lum*_lum_adjust;
+        return lum;
+      } else if (mass < tablemasses.back()) {
+        lum =  tablelums.back();
+        lum = std::pow(10,lum);
+        lum = lum*_lum_adjust;
+        return lum;
       }
 
 
-    //  if (mass > 40) {
-    //    lum = std::pow(10,49);
-    //  } else {
-    //    lum = 0.0;
-    //  }
+      // Find the interval containing x
+      for (size_t i = 0; i < tablemasses.size() - 1; ++i) {
+          if (tablemasses[i] >= mass && mass >= tablemasses[i + 1]) {
+              // Perform linear interpolation
+              double x1 = tablemasses[i];
+              double x2 = tablemasses[i + 1];
+              double y1 = tablelums[i];
+              double y2 = tablelums[i + 1];
+              lum = y1 + (mass - x1) * (y2 - y1) / (x2 - x1);
+          }
+      }
 
+      lum = std::pow(10,lum);
       lum = lum*_lum_adjust;
       return lum;
 
@@ -345,6 +328,11 @@ public:
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(41000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(42000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(43000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(44000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,25,log));
     _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
 
 
