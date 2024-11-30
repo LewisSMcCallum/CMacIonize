@@ -50,31 +50,27 @@ double interpolate(double x, const std::vector<double>& xVals, const std::vector
         throw std::invalid_argument("Invalid input: xVals and yVals must have the same size and cannot be empty.");
     }
 
-    // Check if xVals are in descending order
-    if (!std::is_sorted(xVals.rbegin(), xVals.rend())) {
-        throw std::invalid_argument("xVals must be sorted in descending order.");
+
+    if (x > xVals.front()){
+      return xVals.front();
+    } else if (x < xVals.back()) {
+      return xVals.back();
     }
 
     // Find the interval containing x
-    auto it = std::lower_bound(xVals.rbegin(), xVals.rend(), x, std::greater<double>());
-    if (it == xVals.rbegin()) {
-        // x is above the range, return the first value
-        return yVals.front();
-    }
-    if (it == xVals.rend()) {
-        // x is below the range, return the last value
-        return yVals.back();
+    for (size_t i = 0; i < xVals.size() - 1; ++i) {
+        if (xVals[i] >= x && x >= xVals[i + 1]) {
+            // Perform linear interpolation
+            double x1 = xVals[i];
+            double x2 = xVals[i + 1];
+            double y1 = yVals[i];
+            double y2 = yVals[i + 1];
+            return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+        }
     }
 
-    // Perform linear interpolation
-    size_t idx = std::distance(xVals.rbegin(), it);
-    double x1 = xVals[xVals.size() - idx];
-    double x2 = xVals[xVals.size() - idx - 1];
-    double y1 = yVals[xVals.size() - idx];
-    double y2 = yVals[xVals.size() - idx - 1];
-
-    // Calculate interpolated value
-    return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+    // If we reach here, x was not in any valid interval
+    throw std::logic_error("Could not interpolate: x is not within any interval.");
 }
 
 
