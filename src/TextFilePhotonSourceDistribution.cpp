@@ -52,9 +52,9 @@ double interpolate(double x, const std::vector<double>& xVals, const std::vector
 
 
     if (x > xVals.front()){
-      return xVals.front();
+      return yVals.front();
     } else if (x < xVals.back()) {
-      return xVals.back();
+      return yVals.back();
     }
 
     // Find the interval containing x
