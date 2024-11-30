@@ -422,7 +422,7 @@ public:
             _source_lifetimes.push_back(lifetime);
             _source_indices.push_back(_next_index);
             if (star_type == "HOLMES") {
-              _spectrum_index.push_back(9);
+              _spectrum_index.push_back(14);
               if (_output_file != nullptr) {
                 *_output_file << _total_time << "\t" << posx << "\t" << posy
                           << "\t" << posz << "\t1\t"
@@ -712,7 +712,7 @@ public:
     double area_kpc = _sides_x*_sides_y/(3.086e+19)/(3.086e+19);
 
 
-    int should_have_done = int(4*area_kpc*_total_time/3.15576e13);
+    int should_have_done = int(4*area_kpc*_total_time/3.15576e13)*0;
 
     int do_type1 = should_have_done-type1done;
 
