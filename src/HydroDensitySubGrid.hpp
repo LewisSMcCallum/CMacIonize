@@ -1069,6 +1069,7 @@ public:
         _number_of_cells[0] * _number_of_cells[1] * _number_of_cells[2];
     for (int_fast32_t i = 0; i < number_of_cells; ++i) {
       _hydro_variables[i].write_restart_file(restart_writer);
+      _ionization_variables[i].write_restart_file(restart_writer);
     }
   }
 
@@ -1090,6 +1091,7 @@ public:
     _hydro_variables = new HydroVariables[number_of_cells];
     for (int_fast32_t i = 0; i < number_of_cells; ++i) {
       _hydro_variables[i] = HydroVariables(restart_reader);
+      _ionization_variables[i] = IonizationVariables(restart_reader);
     }
     _primitive_variable_limiters = new double[10 * number_of_cells];
     for (int_fast32_t i = 0; i < 5 * number_of_cells; ++i) {
