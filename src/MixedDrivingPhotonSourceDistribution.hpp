@@ -243,10 +243,7 @@ size_t findClosestIndex(double value, const std::vector<double>& values) {
         lum = lum*_lum_adjust;
         return lum;
       } else if (mass < tablemasses.back()) {
-        lum =  tablelums.back();
-        lum = std::pow(10,lum);
-        lum = lum*_lum_adjust;
-        return lum;
+        return 0.0;
       }
 
 
