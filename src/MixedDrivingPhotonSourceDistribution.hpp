@@ -88,7 +88,7 @@ private:
   std::vector<double> stellarMasses = {57.95, 46.94, 38.08, 34.39, 30.98, 28.0, 25.29, 22.90, 20.76, 18.80, 17.08, 15.55};
   std::vector<double> temperatures = {44852, 42857, 40862, 39865, 38867, 37870, 36872, 35874, 34877, 33879, 32882, 31884};
 
-  std::vector<double> avail_temps = {32000, 34000, 34000, 36000, 36000, 37000, 39000, 39000, 40000, 41000,42000,43000,44000,45000};
+  std::vector<double> avail_temps = {32000, 34000, 34000, 35000, 36000, 37000, 39000, 39000, 40000, 41000,42000,43000,44000,45000};
 
   /*! @brief Index of the next source to add (if output is enabled). */
   uint_fast32_t _next_index;
@@ -322,17 +322,17 @@ public:
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(35000,40,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(37000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(41000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(42000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(43000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(44000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,25,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(41000,40,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(42000,40,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(43000,40,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(44000,40,log));
+    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,40,log));
     _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
 
 
