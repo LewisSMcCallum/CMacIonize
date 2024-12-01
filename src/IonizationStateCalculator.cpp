@@ -1026,6 +1026,16 @@ int hydrogen_ode_system(double t, const double y[], double f[], void *params) {
     // ODE for the neutral fraction x
     f[0] = -k_coll * x * (1 - x) * n_total - k_photo * x + k_rec * (1 - x) * (1 - x) * n_total;
 
+
+    // Preventing negative growth for negative values
+      if (y[0] < 1e-14) {
+          f[0] = std::max(f[0], 0.0);
+      } 
+      // Preventing positive growth for values greater than 1
+      else if (y[0] > 1.0) {
+              f[0] = std::min(f[0], 0.0);
+      }
+
     return GSL_SUCCESS;
 }
 
@@ -1043,7 +1053,7 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
   gsl_odeiv2_system sys = {hydrogen_ode_system, nullptr, 1, coefficients};
 
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+        &sys, gsl_odeiv2_step_rkf45, ts/1000., 1e-4, 0.0);
 
 
   int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
@@ -1059,9 +1069,17 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
 
   double xn = y[0];
 
+  xn = std::max(xn,1e-14);
+  xn = std::min(xn,1.);
+
+  if (xn != xn) {
+    cmac_warning("Nan H0 in solver. Setting 0.999");
+    xn = 0.999;
+  }
 
 
-  return std::max(1.e-14,xn);
+
+  return xn;
 }
 
 int hydrogen_helium_ode_system(double t, const double y[], double f[], void *params) {
