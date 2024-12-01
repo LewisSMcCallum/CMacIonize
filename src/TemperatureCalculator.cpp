@@ -1020,7 +1020,7 @@ void TemperatureCalculator::calculate_temperature(
 #ifdef HAS_HELIUM
   ionization_variables.set_mean_intensity(ION_He_n, jHe);
 #endif
-  for (int_fast32_t ion = 0; ion < 12; ++ion) {
+  for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
     ionization_variables.set_mean_intensity(ion, j[ion]);
   }
 #endif
