@@ -149,6 +149,7 @@ public:
         new_photon.set_type(new_type);
         new_photon.set_scatter_counter(old_photon.get_scatter_counter() + 1);
         new_photon.set_position(old_photon.get_position());
+        new_photon.set_distance_travelled(0.0);
         new_photon.set_weight(old_photon.get_weight());
 
         new_photon.set_energy(new_frequency);

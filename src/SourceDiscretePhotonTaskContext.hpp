@@ -150,6 +150,7 @@ public:
 
       photon.set_type(PHOTONTYPE_PRIMARY);
       photon.set_scatter_counter(0);
+      photon.set_distance_travelled(0.0);
 
       // initial position: we currently assume a single source at the
       // origin
