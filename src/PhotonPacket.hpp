@@ -240,7 +240,7 @@ public:
 
   inline double get_c_opacity() const {return _c_opacity;}
 
-  inline double set_distance_travelled(const double value) {
+  inline void set_distance_travelled(const double value) {
     _distance_travelled = value;
   }
   inline double get_distance_travelled() const {return _distance_travelled;}
