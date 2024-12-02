@@ -44,7 +44,7 @@ VernerCrossSections::VernerCrossSections() {
 
   std::stringstream filenamestream;
    filenamestream << DRAINEDATALOCATION
-                  << "DraineDustOrig.dat";
+                  << "DraineOrig.dat";
    std::ifstream drfile(filenamestream.str());
 
 
