@@ -30,6 +30,8 @@ configure_file(${PROJECT_SOURCE_DIR}/data/DraineDustSi.dat
               ${PROJECT_BINARY_DIR}/data/DraineDustSi.dat COPYONLY)
 configure_file(${PROJECT_SOURCE_DIR}/data/DraineDustGr.dat
               ${PROJECT_BINARY_DIR}/data/DraineDustGr.dat COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/DraineOrig.dat
+              ${PROJECT_BINARY_DIR}/data/DraineOrig.dat COPYONLY)
 set(VERNERCROSSSECTIONSDATALOCATION_A ${PROJECT_BINARY_DIR}/data/verner_A.dat)
 set(VERNERCROSSSECTIONSDATALOCATION_B ${PROJECT_BINARY_DIR}/data/verner_B.dat)
 set(VERNERCROSSSECTIONSDATALOCATION_C ${PROJECT_BINARY_DIR}/data/verner_C.dat)

@@ -161,8 +161,7 @@ public:
           }
 #endif
           new_photon.set_photoionization_cross_section(ion, sigma);
-          new_photon.set_si_opacity(_cross_sections.get_dust_opacity(new_frequency,true));
-          new_photon.set_gr_opacity(_cross_sections.get_dust_opacity(new_frequency,false));
+          new_photon.set_dust_opacity(_cross_sections.get_dust_opacity(new_frequency));
 
         }
 

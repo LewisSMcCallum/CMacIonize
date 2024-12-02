@@ -44,10 +44,10 @@ VernerCrossSections::VernerCrossSections() {
 
   std::stringstream filenamestream;
    filenamestream << DRAINEDATALOCATION
-                  << "DraineDustSi.dat";
+                  << "DraineDustOrig.dat";
    std::ifstream drfile(filenamestream.str());
 
-   double dummy1;
+
 
    // skip the first three lines
    std::string line;
@@ -60,42 +60,42 @@ VernerCrossSections::VernerCrossSections() {
    for (uint_fast32_t i = 0; i < _num_dust_vals; ++i) {
      std::getline(drfile, line);
      std::istringstream linestream(line);
-     linestream >> _draine_freq[i] >>  _draine_kappa_si[i];
+     linestream >> _draine_freq[i] >>  _draine_kappa[i];
 
-     std::cout << _draine_freq[i] << " " << _draine_kappa_si[i] << std::endl;
+     std::cout << _draine_freq[i] << " " << _draine_kappa[i] << std::endl;
 
 
 
 
      _draine_freq[i] = 299792458./(_draine_freq[i]*1e-6); // to Hz
-     _draine_kappa_si[i] = _draine_kappa_si[i]; //already in SI
+   //  _draine_kappa_si[i] = _draine_kappa[i]; //already in SI
 
 
    }
 
+// this was really wrong! comment out!
+  //  std::stringstream filenamestream2;
+  //   filenamestream2 << DRAINEDATALOCATION
+  //                  << "DraineDustGr.dat";
+  //   std::ifstream drfile2(filenamestream2.str());
+  //  std::getline(drfile2, line);
+  //  std::getline(drfile2, line);
+  //  std::getline(drfile2,line);
 
-   std::stringstream filenamestream2;
-    filenamestream2 << DRAINEDATALOCATION
-                   << "DraineDustGr.dat";
-    std::ifstream drfile2(filenamestream2.str());
-   std::getline(drfile2, line);
-   std::getline(drfile2, line);
-   std::getline(drfile2,line);
+  //  // now parse the remaining lines
+  //  for (uint_fast32_t i = 0; i < _num_dust_vals; ++i) {
+  //    std::getline(drfile2, line);
+  //    std::istringstream linestream(line);
+  //    linestream >> dummy1 >> _draine_kappa_gr[i];
 
-   // now parse the remaining lines
-   for (uint_fast32_t i = 0; i < _num_dust_vals; ++i) {
-     std::getline(drfile2, line);
-     std::istringstream linestream(line);
-     linestream >> dummy1 >> _draine_kappa_gr[i];
+  //    //NOTE - I am using lambda axis from the Silicate file, under the assumption the Graphite file is interpolated on the same axis.
 
-     //NOTE - I am using lambda axis from the Silicate file, under the assumption the Graphite file is interpolated on the same axis.
-
-     _draine_kappa_gr[i] = _draine_kappa_gr[i]; // already in SI
-
-
+  //    _draine_kappa_gr[i] = _draine_kappa_gr[i]; // already in SI
 
 
-   }
+
+
+  //  }
 
 
 
@@ -225,7 +225,7 @@ VernerCrossSections::VernerCrossSections() {
 
 
 
-double VernerCrossSections::get_dust_opacity(const double energy,const bool silicate) const {
+double VernerCrossSections::get_dust_opacity(const double energy) const {
   // we need to find the index of the lower limit and the upper limit of
 // the temperature interval that contains the given temperature
 uint_fast32_t ilow, ihigh;
@@ -269,13 +269,17 @@ const double fac = (energy - _draine_freq[ilow]) /
                    (_draine_freq[ihigh] - _draine_freq[ilow]);
 
 double opacity;
-if (silicate) {
-  opacity =
-      (1. - fac) * _draine_kappa_si[ilow] + fac * _draine_kappa_si[ihigh];
-} else {
-  opacity =
-      (1. - fac) * _draine_kappa_gr[ilow] + fac * _draine_kappa_gr[ihigh];
-}
+
+opacity =
+      (1. - fac) * _draine_kappa[ilow] + fac * _draine_kappa[ihigh];
+
+// if (silicate) {
+//   opacity =
+//       (1. - fac) * _draine_kappa_si[ilow] + fac * _draine_kappa_si[ihigh];
+// } else {
+//   opacity =
+//       (1. - fac) * _draine_kappa_gr[ilow] + fac * _draine_kappa_gr[ihigh];
+// }
 
 
 

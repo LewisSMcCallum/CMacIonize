@@ -197,6 +197,7 @@ public:
         }
 #endif
         photon.set_photoionization_cross_section(ion, sigma);
+        photon.set_dust_opacity(_cross_sections.get_dust_opacity(frequency));
       }
 
       // did the photon make the buffer overflow?

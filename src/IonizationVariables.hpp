@@ -90,7 +90,7 @@ private:
 
   double _dust_density;
 
-  double _fraction_silicon;
+ // double _fraction_silicon;
 
   /*! @brief Ionic fractions. For hydrogen and helium, these are the neutral
    *  fractions. For other elements, they are the fraction of the end product
@@ -162,7 +162,7 @@ public:
     // single variables
     _number_density = other._number_density;
     _dust_density = other._dust_density;
-    _fraction_silicon = other._fraction_silicon;
+  //  _fraction_silicon = other._fraction_silicon;
     _temperature = other._temperature;
     _cosmic_ray_factor = other._cosmic_ray_factor;
 #ifdef VARIABLE_ABUNDANCES
@@ -258,15 +258,15 @@ public:
     _dust_density = dust_density;
   }
 
-  inline void set_fraction_silicon(const double fraction_silicon) {
-    _fraction_silicon = fraction_silicon;
-  }
+  // inline void set_fraction_silicon(const double fraction_silicon) {
+  //   _fraction_silicon = fraction_silicon;
+  // }
 
 
   inline double get_dust_density() const {return _dust_density;}
 
 
-  inline double get_fraction_silicon() const {return _fraction_silicon;}
+  // inline double get_fraction_silicon() const {return _fraction_silicon;}
 
   /**
    * @brief Get the temperature.

@@ -57,9 +57,8 @@ private:
    *  additional abundance factor. */
   double _photoionization_cross_section[NUMBER_OF_IONNAMES];
 
-  double _si_opacity;
+  double _dust_opacity;
 
-  double _c_opacity;
 
   /*! @brief Energy of the photon packet (in Hz). */
   double _energy;
@@ -236,9 +235,8 @@ public:
   }
 
 
-  inline double get_si_opacity() const {return _si_opacity;}
+  inline double get_dust_opacity() const {return _dust_opacity;}
 
-  inline double get_c_opacity() const {return _c_opacity;}
 
   inline void set_distance_travelled(const double value) {
     _distance_travelled = value;
@@ -263,13 +261,10 @@ public:
     _photoionization_cross_section[ion] = photoionization_cross_section;
   }
 
-  inline void set_si_opacity(const double opacity) {
-    _si_opacity = opacity;
+  inline void set_dust_opacity(const double opacity) {
+    _dust_opacity = opacity;
   }
 
-  inline void set_gr_opacity(const double opacity) {
-    _c_opacity = opacity;
-  }
 
   /**
    * @brief Get the energy of the photon packet.

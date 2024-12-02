@@ -558,25 +558,15 @@ protected:
                                   const double distance,
                                   const PhotonPacket &photon) const {
 
-    bool destroy_carbon = false;
-
-    double dust_opacity_si = photon.get_si_opacity();
-    double dust_opacity_c = photon.get_c_opacity();
-    double fraction_silicon = _ionization_variables[active_cell].get_fraction_silicon();
-
-    double dust_contr = fraction_silicon * distance
-              * dust_opacity_si * _ionization_variables[active_cell].get_dust_density();
 
 
-   if (destroy_carbon) {
-     dust_contr += (1.-fraction_silicon) * distance * dust_opacity_c
-                 * _ionization_variables[active_cell].get_dust_density()
-                  *_ionization_variables[active_cell].get_ionic_fraction(ION_H_n);
+    double dust_opacity = photon.get_dust_opacity();
+ 
 
-   } else {
-     dust_contr += (1.-fraction_silicon)*distance*dust_opacity_c
-                  *_ionization_variables[active_cell].get_dust_density();
-   }
+    double dust_contr = distance
+              * dust_opacity * _ionization_variables[active_cell].get_dust_density();
+
+
 
 
 

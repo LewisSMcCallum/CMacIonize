@@ -62,7 +62,7 @@ double PhysicalDiffuseReemissionHandler::reemit(
     PhotonPacketStatistics *statistics) const {
 
       
-  const bool destroy_carbon = false;
+
   double new_frequency = 0.;
 
   // Wood, Mathis & Ercolano (2004), section 3.3
@@ -80,21 +80,11 @@ double PhysicalDiffuseReemissionHandler::reemit(
   const double nHe0anuHe0 = 0.;
 #endif
 
-    double dust_opacity_si = photon.get_si_opacity();
-    double dust_opacity_c = photon.get_c_opacity();
-    double fraction_silicon = ionization_variables.get_fraction_silicon();
+    double dust_opacity = photon.get_dust_opacity();
 
-    double ndustdust = fraction_silicon
-          * dust_opacity_si * ionization_variables.get_dust_density();
 
-   if (destroy_carbon) {
-      ndustdust += (1.-fraction_silicon) * dust_opacity_c
-             *ionization_variables.get_dust_density()
-             *ionization_variables.get_ionic_fraction(ION_H_n);
-   } else {
-      ndustdust += (1.-fraction_silicon) * dust_opacity_c
-             *ionization_variables.get_dust_density();
-   }
+    double ndustdust = dust_opacity * ionization_variables.get_dust_density();
+
   
 
     const double pDustabs = ndustdust / (nH0anuH0 + nHe0anuHe0 + ndustdust);
