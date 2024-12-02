@@ -62,7 +62,7 @@ VernerCrossSections::VernerCrossSections() {
      std::istringstream linestream(line);
      linestream >> _draine_freq[i] >>  _draine_kappa[i];
 
-     std::cout << _draine_freq[i] << " " << _draine_kappa[i] << std::endl;
+
 
 
 
