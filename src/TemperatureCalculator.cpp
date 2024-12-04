@@ -647,6 +647,11 @@ void TemperatureCalculator::calculate_temperature(
     ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
     ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
 #endif
+
+#ifdef HAS_MAGNESIUM
+    ionization_variables.set_ionic_fraction(ION_Mg_p1, 1.);
+
+#endif
     // set the heating term values to zero
     for (int_fast32_t heating_term = 0; heating_term < NUMBER_OF_HEATINGTERMS;
          ++heating_term) {
@@ -727,6 +732,10 @@ void TemperatureCalculator::calculate_temperature(
       ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
       ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
 #endif
+
+#ifdef HAS_MAGNESIUM
+      ionization_variables.set_ionic_fraction(ION_Mg_p1, 1.);
+#endif
       // set the heating term values to zero
       for (int_fast32_t heating_term = 0; heating_term < NUMBER_OF_HEATINGTERMS;
            ++heating_term) {
@@ -753,7 +762,7 @@ void TemperatureCalculator::calculate_temperature(
  //   j[ion] = jfac * ionization_variables.get_mean_intensity(ion);
  // }
 
-  double j[12] = {
+  double j[13] = {
 #ifdef HAS_CARBON
         jfac*ionization_variables.get_mean_intensity(ION_C_p1),
         jfac*ionization_variables.get_mean_intensity(ION_C_p2),
@@ -783,9 +792,14 @@ void TemperatureCalculator::calculate_temperature(
 #ifdef HAS_SULPHUR
         jfac*ionization_variables.get_mean_intensity(ION_S_p1),
         jfac*ionization_variables.get_mean_intensity(ION_S_p2),
-        jfac*ionization_variables.get_mean_intensity(ION_S_p3)
+        jfac*ionization_variables.get_mean_intensity(ION_S_p3),
 #else
         0., 0.,
+        0.,
+#endif
+#ifdef HAS_MAGNESIUM
+        jfac*ionization_variables.get_mean_intensity(ION_Mg_p1)
+#else
         0.
 #endif
     };

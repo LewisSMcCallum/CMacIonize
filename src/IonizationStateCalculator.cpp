@@ -177,7 +177,7 @@ void IonizationStateCalculator::calculate_ionization_state(
 #endif
     const double T4 = T * 1.e-4;
 
-    const double j_metals[12] = {
+    const double j_metals[13] = {
 #ifdef HAS_CARBON
         jfac*ionization_variables.get_mean_intensity(ION_C_p1),
         jfac*ionization_variables.get_mean_intensity(ION_C_p2),
@@ -207,9 +207,14 @@ void IonizationStateCalculator::calculate_ionization_state(
 #ifdef HAS_SULPHUR
         jfac*ionization_variables.get_mean_intensity(ION_S_p1),
         jfac*ionization_variables.get_mean_intensity(ION_S_p2),
-        jfac*ionization_variables.get_mean_intensity(ION_S_p3)
+        jfac*ionization_variables.get_mean_intensity(ION_S_p3),
 #else
         0., 0.,
+        0.,
+#endif
+#ifdef HAS_MAGNESIUM
+        jfac*ionization_variables.get_mean_intensity(ION_Mg_p1)
+#else
         0.
 #endif
     };
@@ -269,6 +274,10 @@ void IonizationStateCalculator::calculate_ionization_state(
       ionization_variables.set_ionic_fraction(ION_S_p1, 0.);
       ionization_variables.set_ionic_fraction(ION_S_p2, 0.);
       ionization_variables.set_ionic_fraction(ION_S_p3, 0.);
+#endif
+
+#ifdef HAS_MAGNESIUM
+      ionization_variables.set_ionic_fraction(ION_Mg_p1, 0.);
 #endif
 
   }
@@ -368,6 +377,10 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   const double jSp3 = j_metals[11];
 #endif
 
+#ifdef HAS_MAGNESIUM
+  const double jMgp1 = j_metals[12];
+#endif
+
 #ifdef HAS_CARBON
   const double alphaC[2] = {
       recombination_rates.get_recombination_rate(ION_C_p1, T),
@@ -402,6 +415,11 @@ void IonizationStateCalculator::compute_ionization_states_metals(
       recombination_rates.get_recombination_rate(ION_S_p1, T),
       recombination_rates.get_recombination_rate(ION_S_p2, T),
       recombination_rates.get_recombination_rate(ION_S_p3, T)};
+#endif
+
+#ifdef HAS_MAGNESIUM
+  const double alphaMg[1] = {
+      recombination_rates.get_recombination_rate(ION_Mg_p1, T)};
 #endif
 
 #ifdef HAS_CARBON
@@ -566,6 +584,17 @@ void IonizationStateCalculator::compute_ionization_states_metals(
   ionization_variables.set_ionic_fraction(ION_S_p1, 1.0 - (S21 * sumS_inv) - (S31 * sumS_inv) - (S41 * sumS_inv));
   ionization_variables.set_ionic_fraction(ION_S_p2, S21 * sumS_inv);
   ionization_variables.set_ionic_fraction(ION_S_p3, S31 * sumS_inv);
+#endif
+
+#ifdef HAS_MAGNESIUM
+  // Magnesium
+  const double Mg21 =
+      (jMgp1 + ne*collisional_rates.get_collisional_rate(ION_Mg_p1, T) + nhp * charge_transfer_rates.get_charge_transfer_ionization_rate_H(
+                       ION_Mg_p1, T4)) /
+      (ne * alphaMg[0] + nh0 * charge_transfer_rates.get_charge_transfer_recombination_rate_H(
+                 ION_Mg_p1, T4));
+  const double sumMg_inv = 1. / (1. + Mg21);
+  ionization_variables.set_ionic_fraction(ION_Mg_p1, 1.0 - (Mg21 * sumMg_inv));
 #endif
 }
 

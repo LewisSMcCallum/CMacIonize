@@ -261,6 +261,22 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_H(
   }
 #endif
 
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1: {
+    // Kingdon & Ferland (1996), table 1
+    // valid in the range [1,000 K; 30,000 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 0.1);
+    safe_temperature = std::min(safe_temperature, 3.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 8.58e-20 * std::pow(safe_temperature, 2.49e-3) *
+           (1. + 2.93e-2 * std::exp(-4.33 * safe_temperature));
+    }
+  }
+#endif
+
   default:
     cmac_error("Unknown ion name: %" PRIiFAST32 "!", ion);
     return 0;
@@ -362,6 +378,26 @@ double ChargeTransferRates::get_charge_transfer_ionization_rate_H(
   case ION_S_p3:
     // no rate given in Kingdon & Ferland (1996)
     return 0.;
+#endif
+
+#ifdef HAS_MAGNESIUM
+
+  case ION_Mg_p1: {
+    // Kingdon & Ferland (1996), table 3
+    // valid in the range [1e4 K; 3e5 K]
+    // we multiplied with 1.e-6 to convert cm^3 s^-1 to m^3 s^-1
+    double safe_temperature = std::max(temperature, 1.);
+    safe_temperature = std::min(safe_temperature, 30.);
+    if (temperature > safe_temperature) {
+      return 0.0;
+    } else {
+    return 7.6e-20 * std::pow(safe_temperature, 0.0) *
+           (1. - 1.97 * std::exp(-4.32 * safe_temperature)) *
+           std::exp(-1.67 / safe_temperature);
+    }
+  }
+
+
 #endif
 
   default:
@@ -545,6 +581,12 @@ double ChargeTransferRates::get_charge_transfer_recombination_rate_He(
            (1. + 3.4 * std::exp(-5.25 * safe_temperature));
          }
   }
+#endif
+
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    // no rate given in Arnaud & Rothenflug (1985)
+    return 0.;
 #endif
 
   default:

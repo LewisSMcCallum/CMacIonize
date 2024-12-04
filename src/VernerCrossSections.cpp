@@ -459,6 +459,11 @@ double VernerCrossSections::get_cross_section(const int_fast32_t ion,
     return get_cross_section_verner(16, 13, 5, energy);
 #endif
 
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    return get_cross_section_verner(12, 11, 4, energy);
+#endif
+
   default:
     cmac_error("Unknown ion: %" PRIiFAST32, ion);
   }

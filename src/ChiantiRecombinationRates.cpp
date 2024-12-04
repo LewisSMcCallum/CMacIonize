@@ -302,6 +302,13 @@ double ChiantiRecombinationRates::get_recombination_rate(
   }
 #endif
 
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1: {
+    rate = get_recombination_rate_chianti(ion,temperature);
+    break;
+  }
+#endif
+
   default:
     cmac_error("Unknown ion: %" PRIiFAST32, ion);
   }

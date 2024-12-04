@@ -40,6 +40,7 @@
 #define HAS_OXYGEN
 #define HAS_NEON
 #define HAS_SULPHUR
+#define HAS_MAGNESIUM
 #endif
 
 // activate new additional metals
@@ -84,6 +85,9 @@ enum ElementName {
 #endif
 #ifdef HAS_ARGON
   ELEMENT_Ar,
+#endif
+#ifdef HAS_MAGNESIUM
+  ELEMENT_Mg,
 #endif
   /*! @brief Atom number counter. Add new atoms above this element! */
   NUMBER_OF_ELEMENTNAMES
@@ -154,6 +158,10 @@ enum IonName {
   /*! @brief Triple ionized argon. */
   ION_Ar_p3,
 #endif
+#ifdef HAS_MAGNESIUM
+  /*! @brief Ionized magnesium. */
+  ION_Mg_p1,
+#endif
   /*! @brief Number of supported elements. */
   NUMBER_OF_IONNAMES
 };
@@ -197,6 +205,11 @@ static inline std::string get_element_name(const int_fast32_t element) {
 #ifdef HAS_ARGON
   case ELEMENT_Ar:
     return "Ar";
+#endif
+#ifdef HAS_MAGNESIUM
+  /*! @brief Ionized magnesium. */
+  case ELEMENT_Mg:
+    return "Mg";
 #endif
   default:
     cmac_error("Unknown element: %" PRIiFAST32 "!", element);
@@ -282,6 +295,14 @@ static inline std::string get_ion_name(const int_fast32_t ion) {
     return "Ar+++";
 #endif
 
+
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    return "Mg+";
+#endif
+
+
+
   default:
     cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
     return "";
@@ -366,6 +387,11 @@ static inline int_fast32_t get_element(const int_fast32_t ion) {
     return ELEMENT_Ar;
 #endif
 
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    return ELEMENT_Mg;
+#endif
+
   default:
     cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
     return -1;
@@ -445,6 +471,13 @@ static inline std::string get_ion_collisional_filename(const int_fast32_t ion) {
     return "Ar+++";
 #endif
 
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    return "MgII.dat";
+#endif
+
+
+
   default:
     cmac_error("Unknown ion: %" PRIiFAST32 "!", ion);
     return "";
@@ -522,6 +555,11 @@ static inline std::string get_ion_recombination_filename(const int_fast32_t ion)
     return "Ar++";
   case ION_Ar_p3:
     return "Ar+++";
+#endif
+
+#ifdef HAS_MAGNESIUM
+  case ION_Mg_p1:
+    return "MgII.dat";
 #endif
 
   default:
