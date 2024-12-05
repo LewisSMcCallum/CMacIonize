@@ -33,6 +33,7 @@
 
 #include <cinttypes>
 #include <string>
+#include <iostream>
 
 /**
  * @brief Convenient indices for all supported output fields.
@@ -857,7 +858,7 @@ public:
    */
   inline bool ion_present(const int_fast32_t field_name,
                           const int_fast32_t ion) const {
-    return (_field_flag[field_name] >> ion) > 0;
+    return ((_field_flag[field_name] >> ion) & 1) != 0;
   }
 
   /**
@@ -870,7 +871,7 @@ public:
    */
   inline bool heatingterm_present(const int_fast32_t field_name,
                                   const int_fast32_t heating) const {
-    return (_field_flag[field_name] >> heating) > 0;
+    return ((_field_flag[field_name] >> ion) & 1) != 0;
   }
 
   /**
