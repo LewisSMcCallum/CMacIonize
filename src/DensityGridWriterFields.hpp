@@ -710,7 +710,7 @@ private:
   /*! @brief Field flag for each DensityGridField. For fields with multiple
    *  variables this flag encodes the variables that should be written to the
    *  output. */
-  uint_least32_t _field_flag[DENSITYGRIDFIELD_NUMBER];
+  uint_least64_t _field_flag[DENSITYGRIDFIELD_NUMBER];
 
   /*! @brief Number of active fields of each type. */
   uint_least8_t _field_count[DENSITYGRIDFIELDTYPE_NUMBER];
@@ -871,7 +871,7 @@ public:
    */
   inline bool heatingterm_present(const int_fast32_t field_name,
                                   const int_fast32_t heating) const {
-    return ((_field_flag[field_name] >> ion) & 1) != 0;
+    return ((_field_flag[field_name] >> heating) & 1) != 0;
   }
 
   /**
