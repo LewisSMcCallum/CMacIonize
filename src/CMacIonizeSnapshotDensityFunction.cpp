@@ -316,15 +316,9 @@ void CMacIonizeSnapshotDensityFunction::initialize() {
     for (size_t i = 0; i < cell_midpoints.size(); ++i) {
       CoordinateVector<> p = cell_midpoints[i];
       // the anchor of the box is always [0., 0., 0.] in the snapshot file
-      // uint_fast32_t ix = _ncell.x() * p.x() / _box.get_sides().x();
-      // uint_fast32_t iy = _ncell.y() * p.y() / _box.get_sides().y();
-      // uint_fast32_t iz = _ncell.z() * p.z() / _box.get_sides().z();
-      uint_fast32_t ix = (p.x() - _box.get_anchor().x()) / _box.get_sides().x() *
-                  _ncell.x();
-      uint_fast32_t iy = (p.y() - _box.get_anchor().y()) / _box.get_sides().y() *
-                  _ncell.y();
-      uint_fast32_t iz = (p.z() - _box.get_anchor().z()) / _box.get_sides().z() *
-                  _ncell.z();
+      uint_fast32_t ix = _ncell.x() * p.x() / _box.get_sides().x();
+      uint_fast32_t iy = _ncell.y() * p.y() / _box.get_sides().y();
+      uint_fast32_t iz = _ncell.z() * p.z() / _box.get_sides().z();
       _cartesian_grid[ix][iy][iz].set_number_density(cell_densities[i]);
       _cartesian_grid[ix][iy][iz].set_temperature(cell_temperatures[i]);
       for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
