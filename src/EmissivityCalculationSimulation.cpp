@@ -224,7 +224,7 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
         neutral_fractions[i] = HDF5Tools::read_dataset< double >(
             parttype0, "NeutralFraction" + get_ion_name(i));
       } else {
-        cmac_error("Missing ionic fractions for \"%s\"!",
+        cmac_warning("Missing ionic fractions for \"%s\"!",
                    get_ion_name(i).c_str());
       }
       cmac_assert(size == neutral_fractions[i].size());
