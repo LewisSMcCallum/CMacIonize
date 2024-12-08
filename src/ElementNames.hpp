@@ -40,7 +40,7 @@
 #define HAS_OXYGEN
 #define HAS_NEON
 #define HAS_SULPHUR
-#define HAS_MAGNESIUM
+//#define HAS_MAGNESIUM
 #endif
 
 // activate new additional metals
