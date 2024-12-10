@@ -130,7 +130,7 @@ set(CMACIONIZE_VERSION_MAJOR ${GIT_VERSION_MAJOR})
 set(CMACIONIZE_VERSION_MINOR ${GIT_VERSION_MINOR})
 
 # Enable C++11, since we need this for delegating constructors
-add_compiler_flag("-std=c++11" REQUIRED)
+add_compiler_flag("-std=c++14" REQUIRED)
 
 # Find GSL.
 find_package(GSL)
@@ -202,7 +202,7 @@ else(OUTPUT_PHOTOIONIZATION_RATES)
 endif(OUTPUT_PHOTOIONIZATION_RATES)
 
 # Enable all standard compiler warnings and enforce them
-add_compiler_flag("-Wall -Werror -Wno-deprecated -Wno-inconsistent-missing-override" OPTIONAL)
+add_compiler_flag("-Wall -Werror -Wno-deprecated -Wno-unused-private-field -Wno-inconsistent-missing-override -Wno-unused-but-set-variable -Wno-array-parameter" OPTIONAL)
 
 # Enable the address sanitizer in debug builds
 # (to symbolize the code, run
@@ -413,6 +413,14 @@ else(HYDROGEN_ONLY)
   message(STATUS "Compiling full code.")
   add_configuration_option(HAVE_HYDROGEN_ONLY False)
 endif(HYDROGEN_ONLY)
+
+if(HAS_MAGNESIUM)
+  message(STATUS "Compiling with magnesium.")
+  add_configuration_option(HAS_MAGNESIUM True)
+else(HAS_MAGNESIUM)
+  message(STATUS "Compiling without magnesium.")
+  add_configuration_option(HAS_MAGNESIUM False)
+endif(HAS_MAGNESIUM)
 
 if(ACTIVATE_VARIABLE_ABUNDANCES)
   message(STATUS "Compiling support for variable abundances.")
