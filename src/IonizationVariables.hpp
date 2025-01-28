@@ -118,6 +118,9 @@ private:
   /*! @brief Cosmic ray heating factor (in kg m A^-1 s^-4). */
   double _cosmic_ray_factor;
 
+  uint_fast32_t _dust_abs;
+  uint_fast32_t _gas_abs;
+
 #ifdef VARIABLE_ABUNDANCES
   Abundances _abundances;
 #endif
@@ -130,8 +133,8 @@ public:
    * @brief (Empty) constructor.
    */
   inline IonizationVariables()
-      : _number_density(0.), _temperature(0.), _cosmic_ray_factor(-1.),
-        _tracker(nullptr) {
+      : _number_density(0.), _temperature(0.), _cosmic_ray_factor(-1.), _dust_abs(0),
+       _gas_abs(0), _tracker(nullptr) {
 
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = 0.;
@@ -165,6 +168,8 @@ public:
   //  _fraction_silicon = other._fraction_silicon;
     _temperature = other._temperature;
     _cosmic_ray_factor = other._cosmic_ray_factor;
+    _dust_abs = other._dust_abs;
+    _gas_abs = other._gas_abs;
 #ifdef VARIABLE_ABUNDANCES
     _abundances = other._abundances;
 #endif
@@ -411,6 +416,28 @@ public:
 #else
     _heating[name] += increment;
 #endif
+  }
+
+
+  inline void increment_counter(const bool dust) {
+    if (dust) {
+      _dust_abs+=1;
+    } else {
+      _gas_abs+=1;
+    }
+  }
+
+  inline uint_fast32_t get_counter(const bool dust) const {
+    if (dust){
+      return _dust_abs;
+    } else {
+      return _gas_abs;
+    }
+  }
+
+  inline void reset_counter(){
+    _dust_abs = 0;
+    _gas_abs = 0;
   }
 
 #ifdef DO_OUTPUT_COOLING

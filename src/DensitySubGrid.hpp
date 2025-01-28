@@ -1111,6 +1111,7 @@ public:
     const int_fast32_t tot_ncell = _number_of_cells[3] * _number_of_cells[0];
     for (int_fast32_t i = 0; i < tot_ncell; ++i) {
       _ionization_variables[i].reset_mean_intensities();
+      _ionization_variables[i].reset_counter();
     }
   }
 

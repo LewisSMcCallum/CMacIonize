@@ -60,6 +60,7 @@ enum DensityGridField {
   DENSITYGRIDFIELD_MOMENTUM,
   DENSITYGRIDFIELD_TOTAL_ENERGY,
   DENSITYGRIDFIELD_ACCELERATION,
+  DENSITYGRIDFIELD_PHOTONCOUNTER,
   DENSITYGRIDFIELD_NUMBER
 };
 
@@ -123,6 +124,8 @@ public:
       return DENSITYGRIDFIELDTYPE_SCALAR_DOUBLE;
     case DENSITYGRIDFIELD_ACCELERATION:
       return DENSITYGRIDFIELDTYPE_VECTOR_DOUBLE;
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
+      return DENSITYGRIDFIELDTYPE_SCALAR_DOUBLE;
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
       return DENSITYGRIDFIELDTYPE_NUMBER;
@@ -173,6 +176,8 @@ public:
       return "TotalEnergy";
     case DENSITYGRIDFIELD_ACCELERATION:
       return "Acceleration";
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
+      return "PhotonCounter";
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
       return "";
@@ -227,6 +232,8 @@ public:
       return false;
     case DENSITYGRIDFIELD_ACCELERATION:
       return false;
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
+      return false;
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
       return false;
@@ -276,6 +283,8 @@ public:
     case DENSITYGRIDFIELD_TOTAL_ENERGY:
       return false;
     case DENSITYGRIDFIELD_ACCELERATION:
+      return false;
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
       return false;
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
@@ -327,6 +336,8 @@ public:
       return false;
     case DENSITYGRIDFIELD_ACCELERATION:
       return false;
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
+      return false;
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
       return false;
@@ -377,6 +388,8 @@ public:
       return true;
     case DENSITYGRIDFIELD_ACCELERATION:
       return true;
+    case DENSITYGRIDFIELD_PHOTONCOUNTER:
+      return false;
     default:
       cmac_error("Unknown DensityGridField: %" PRIiFAST32, field_name);
       return false;
@@ -433,6 +446,9 @@ public:
       } else {
         return it.get_hydro_variables().get_conserved_total_energy();
       }
+    }
+    case DENSITYGRIDFIELD_PHOTONCOUNTER: {
+      return it.get_ionization_variables().get_counter(false);
     }
     default:
       cmac_error("Not a scalar DensityGridField: %" PRIiFAST32, field_name);
@@ -491,6 +507,9 @@ public:
       } else {
         return it.get_hydro_variables().get_conserved_total_energy();
       }
+    }
+    case DENSITYGRIDFIELD_PHOTONCOUNTER: {
+      return it.get_ionization_variables().get_counter(false);
     }
     default:
       cmac_error("Not a scalar DensityGridField: %" PRIiFAST32, field_name);

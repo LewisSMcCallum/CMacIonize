@@ -125,7 +125,7 @@ public:
     uint_fast32_t index = 0;
     for (uint_fast32_t iphoton = 0; iphoton < buffer.size(); ++iphoton) {
       PhotonPacket &old_photon = buffer[iphoton];
-      const IonizationVariables &ionization_variables =
+      IonizationVariables &ionization_variables =
           subgrid.get_cell(old_photon.get_position())
               .get_ionization_variables();
 #ifdef HAS_HELIUM
@@ -151,6 +151,7 @@ public:
         new_photon.set_position(old_photon.get_position());
         new_photon.set_distance_travelled(0.0);
         new_photon.set_weight(old_photon.get_weight());
+        new_photon.set_source_index(old_photon.get_source_index());
 
         new_photon.set_energy(new_frequency);
         for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {

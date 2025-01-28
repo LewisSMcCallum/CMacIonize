@@ -56,7 +56,7 @@ private:
   AtomicValue<uint_fast32_t> _num_abs_dens;
   AtomicValue<uint_fast32_t> _num_abs_dif;
 
-
+  const uint_fast32_t _track_source_num;
 
   const uint_fast32_t numbins = 1000;
 
@@ -74,9 +74,10 @@ public:
    *
    * @param max_scatter maximum number of scatters recorded by the statistics
    */
-  inline PhotonPacketStatistics(uint_fast32_t max_scatter)
-      : _scatter_histogram(max_scatter + 2), _frequencies(numbins),_ingoing_spectrum(numbins),
-      _outgoing_spectrum(numbins) {
+  inline PhotonPacketStatistics(uint_fast32_t max_scatter, uint_fast32_t track_source_num)
+      : _scatter_histogram(max_scatter + 2), _track_source_num(track_source_num),
+       _frequencies(numbins),_ingoing_spectrum(numbins),
+      _outgoing_spectrum(numbins){
         _num_abs.set(0);
         _num_escape.set(0);
         _num_abs_dens.set(0);
@@ -99,7 +100,9 @@ public:
    */
   inline PhotonPacketStatistics(ParameterFile &params)
       : PhotonPacketStatistics(params.get_value< uint_fast32_t >(
-            "PhotonPacketStatistics:maximum number of scatters", 5)) {}
+            "PhotonPacketStatistics:maximum number of scatters", 5),
+            params.get_value< uint_fast32_t >(
+            "PhotonPacketStatistics:track source index", 0)) {}
   /**
    * @brief function that implements photon absorption termination
    *
@@ -133,6 +136,8 @@ public:
       _ingoing_spectrum[bin_index].pre_increment();
     }
   }
+
+  inline uint_fast32_t get_tracked_source() {return _track_source_num;}
 
 
   /**

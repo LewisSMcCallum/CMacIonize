@@ -75,6 +75,8 @@ private:
 
   double _distance_travelled = 0.0;
 
+  uint_fast32_t _source_index;
+
 public:
 #ifdef HAVE_MPI
   /**
@@ -246,6 +248,13 @@ public:
   inline void add_distance_travelled(const double distance) {
     _distance_travelled+= distance;
   }
+
+
+  inline void set_source_index(const uint_fast32_t index) {
+    _source_index = index;
+  }
+  inline double get_source_index() const {return _source_index;}
+
 
 
   /**

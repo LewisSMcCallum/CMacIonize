@@ -100,7 +100,7 @@ public:
 
   virtual double reemit(const PhotonPacket &photon,
                         const double helium_abundance,
-                        const IonizationVariables &ionization_variables,
+                        IonizationVariables &ionization_variables,
                         RandomGenerator &random_generator,
                         PhotonType &type,
                         PhotonPacketStatistics *statistics) const {return 0;}

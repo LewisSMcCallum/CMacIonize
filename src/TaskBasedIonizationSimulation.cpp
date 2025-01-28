@@ -685,7 +685,7 @@ void TaskBasedIonizationSimulation::run(
 
     // define photon scattering stats
 
-    PhotonPacketStatistics statistics(5);
+    PhotonPacketStatistics statistics(_parameter_file);
     if (_trackers != nullptr && iloop == _number_of_iterations - 1) {
       if (_log) {
         _log->write_status("Adding trackers...");
