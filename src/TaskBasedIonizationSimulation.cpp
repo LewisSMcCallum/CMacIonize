@@ -686,6 +686,8 @@ void TaskBasedIonizationSimulation::run(
     // define photon scattering stats
 
     PhotonPacketStatistics statistics(_parameter_file);
+
+    std::cout << "Tracked source xpos = " << photon_source->get_position(statistics.get_tracked_source())[0] << std::endl;
     if (_trackers != nullptr && iloop == _number_of_iterations - 1) {
       if (_log) {
         _log->write_status("Adding trackers...");

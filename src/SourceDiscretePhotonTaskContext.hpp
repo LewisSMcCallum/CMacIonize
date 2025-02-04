@@ -200,7 +200,10 @@ public:
 
 
       photon.set_source_index(_photon_source.get_index(source_index));
-      
+      if (_photon_source.get_index(source_index) == 86) {
+        std::cout << source_position[0] << " " << source_position[1]  << " " << source_position[2] << std::endl;
+      }
+
 
       photon.set_energy(frequency);
       if (_statistics != nullptr) {
