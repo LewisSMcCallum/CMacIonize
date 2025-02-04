@@ -138,7 +138,7 @@ public:
   inline IonizationVariables()
       : _number_density(0.), _temperature(0.), _cosmic_ray_factor(-1.), _dust_abs(0),
        _gas_abs(0), _tracker(nullptr) {
-
+        _dust_density = 0.0;
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = 0.;
       _mean_intensity[i] = 0.;
