@@ -31,6 +31,9 @@
 #include "RestartReader.hpp"
 #include "RestartWriter.hpp"
 #include "Tracker.hpp"
+#include "AtomicValue.hpp"
+#include <iostream>
+
 
 #ifdef VARIABLE_ABUNDANCES
 #include "Abundances.hpp"
@@ -118,8 +121,8 @@ private:
   /*! @brief Cosmic ray heating factor (in kg m A^-1 s^-4). */
   double _cosmic_ray_factor;
 
-  uint_fast32_t _dust_abs;
-  uint_fast32_t _gas_abs;
+  AtomicValue<uint_fast32_t> _dust_abs;
+  AtomicValue<uint_fast32_t> _gas_abs;
 
 #ifdef VARIABLE_ABUNDANCES
   Abundances _abundances;
@@ -154,6 +157,24 @@ public:
 #endif
   }
 
+  IonizationVariables(const IonizationVariables &other) {
+      copy_all(other);
+  }
+
+  // Custom move constructor
+  IonizationVariables(IonizationVariables &&other) noexcept {
+      copy_all(other); // or a "move_all" if you have special logic
+      // Potentially reset `other` if that makes sense
+  }
+
+  IonizationVariables& operator=(const IonizationVariables &other) {
+      if (this != &other) {
+          // 2. Call the manual copy function
+          copy_all(other);
+      }
+      return *this;
+  }
+
   /**
    * @brief Copy the contents of the given IonizationVariables instance into
    * this one.
@@ -168,8 +189,8 @@ public:
   //  _fraction_silicon = other._fraction_silicon;
     _temperature = other._temperature;
     _cosmic_ray_factor = other._cosmic_ray_factor;
-    _dust_abs = other._dust_abs;
-    _gas_abs = other._gas_abs;
+    _dust_abs.set(other._dust_abs.value());
+    _gas_abs.set(other._gas_abs.value());
 #ifdef VARIABLE_ABUNDANCES
     _abundances = other._abundances;
 #endif
@@ -240,6 +261,13 @@ public:
     for (int_fast32_t i = 0; i < NUMBER_OF_HEATINGTERMS; ++i) {
       _heating[i] += other._heating[i];
     }
+  }
+
+  inline void merge_counters(const IonizationVariables &other) {
+    uint_fast32_t toadd = other._gas_abs.value();
+    _gas_abs.set(_gas_abs.value() + toadd);
+    toadd = other._dust_abs.value();
+    _dust_abs.set(_dust_abs.value() + toadd);
   }
 
   /**
@@ -421,23 +449,23 @@ public:
 
   inline void increment_counter(const bool dust) {
     if (dust) {
-      _dust_abs+=1;
+      _dust_abs.pre_increment();
     } else {
-      _gas_abs+=1;
+      _gas_abs.pre_increment();
     }
   }
 
   inline uint_fast32_t get_counter(const bool dust) const {
     if (dust){
-      return _dust_abs;
+      return _dust_abs.value();
     } else {
-      return _gas_abs;
+      return _gas_abs.value();
     }
   }
 
   inline void reset_counter(){
-    _dust_abs = 0;
-    _gas_abs = 0;
+    _dust_abs.set(0);
+    _gas_abs.set(0);
   }
 
 #ifdef DO_OUTPUT_COOLING

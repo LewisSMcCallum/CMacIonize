@@ -62,6 +62,7 @@ private:
 
 
 
+
 public:
   PhysicalDiffuseReemissionHandler(const CrossSections &cross_sections);
 

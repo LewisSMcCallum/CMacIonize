@@ -1101,6 +1101,8 @@ public:
     for (int_fast32_t i = 0; i < tot_ncell; ++i) {
       _ionization_variables[i].increase_mean_intensities(
           copy._ionization_variables[i]);
+          
+      _ionization_variables[i].merge_counters(copy._ionization_variables[i]);
     }
   }
 
