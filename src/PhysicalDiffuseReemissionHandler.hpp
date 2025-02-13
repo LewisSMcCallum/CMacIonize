@@ -57,7 +57,7 @@ private:
   /*! @brief Helium 2-photon continuum spectrum. */
   const HeliumTwoPhotonContinuumSpectrum _He2pc_spectrum;
 
-  const double dens_thresh = 1e5;
+  const double dens_thresh = 2e5;
 
 
 
