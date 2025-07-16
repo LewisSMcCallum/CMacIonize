@@ -422,6 +422,13 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _luminosities.erase(_luminosities.begin() + i);
         _spectrum_index.erase(_spectrum_index.begin() + i);
+        if (_td_sources) {
+          for (auto &slice : _td_positions) {
+            slice.erase(slice.begin() + i);
+          }
+        }
+
+        
         changed = true;
 
       } else {
@@ -429,7 +436,10 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
         ++i;
       }
     }
-
+    _total_luminosity = 0.0;
+    for (uint_fast32_t i=0;i<_luminosities.size();++i) {
+      _total_luminosity += _luminosities[i];
+    }
     _number_of_updates += 1;
 
 
