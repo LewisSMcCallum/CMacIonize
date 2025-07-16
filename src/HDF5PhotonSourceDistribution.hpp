@@ -63,6 +63,7 @@ private:
 
   bool _has_exploded;
   const bool _has_lifetimes;
+  const bool _td_sources;
   /*! @brief Positions of the sources in the snapshot file (in m). */
   std::vector< CoordinateVector<> > _positions;
 
@@ -71,6 +72,16 @@ private:
 
 
   std::vector< double > _source_lifetimes;
+
+
+  std::vector<double>                              _times;               ///< HDF5 “Times” array
+
+  std::vector<std::vector< CoordinateVector<> >>   _td_positions;        ///< shape [N][n_sources]
+
+  std::size_t                                      _current_time_index;  ///< which slice we’re on
+
+  double                                           _accumulated_time;    ///< simulation time since start
+
 
   std::vector<PhotonSourceSpectrum*> _all_spectra;
 
@@ -87,6 +98,7 @@ private:
 public:
   HDF5PhotonSourceDistribution(
       std::string filename, const Box<> box, const double update_interval, const bool has_lifetimes,
+      const bool td_sources,
       Log *log = nullptr);
   HDF5PhotonSourceDistribution(ParameterFile &params,
                                          Log *log = nullptr);
@@ -104,6 +116,7 @@ public:
   virtual void add_stellar_feedback(HydroDensitySubGrid &subgrid, Hydro &hydro);
   virtual void done_stellar_feedback();
   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep);
+  virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep);
 };
 
 #endif // HDF5PHOTONSOURCEDISTRIBUTION_HPP
