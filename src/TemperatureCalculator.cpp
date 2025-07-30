@@ -1114,4 +1114,14 @@ void TemperatureCalculator::calculate_temperature(
   } else {
     _ionization_state_calculator.calculate_ionization_state(totweight, subgrid, timestep, time_dependent, do_metals);
   }
+  if (true) {
+      for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
+        double newrho = cellit.get_ionization_variables().get_base_number_density();
+        double fac = 3.0-(2.0*cellit.get_ionization_variables().get_ionic_fraction(ION_H_n));
+        newrho = newrho*fac;
+        cellit.get_ionization_variables().set_number_density(newrho);
+      }
+
+
+  }
 }

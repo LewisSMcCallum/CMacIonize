@@ -93,6 +93,8 @@ private:
 
   double _dust_density;
 
+  double _base_number_density;
+
  // double _fraction_silicon;
 
   /*! @brief Ionic fractions. For hydrogen and helium, these are the neutral
@@ -136,7 +138,7 @@ public:
    * @brief (Empty) constructor.
    */
   inline IonizationVariables()
-      : _number_density(0.), _temperature(0.), _cosmic_ray_factor(-1.), _dust_abs(0),
+      : _number_density(0.), _temperature(0.), _base_number_density(0.0),_cosmic_ray_factor(-1.), _dust_abs(0),
        _gas_abs(0), _tracker(nullptr) {
         _dust_density = 0.0;
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
@@ -186,6 +188,7 @@ public:
     // single variables
     _number_density = other._number_density;
     _dust_density = other._dust_density;
+    _base_number_density = other._base_number_density;
   //  _fraction_silicon = other._fraction_silicon;
     _temperature = other._temperature;
     _cosmic_ray_factor = other._cosmic_ray_factor;
@@ -284,6 +287,23 @@ public:
    */
   inline void set_number_density(const double number_density) {
     _number_density = number_density;
+  
+  }
+
+  /**
+   * @brief Get the baseline number density.
+   *
+   * @return Number density (in m^-3).
+   */
+  inline double get_base_number_density() const { return _base_number_density; }
+
+  /**
+   * @brief Set the base number density.
+   *
+   * @param number_density New number density (in m^-3).
+   */
+  inline void set_base_number_density(const double base_number_density) {
+    _base_number_density = base_number_density;
   
   }
 
@@ -515,6 +535,8 @@ public:
 
     restart_writer.write(_number_density);
     restart_writer.write(_temperature);
+    restart_writer.write(_dust_density);
+    restart_writer.write(_base_number_density);
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       restart_writer.write(_ionic_fractions[i]);
       restart_writer.write(_prev_ionic_fractions[i]);
@@ -541,6 +563,8 @@ public:
 
     _number_density = restart_reader.read< double >();
     _temperature = restart_reader.read< double >();
+    _dust_density = restart_reader.read< double >();
+    _base_number_density = restart_reader.read< double >();
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
       _ionic_fractions[i] = restart_reader.read< double >();
       _prev_ionic_fractions[i] = restart_reader.read< double >();
