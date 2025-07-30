@@ -108,10 +108,13 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
         HDF5Tools::read_dataset<double>           (maingroup, "SourceLuminosities");
     std::vector<int>             raw_spec_index =
         HDF5Tools::read_dataset<int>              (maingroup, "spec_index");
-    std::vector<double>          raw_lifetimes  =
+
+    if (_has_lifetimes) {
+          std::vector<double>          raw_lifetimes  =
         HDF5Tools::read_dataset<double>           (maingroup, "Lifetimes");
-    std::vector<double>          raw_turn_on    =
-        HDF5Tools::read_dataset<double>           (maingroup, "TurnOnTimes");
+    }
+
+
 
     // Read time‐dependent arrays only if requested
     std::vector<CoordinateVector<>> flat_td;
@@ -119,6 +122,8 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
       _times = HDF5Tools::read_dataset<double>(maingroup, "Times");
       flat_td =
         HDF5Tools::read_dataset<CoordinateVector<>>(maingroup, "TD_Positions");
+      std::vector<double>          raw_turn_on    =
+      HDF5Tools::read_dataset<double>           (maingroup, "TurnOnTimes");
     }
 
     // — close HDF5 group & file — (unchanged)
