@@ -108,9 +108,9 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
         HDF5Tools::read_dataset<double>           (maingroup, "SourceLuminosities");
     std::vector<int>             raw_spec_index =
         HDF5Tools::read_dataset<int>              (maingroup, "spec_index");
-
+    std::vector<double>    raw_lifetimes;
     if (_has_lifetimes) {
-          std::vector<double>          raw_lifetimes  =
+          raw_lifetimes  =
         HDF5Tools::read_dataset<double>           (maingroup, "Lifetimes");
     }
 
@@ -118,12 +118,12 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
 
     // Read time‐dependent arrays only if requested
     std::vector<CoordinateVector<>> flat_td;
+    std::vector<double>          raw_turn_on;
     if (_td_sources) {
       _times = HDF5Tools::read_dataset<double>(maingroup, "Times");
       flat_td =
         HDF5Tools::read_dataset<CoordinateVector<>>(maingroup, "TD_Positions");
-      std::vector<double>          raw_turn_on    =
-      HDF5Tools::read_dataset<double>           (maingroup, "TurnOnTimes");
+      raw_turn_on = HDF5Tools::read_dataset<double>           (maingroup, "TurnOnTimes");
     }
 
     // — close HDF5 group & file — (unchanged)
@@ -151,14 +151,23 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
     for (size_t k : keep) {
       _positions       .push_back(raw_positions[k]);
       _spectrum_index  .push_back(raw_spec_index[k]);
+      if (_has_lifetimes){
       _source_lifetimes.push_back(raw_lifetimes[k]);
+      }
+      if (_td_sources) {
       _turn_on_times   .push_back(raw_turn_on[k]);
       _base_luminosities.push_back(raw_lums[k]);
+      }
 
       // initially off unless turn_on == 0
+      if (_td_sources){
       double init_lum = (raw_turn_on[k] > 0.0 ? 0.0 : raw_lums[k]);
       _luminosities   .push_back(init_lum);
       _total_luminosity += init_lum;
+      } else {
+        _luminosities.push_back(raw_lums[k]);
+        _total_luminosity += raw_lums[k];
+      }
     }
 
     // 5) Split flat_td into _td_positions[t] **using the same `keep` indices**
