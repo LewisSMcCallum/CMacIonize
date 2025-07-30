@@ -70,12 +70,14 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
     const bool td_sources,
     Log *log)
     : _log(log),_update_interval(update_interval),_has_lifetimes(has_lifetimes),_td_sources(td_sources),
-    _current_time_index(0),_accumulated_time(0.0) {
+    _current_time_index(0),_accumulated_time(0.0), _box(box) {
 
 
 
    _has_exploded=false;
    _number_of_updates = 0;
+
+   novahandler = new SupernovaHandler(1.e44);
 
 
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
@@ -94,88 +96,79 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,40,log));
     _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
 
-  // turn off default HDF5 error handling: we catch errors ourselves
-  HDF5Tools::initialize();
+    // — turn off HDF5 errors & open file/group — (unchanged)
+    HDF5Tools::initialize();
+    auto file     = HDF5Tools::open_file(filename, HDF5Tools::HDF5FILEMODE_READ);
+    auto maingroup= HDF5Tools::open_group(file, "/PartType0");
 
-  // open the file for reading
-  HDF5Tools::HDF5File file =
-      HDF5Tools::open_file(filename, HDF5Tools::HDF5FILEMODE_READ);
+    // 1) Read **raw** arrays for ALL sources in the file
+    std::vector<CoordinateVector<>> raw_positions =
+        HDF5Tools::read_dataset<CoordinateVector<>>(maingroup, "Sources");
+    std::vector<double>          raw_lums       =
+        HDF5Tools::read_dataset<double>           (maingroup, "SourceLuminosities");
+    std::vector<int>             raw_spec_index =
+        HDF5Tools::read_dataset<int>              (maingroup, "spec_index");
+    std::vector<double>          raw_lifetimes  =
+        HDF5Tools::read_dataset<double>           (maingroup, "Lifetimes");
+    std::vector<double>          raw_turn_on    =
+        HDF5Tools::read_dataset<double>           (maingroup, "TurnOnTimes");
 
-
-
-  _total_luminosity = 0.;
-
-  // open the group containing the star particle data
-  HDF5Tools::HDF5Group maingroup =
-      HDF5Tools::open_group(file, "/PartType0");
-  // read the positions
-  std::vector< CoordinateVector<> > positions =
-      HDF5Tools::read_dataset< CoordinateVector<> >(maingroup,
-                                                      "Sources");
-
-
-
-
-
-   std::vector< double > read_lums =
-       HDF5Tools::read_dataset< double > (maingroup, "SourceLuminosities");
-
-
-
-  _spectrum_index = HDF5Tools::read_dataset<int> (maingroup, "spec_index");
-
-  if (_has_lifetimes) {
-    _source_lifetimes = HDF5Tools::read_dataset<double> (maingroup, "Lifetimes");
-  }
-  std::vector< CoordinateVector<> > flat_td;
-  if (_td_sources){
-
-     _times = HDF5Tools::read_dataset<double>(maingroup, "Times");
-
-
+    // Read time‐dependent arrays only if requested
+    std::vector<CoordinateVector<>> flat_td;
+    if (_td_sources) {
+      _times = HDF5Tools::read_dataset<double>(maingroup, "Times");
       flat_td =
-          HDF5Tools::read_dataset< CoordinateVector<> >(maingroup, "TD_Positions");
-  }
-  
-
-
-  // close the group
-  HDF5Tools::close_group(maingroup);
-  // close the file
-  HDF5Tools::close_file(file);
-
-
-  novahandler = new SupernovaHandler(1.e44);
-
-
-  for (size_t i = 0; i < positions.size(); ++i) {
-    CoordinateVector<> position = positions[i];
-    if (box.inside(position)) {
-      double UV_luminosity = read_lums[i];
-      
-      _positions.push_back(position);
-      _luminosities.push_back(UV_luminosity);
-      _total_luminosity += UV_luminosity;
-      
+        HDF5Tools::read_dataset<CoordinateVector<>>(maingroup, "TD_Positions");
     }
-  }
 
-  // sanity check
-  std::size_t n_times   = _times.size();
-  std::size_t n_sources = positions.size();
-  if (flat_td.size() != n_times * n_sources) {
-    _log->write_error("TD_Positions length (", flat_td.size(),
-                      ") != Times.size * n_sources (",
-                      n_times * n_sources, ")");
-  }
+    // — close HDF5 group & file — (unchanged)
+    HDF5Tools::close_group(maingroup);
+    HDF5Tools::close_file(file);
 
-  // split flat_td into a 2D vector [t][i]
-  _td_positions.resize(n_times);
-  for (std::size_t t = 0; t < n_times; ++t) {
-    auto begin = flat_td.begin() + t * n_sources;
-    auto end   = begin       + n_sources;
-    _td_positions[t].assign(begin, end);
-  }
+    // 2) Build an index list of sources you actually keep (inside the box)
+    std::vector<size_t> keep;
+    for (size_t i = 0; i < raw_positions.size(); ++i) {
+      if (box.inside(raw_positions[i])) {
+        keep.push_back(i);
+      }
+    }
+
+    // 3) Reserve space in your member‐arrays
+    _positions         .reserve(keep.size());
+    _luminosities      .reserve(keep.size());
+    _spectrum_index    .reserve(keep.size());
+    _source_lifetimes  .reserve(keep.size());
+    _turn_on_times     .reserve(keep.size());
+    _base_luminosities .reserve(keep.size());
+    _total_luminosity  = 0.0;
+
+    // 4) Copy only the kept entries into your members
+    for (size_t k : keep) {
+      _positions       .push_back(raw_positions[k]);
+      _spectrum_index  .push_back(raw_spec_index[k]);
+      _source_lifetimes.push_back(raw_lifetimes[k]);
+      _turn_on_times   .push_back(raw_turn_on[k]);
+      _base_luminosities.push_back(raw_lums[k]);
+
+      // initially off unless turn_on == 0
+      double init_lum = (raw_turn_on[k] > 0.0 ? 0.0 : raw_lums[k]);
+      _luminosities   .push_back(init_lum);
+      _total_luminosity += init_lum;
+    }
+
+    // 5) Split flat_td into _td_positions[t] **using the same `keep` indices**
+    if (_td_sources) {
+      std::size_t n_times = _times.size();
+      _td_positions.resize(n_times);
+      for (std::size_t t = 0; t < n_times; ++t) {
+        auto begin = flat_td.begin() + t * raw_positions.size();
+        // Reserve and then push only kept sources:
+        _td_positions[t].reserve(keep.size());
+        for (size_t k : keep) {
+          _td_positions[t].push_back(*(begin + k));
+        }
+      }
+    }
 
 
 
@@ -356,9 +349,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
         double r_inj,r_st,nbar,num_inj;
 
-
         std::tie(r_inj,r_st,nbar,num_inj) = novahandler->get_r_inj(&grid_creator,_to_do_feedback[i]);
-
          _r_inj.push_back(r_inj);
          _r_st.push_back(r_st);
          _nbar.push_back(nbar);
@@ -409,6 +400,16 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
     _accumulated_time += actual_timestep;
 
+    for (size_t j = 0; j < _luminosities.size(); ++j) {
+      if (_luminosities[j] == 0.0 &&      // still off
+          _accumulated_time >= _turn_on_times[j]
+        && _base_luminosities[j] > 0.0)
+      {
+        std::cout << "Turning on star of lum " << _base_luminosities[j] << std::endl;
+        _luminosities[j] = _base_luminosities[j];
+      }
+    }
+
 
     // clear out sources which no longer exist and add them to SNe todo list
     size_t i = 0;
@@ -422,6 +423,8 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _luminosities.erase(_luminosities.begin() + i);
         _spectrum_index.erase(_spectrum_index.begin() + i);
+        _base_luminosities.erase(_base_luminosities.begin() + i);
+        _turn_on_times.erase(_turn_on_times.begin() + i);
         if (_td_sources) {
           for (auto &slice : _td_positions) {
             slice.erase(slice.begin() + i);
@@ -440,6 +443,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
     for (uint_fast32_t i=0;i<_luminosities.size();++i) {
       _total_luminosity += _luminosities[i];
     }
+    std::cout << _total_luminosity << std::endl;
     _number_of_updates += 1;
 
 
@@ -455,6 +459,7 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
     while (_current_time_index + 1 < _times.size() &&
           _accumulated_time >= _times[_current_time_index + 1])
     {
+      std::cout << "Pushin on time index " << _current_time_index << std::endl;
       ++_current_time_index;
     }
 
@@ -463,6 +468,30 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
     for (std::size_t i = 0; i < _positions.size(); ++i) {
       _positions[i] = slice[i];
     }
+
+
+  {
+    size_t j = 0;
+    while (j < _positions.size()) {
+      if (!_box.inside(_positions[j])) {
+        // erase source j from every per‑source array
+        _positions         .erase(_positions.begin() + j);
+        _luminosities      .erase(_luminosities.begin() + j);
+        _spectrum_index    .erase(_spectrum_index.begin() + j);
+        _source_lifetimes  .erase(_source_lifetimes.begin() + j);
+        _turn_on_times     .erase(_turn_on_times.begin() + j);
+        _base_luminosities .erase(_base_luminosities.begin() + j);
+        if (_td_sources) {
+          for (auto &ts : _td_positions) {
+            ts.erase(ts.begin() + j);
+          }
+        }
+        // do NOT increment j: everything shifted down
+      } else {
+        ++j;
+      }
+    }
+  }
 }
 
 

@@ -58,7 +58,7 @@ public:
                                          CoordinateVector<> sne_loc) {
 
 
-
+          
       HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(sne_loc);
 
       double cell_vol =  subgrid.get_cell(sne_loc).get_volume();
@@ -72,7 +72,7 @@ public:
 
 
       vec = grid_creator->cells_within_radius(sne_loc,r_run);
-
+      
 
       double mtot = 0.0;
       for (auto & pair : vec) {
@@ -80,6 +80,7 @@ public:
         mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
 
       }
+
       if (mtot > 1.988e+33) {
         double inj_vol = 1.3333*3.14159265*std::pow(r_run,3.0);
         double rho = mtot/inj_vol;
@@ -87,6 +88,7 @@ public:
         double r_st = 3.086e+16 * 19.1 * std::pow(_sne_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
         return std::make_tuple(r_run,r_st,nbar,268.);
       }
+    
 
       while (mtot < 1.988e+33) {
         r_run = r_run+(0.25*dx);
@@ -98,6 +100,7 @@ public:
           mtot = mtot + cell_mass;
         }
       }
+  
     
     num_cells = vec.size();
     double inj_vol = 1.3333*3.14159265*std::pow(r_run,3.0);

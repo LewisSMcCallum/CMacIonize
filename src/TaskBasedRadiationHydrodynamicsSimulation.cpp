@@ -3056,10 +3056,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
          log->write_status("Starting stellar feedback.");
        }
 
-
      sourcedistribution->get_sne_radii(*grid_creator);
-
-
 
       AtomicValue< size_t > igrid(0);
       start_parallel_timing_block();

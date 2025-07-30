@@ -83,6 +83,8 @@ private:
   double                                           _accumulated_time;    ///< simulation time since start
 
 
+  std::vector<double> _turn_on_times;     ///< seconds when each source “switches on”
+  std::vector<double> _base_luminosities; ///< the full luminosity once turned on
   std::vector<PhotonSourceSpectrum*> _all_spectra;
 
   std::vector<int> _spectrum_index;
@@ -94,7 +96,7 @@ private:
   SupernovaHandler *novahandler;
 
 
-
+  const Box<> _box;
 public:
   HDF5PhotonSourceDistribution(
       std::string filename, const Box<> box, const double update_interval, const bool has_lifetimes,
