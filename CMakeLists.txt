@@ -30,6 +30,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 project(CMacIonize)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include cstdint")
 # Enable unit testing using CTest
 enable_testing()
 

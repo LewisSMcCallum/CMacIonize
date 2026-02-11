@@ -247,7 +247,12 @@ if(HAVE_HDF5)
 endif(HAVE_HDF5)
 
 if(HAVE_GSL)
-    target_link_libraries(SharedEngine ${GSL_LIBRARIES})
+    # Prefer imported GSL targets to avoid ambiguous -lgsl/-lgslcblas resolution.
+    if(TARGET GSL::gsl AND TARGET GSL::gslcblas)
+        target_link_libraries(SharedEngine GSL::gsl GSL::gslcblas)
+    else()
+        target_link_libraries(SharedEngine ${GSL_LIBRARIES})
+    endif()
 endif(HAVE_GSL)
 
 
