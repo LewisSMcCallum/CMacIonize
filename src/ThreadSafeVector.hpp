@@ -223,11 +223,40 @@ public:
    * @return Index of a free element.
    */
   inline size_t get_free_element() {
+    if (_number_taken.value() >= _size) {
+      cmac_error(
+          "No free element is available in \"%s\" (%zu / %zu in use). "
+          "Increase \"TaskBasedIonizationSimulation:number of tasks\" or "
+          "\"TaskBasedIonizationSimulation:number of buffers\", or lower "
+          "\"TaskBasedIonizationSimulation:number of photons\".",
+          _label.c_str(), _number_taken.value(), _size);
+    }
     cmac_assert_message(_number_taken.value() < _size,
                         "No more free elements in vector (%zu < %zu)! (%s)",
                         _number_taken.value(), _size, _label.c_str());
     size_t index = _current_index.post_increment() % _size;
+    size_t spin_count = 0;
+    size_t next_warning = 1000000;
     while (!_locks[index].lock()) {
+      ++spin_count;
+      if (spin_count == next_warning) {
+        cmac_warning(
+            "Long wait for a free element in \"%s\" (%zu attempts). Try "
+            "increasing \"TaskBasedIonizationSimulation:number of tasks\" "
+            "or \"TaskBasedIonizationSimulation:number of buffers\", or "
+            "lowering \"TaskBasedIonizationSimulation:number of photons\".",
+            _label.c_str(), spin_count);
+        next_warning <<= 2;
+      }
+      if (spin_count >= 100000000) {
+        cmac_error(
+            "Free-element wait in \"%s\" exceeded %zu attempts. Aborting "
+            "instead of spinning forever. Increase \"TaskBasedIonizationSim"
+            "ulation:number of tasks\" or \"TaskBasedIonizationSimulation:"
+            "number of buffers\", or lower \"TaskBasedIonizationSimulatio"
+            "n:number of photons\".",
+            _label.c_str(), spin_count);
+      }
       index = _current_index.post_increment() % _size;
     }
 #ifdef THREADSAFEVECTOR_STATS
@@ -279,7 +308,28 @@ public:
   inline size_t get_free_element_safe() {
     if (_number_taken.value() < _size) {
       size_t index = _current_index.post_increment() % _size;
+      size_t spin_count = 0;
+      size_t next_warning = 1000000;
       while (!_locks[index].lock()) {
+        ++spin_count;
+        if (spin_count == next_warning) {
+          cmac_warning(
+              "Long wait for a free element in \"%s\" (%zu attempts). Try "
+              "increasing \"TaskBasedIonizationSimulation:number of tasks\" "
+              "or \"TaskBasedIonizationSimulation:number of buffers\", or "
+              "lowering \"TaskBasedIonizationSimulation:number of photons\".",
+              _label.c_str(), spin_count);
+          next_warning <<= 2;
+        }
+        if (spin_count >= 100000000) {
+          cmac_error(
+              "Free-element wait in \"%s\" exceeded %zu attempts. Aborting "
+              "instead of spinning forever. Increase \"TaskBasedIonizationSim"
+              "ulation:number of tasks\" or \"TaskBasedIonizationSimulation:"
+              "number of buffers\", or lower \"TaskBasedIonizationSimulatio"
+              "n:number of photons\".",
+              _label.c_str(), spin_count);
+        }
         index = _current_index.post_increment() % _size;
       }
 #ifdef THREADSAFEVECTOR_STATS

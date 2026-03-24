@@ -109,6 +109,15 @@ public:
    */
   inline void add_task(const size_t task) {
     _queue_lock.lock();
+    if (_current_queue_size >= _size) {
+      _queue_lock.unlock();
+      cmac_error(
+          "Task queue \"%s\" is full (%zu entries). Increase \"TaskBased"
+          "IonizationSimulation:shared queue size\" or \"TaskBasedIoniza"
+          "tionSimulation:queue size per thread\", or lower \"TaskBasedI"
+          "onizationSimulation:number of photons\".",
+          _label.c_str(), _size);
+    }
     cmac_assert_message(_current_queue_size < _size,
                         "Too many tasks in queue (%zu < %zu)! (%s)",
                         _current_queue_size, _size, _label.c_str());
@@ -137,6 +146,15 @@ public:
 
     _queue_lock.lock();
     const size_t new_task_count = task_end - task_start;
+    if (_current_queue_size + new_task_count > _size) {
+      _queue_lock.unlock();
+      cmac_error(
+          "Task queue \"%s\" would overflow (%zu + %zu > %zu). Increase "
+          "\"TaskBasedIonizationSimulation:shared queue size\" or \"Tas"
+          "kBasedIonizationSimulation:queue size per thread\", or lower "
+          "\"TaskBasedIonizationSimulation:number of photons\".",
+          _label.c_str(), _current_queue_size, new_task_count, _size);
+    }
 #ifdef HAVE_OPENMP
 #pragma omp parallel for
 #endif

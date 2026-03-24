@@ -65,6 +65,14 @@ public:
    */
   inline size_t get_free_buffer() {
     const size_t index = _memory_space.get_free_element_safe();
+    if (index >= _memory_space.max_size()) {
+      cmac_error(
+          "No free photon buffer is available (%zu / %zu in use). Increase "
+          "\"TaskBasedIonizationSimulation:number of buffers\" or lower "
+          "\"TaskBasedIonizationSimulation:number of photons\".",
+          _memory_space.get_number_of_active_elements(),
+          _memory_space.max_size());
+    }
     cmac_assert_message(index < _memory_space.max_size(),
                         "No more free elements in memory space!");
     return index;

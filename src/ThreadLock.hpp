@@ -39,6 +39,7 @@
 #include <omp.h>
 #elif defined(LOCK_ATOMIC)
 #include "AtomicValue.hpp"
+#include "Error.hpp"
 #elif defined(LOCK_PTHREAD_SPIN)
 #include <pthread.h>
 #else
@@ -110,7 +111,27 @@ public:
 #if defined(LOCK_OPENMP)
     omp_set_lock(&_lock);
 #elif defined(LOCK_ATOMIC)
+    size_t spin_count = 0;
+    size_t next_warning = 1000000;
     while (!_lock.lock()) {
+      ++spin_count;
+      if (spin_count == next_warning) {
+        cmac_warning(
+            "Long wait for an internal lock (%zu attempts). If this keeps "
+            "happening, lower \"TaskBasedIonizationSimulation:number of "
+            "photons\" or increase \"TaskBasedIonizationSimulation:source "
+            "copy level\".",
+            spin_count);
+        next_warning <<= 2;
+      }
+      if (spin_count >= 100000000) {
+        cmac_error(
+            "Internal lock wait exceeded %zu attempts. Aborting instead of "
+            "spinning forever. Try lowering \"TaskBasedIonizationSimulation:"
+            "number of photons\" or increasing \"TaskBasedIonizationSimula"
+            "tion:source copy level\".",
+            spin_count);
+      }
     }
 #elif defined(LOCK_PTHREAD_SPIN)
     pthread_spin_lock(&_lock);

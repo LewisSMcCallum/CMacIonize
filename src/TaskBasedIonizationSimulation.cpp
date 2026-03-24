@@ -754,6 +754,7 @@ void TaskBasedIonizationSimulation::run(
     size_t number_of_photons_done = 0;
     if (photon_source) {
       while (number_of_photons_done < number_of_discrete_photons) {
+        size_t photons_added_this_pass = 0;
         for (size_t isrc = 0; isrc < photon_source->get_number_of_sources();
              ++isrc) {
 
@@ -766,7 +767,18 @@ void TaskBasedIonizationSimulation::run(
             (*_tasks)[new_task].set_buffer(number_of_photons_this_batch);
             _shared_queue->add_task(new_task);
             number_of_photons_done += number_of_photons_this_batch;
+            photons_added_this_pass += number_of_photons_this_batch;
           }
+        }
+        if (photons_added_this_pass == 0) {
+          cmac_error(
+              "No new discrete source tasks were created although %zu of %zu "
+              "photons remain. Aborting instead of looping forever. Increase "
+              "\"TaskBasedIonizationSimulation:number of tasks\" and "
+              "\"TaskBasedIonizationSimulation:shared queue size\", or "
+              "lower \"TaskBasedIonizationSimulation:number of photons\".",
+              number_of_discrete_photons - number_of_photons_done,
+              number_of_discrete_photons);
         }
       }
     }
@@ -861,6 +873,7 @@ void TaskBasedIonizationSimulation::run(
         *_buffers, *_grid_creator, *_tasks, _queues, *_shared_queue);
 
     Scheduler scheduler(*_tasks, _queues, *_shared_queue);
+    AtomicValue< size_t > stalled_polls(0);
 
     start_parallel_timing_block();
 #ifdef HAVE_OPENMP
@@ -878,12 +891,16 @@ void TaskBasedIonizationSimulation::run(
 
       // actual run flag
       uint_fast32_t current_index = _shared_queue->get_task(*_tasks);
+      size_t next_stall_warning = 1000000;
       while (global_run_flag) {
 
 
         if (current_index == NO_TASK) {
           premature_launch.execute();
           current_index = scheduler.get_task(thread_id);
+          if (current_index != NO_TASK) {
+            stalled_polls.set(0);
+          }
         }
 
         while (current_index != NO_TASK) {
@@ -922,6 +939,7 @@ void TaskBasedIonizationSimulation::run(
             }
           }
 
+          stalled_polls.set(0);
           current_index = scheduler.get_task(thread_id);
         }
 
@@ -930,6 +948,40 @@ void TaskBasedIonizationSimulation::run(
           global_run_flag = false;
         } else {
           current_index = scheduler.get_task(thread_id);
+          if (current_index == NO_TASK) {
+            const size_t stall_count = stalled_polls.pre_increment();
+            if (thread_id == 0 && stall_count == 1) {
+              next_stall_warning = 1000000;
+            }
+            if (thread_id == 0 && stall_count >= next_stall_warning) {
+              cmac_warning(
+                  "Photon propagation is stalled: buffers=%zu tasks=%zu "
+                  "shared_queue=%zu photons_done=%zu/%zu. Try increasing "
+                  "\"TaskBasedIonizationSimulation:number of buffers\", "
+                  "\"TaskBasedIonizationSimulation:number of tasks\", "
+                  "\"TaskBasedIonizationSimulation:shared queue size\", or "
+                  "\"TaskBasedIonizationSimulation:source copy level\", or "
+                  "lower \"TaskBasedIonizationSimulation:number of photons\".",
+                  _buffers->get_number_of_active_buffers(),
+                  _tasks->get_number_of_active_elements(), _shared_queue->size(),
+                  static_cast< size_t >(num_photon_done.value()),
+                  static_cast< size_t >(_number_of_photons));
+              next_stall_warning <<= 2;
+            }
+            if (stall_count >= 100000000) {
+              cmac_error(
+                  "Photon propagation made no progress for %zu polls. "
+                  "Aborting instead of spinning forever. Increase "
+                  "\"TaskBasedIonizationSimulation:number of buffers\", "
+                  "\"TaskBasedIonizationSimulation:number of tasks\", "
+                  "\"TaskBasedIonizationSimulation:shared queue size\", or "
+                  "\"TaskBasedIonizationSimulation:source copy level\", or "
+                  "lower \"TaskBasedIonizationSimulation:number of photons\".",
+                  stall_count);
+            }
+          } else {
+            stalled_polls.set(0);
+          }
         }
       } // while(global_run_flag)
 
