@@ -85,7 +85,7 @@ public:
         double rho = mtot/inj_vol;
         double nbar = 1.e-6*rho/1.67262192e-27;
         double r_st = 3.086e+16 * 19.1 * std::pow(_sne_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
-        return std::make_tuple(r_run,r_st,nbar,268.);
+        return std::make_tuple(r_run,r_st,nbar,vec.size());
       }
 
       while (mtot < 1.988e+33) {
@@ -119,13 +119,18 @@ public:
            CoordinateVector<> cellpos = cellit.get_cell_midpoint();
 
           // is cell within injeciton radius of SNe?
-           if ((cellpos - position).norm() < r_inj) {
+          const double distance = (cellpos - position).norm();
+          if (distance <= r_inj) {
                 if (cellit.get_hydro_variables().get_primitives_density() == 0) {
                     //dont add energy to cell without mass...
-                    return;
+                    continue;
                 }
              double dx = std::pow(cellit.get_volume(),1./3.);
-             if (r_st < 4.*dx) {
+             // Thermal injection is only converged if both the cell and the
+             // actual injection region resolve the shell-formation radius.
+             const bool st_resolved =
+                 dx < r_st / 3. && r_inj < r_st / 3.;
+             if (!st_resolved) {
 
 //Not resolving ST radius, do momentum injection
               CoordinateVector<> vel_prior =
@@ -140,7 +145,11 @@ public:
 
                double vel_to_inj = mom_to_inj/m_tot;
 
-               CoordinateVector<> direction = (cellpos-position)/((cellpos-position).norm());
+               // The radial direction is undefined at the source itself.
+               if (distance == 0.) {
+                 continue;
+               }
+               CoordinateVector<> direction = (cellpos-position)/distance;
 
                CoordinateVector<> vel_new = vel_prior + vel_to_inj*direction;
 
@@ -162,7 +171,11 @@ public:
 
              }
              else {
-               cellit.get_hydro_variables().set_energy_term(_sne_energy/numcells);
+               // Accumulate energy when more than one SN overlaps this cell.
+               const double energy =
+                   cellit.get_hydro_variables().get_energy_term() +
+                   _sne_energy / numcells;
+               cellit.get_hydro_variables().set_energy_term(energy);
              }
            }
 

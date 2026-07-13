@@ -896,7 +896,13 @@ public:
     const double drhodz = state.primitive_gradients(0).z();
 
     const double dvxdx = state.primitive_gradients(1).x();
+    const double dvxdy = state.primitive_gradients(1).y();
+    const double dvxdz = state.primitive_gradients(1).z();
+    const double dvydx = state.primitive_gradients(2).x();
     const double dvydy = state.primitive_gradients(2).y();
+    const double dvydz = state.primitive_gradients(2).z();
+    const double dvzdx = state.primitive_gradients(3).x();
+    const double dvzdy = state.primitive_gradients(3).y();
     const double dvzdz = state.primitive_gradients(3).z();
 
     const double dPdx = state.primitive_gradients(4).x();
@@ -907,9 +913,13 @@ public:
 
     double rho_new =
         rho - dt * (rho * divv + vx * drhodx + vy * drhody + vz * drhodz);
-    const CoordinateVector<> v_new(vx - dt * (vx * divv + rhoinv * dPdx - ax),
-                                   vy - dt * (vy * divv + rhoinv * dPdy - ay),
-                                   vz - dt * (vz * divv + rhoinv * dPdz - az));
+    const CoordinateVector<> v_new(
+        vx - dt * (vx * dvxdx + vy * dvxdy + vz * dvxdz +
+                   rhoinv * dPdx - ax),
+        vy - dt * (vx * dvydx + vy * dvydy + vz * dvydz +
+                   rhoinv * dPdy - ay),
+        vz - dt * (vx * dvzdx + vy * dvzdy + vz * dvzdz +
+                   rhoinv * dPdz - az));
     double P_new =
         P - dt * (_gamma * P * divv + vx * dPdx + vy * dPdy + vz * dPdz);
 
@@ -1209,7 +1219,8 @@ public:
     const double T4 = 1.e-4*ionization_variables.get_temperature();
     const double sqrtT = std::sqrt(ionization_variables.get_temperature());
     const double alpha_e_2sP = 4.17e-20 * std::pow(T4, -0.861);
-    const double pHots = 1. / (1. + 77. * he0 / (sqrtT * h0));
+    const double pHots = h0 > 0. ?
+        1. / (1. + 77. * he0 / (sqrtT * h0)) : 0.;
     const double ne = n * (1. - h0 + AHe * hep + 2*AHe*(1. - hep - he0));
     const double nenhep = ne * hep * n * AHe;
     dE += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume*timestep;

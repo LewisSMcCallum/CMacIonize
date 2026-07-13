@@ -793,7 +793,9 @@ const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
 // calculate heating due to hydrogen OTS absorption of HeLyAlpha photon
     
     const double alpha_e_2sP = 4.17e-20 * std::pow(T4, -0.861);
-    const double pHots = 1. / (1. + 77. * he0 / (sqrtT * h0));
+    // No neutral hydrogen means no local absorption of He Ly-alpha photons.
+    const double pHots = h0 > 0. ?
+        1. / (1. + 77. * he0 / (sqrtT * h0)) : 0.;
     const double ne = n * (1. - h0 + AHe * hep + 2*AHe*(1. - hep - he0));
     const double nenhep = ne * hep * n * AHe;
     gain += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume;
@@ -875,7 +877,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
 
   double rho = hydro_variables.get_primitives_density();
-  if (rho == 0.0) {
+  if (rho <= 0.0 || !std::isfinite(rho) || total_dt <= 0.) {
     //dont heat or cool vacuum cells, or weird zero temp cells
     return;
   }
@@ -954,7 +956,9 @@ double abund[LINECOOLINGDATA_NUMELEMENTS];
 
 
 double clock = 0.0;
-double max_frac = 0.001;
+const double max_frac = 0.001;
+const size_t maximum_substeps = 100000;
+size_t number_of_substeps = 0;
 double tot_dif;
 double time_left;
 double tstep;
@@ -970,12 +974,14 @@ double current_energy;
 cmac_assert(ionization_variables.get_temperature() > 0.0);
 
 
-if (ionization_variables.get_ionic_fraction(ION_H_n) == 0){
-  cmac_warning("Zero neutral faction... Shouldn't be happening...");
-}
-
-
 while (clock < total_dt) {
+
+  if (++number_of_substeps > maximum_substeps) {
+    cmac_warning("Heating/cooling exceeded %zu substeps at T=%g K.",
+                 maximum_substeps,
+                 ionization_variables.get_temperature());
+    break;
+  }
 
 
   if (ionization_variables.get_temperature() == 0) {
@@ -990,7 +996,7 @@ while (clock < total_dt) {
                               line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
 
   
-  if (gain != gain || loss != loss){
+  if (!std::isfinite(gain) || !std::isfinite(loss)){
 #ifdef HAS_HELIUM
     cmac_warning("Nans in the gain/loss - T=%g,xh=%g,xhe=%g,rho=%g",ionization_variables.get_temperature(),
           ionization_variables.get_ionic_fraction(ION_H_n),ionization_variables.get_ionic_fraction(ION_He_n),
@@ -1001,6 +1007,12 @@ while (clock < total_dt) {
 
   temp = ionization_variables.get_temperature();
   current_energy = e_factor*temp;
+
+  if (!(current_energy > 0.) || !std::isfinite(current_energy)) {
+    cmac_warning("Invalid thermal energy in heating/cooling: E=%g, T=%g.",
+                 current_energy, temp);
+    break;
+  }
 
 
   tot_dif = gain - loss;
@@ -1014,13 +1026,22 @@ while (clock < total_dt) {
 
   if (std::abs(tot_dif*time_left) > max_frac*current_energy) {
     tstep  = std::abs(max_frac*current_energy/tot_dif);
-   // if (tstep < 1e-5*total_dt) {
-    //  tstep = 1.e-5*total_dt;
-   // }
+    if (!(tstep > 0.) || !std::isfinite(tstep) || clock + tstep == clock) {
+      cmac_warning("Heating/cooling timestep made no progress: dt=%g, T=%g.",
+                   tstep, temp);
+      break;
+    }
     dE = tot_dif*tstep;
     clock += tstep;
   } else {
     dE = tot_dif*time_left;
+    clock = total_dt;
+  }
+
+  // Never remove more energy than allowed by the temperature floor.
+  const double floor_energy = e_factor * _cooling_temp_floor;
+  if (current_energy + dE < floor_energy) {
+    dE = floor_energy - current_energy;
     clock = total_dt;
   }
 
@@ -2874,15 +2895,25 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           for (auto cellit = (*gridit).hydro_begin();
                cellit != (*gridit).hydro_end(); ++cellit) {
            // hydro.set_primitive_variables(cellit.get_hydro_variables(), cellit.get_ionization_variables(), cellit.get_volume())
-            hydro.hydro_to_ionization(cellit.get_hydro_variables(), cellit.get_ionization_variables());
-           // hydro.align_temp_to_p(cellit.get_hydro_variables(), cellit.get_ionization_variables());
+            HydroVariables &cell_hydro = cellit.get_hydro_variables();
+            IonizationVariables &cell_ionization =
+                cellit.get_ionization_variables();
+            hydro.hydro_to_ionization(cell_hydro, cell_ionization);
+            if (cell_hydro.get_primitives_density() > 0. &&
+                cell_hydro.get_primitives_pressure() > 0.) {
+              hydro.align_temp_to_p(cell_hydro, cell_ionization);
+            } else if (cell_hydro.get_primitives_density() > 0.) {
+              hydro.set_temperature(cell_ionization, cell_hydro,
+                                    cellit.get_volume(), _cooling_temp_floor);
+            }
 
             IonizationVariables ionization_variables =
                 cellit.get_ionization_variables();
             HydroVariables hydro_variables = cellit.get_hydro_variables();
             const double nH = ionization_variables.get_number_density();
             const double nH2 = nH * nH;
-            if (do_rad_cool) {
+            // Explicit heating/cooling already includes radiative cooling.
+            if (do_rad_cool && !do_explicit_temp_calc) {
               do_cooling(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,

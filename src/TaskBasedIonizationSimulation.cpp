@@ -778,7 +778,7 @@ void TaskBasedIonizationSimulation::run(
               "\"TaskBasedIonizationSimulation:shared queue size\", or "
               "lower \"TaskBasedIonizationSimulation:number of photons\".",
               number_of_discrete_photons - number_of_photons_done,
-              number_of_discrete_photons);
+              static_cast< size_t >(number_of_discrete_photons));
         }
       }
     }
@@ -818,7 +818,7 @@ void TaskBasedIonizationSimulation::run(
     }
     cmac_assert_message(number_of_photons_done == _number_of_photons,
                         "%zu =/= %zu", number_of_photons_done,
-                        _number_of_photons);
+                        static_cast< size_t >(_number_of_photons));
     _time_log.end("photon source tasks");
 
     _time_log.start("photon propagation");

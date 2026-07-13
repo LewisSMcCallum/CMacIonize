@@ -24,10 +24,9 @@
  * @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
  */
 #include "Assert.hpp"
-#include "CartesianDensityGrid.hpp"
-#include "HomogeneousDensityFunction.hpp"
+#include "HydroDensitySubGrid.hpp"
 #include "SingleSupernovaPhotonSourceDistribution.hpp"
-#include <fstream>
+#include "SupernovaHandler.hpp"
 
 /**
  * @brief Unit test for the SingleSupernovaPhotonSourceDistribution class.
@@ -38,8 +37,8 @@
  */
 int main(int argc, char **argv) {
 
-  const double kpc_in_m = 3.086e19;
   const double Myr_in_s = 1.e6 * 365.25 * 24. * 3600.;
+  const double pc_in_m = 3.086e16;
 
   CoordinateVector<> position;
   SingleSupernovaPhotonSourceDistribution distribution(position, 10. * Myr_in_s,
@@ -52,20 +51,49 @@ int main(int argc, char **argv) {
     distribution.write_restart_file(restart_writer);
   }
 
-  HomogeneousDensityFunction testfunction(1., 2000.);
-  testfunction.initialize();
-  CartesianDensityGrid grid(Box<>(-1.5 * kpc_in_m, 3. * kpc_in_m), 32, false,
-                            true);
-  std::pair< cellsize_t, cellsize_t > block =
-      std::make_pair(0, grid.get_number_of_cells());
-  grid.initialize(block, testfunction);
+  const double box[6] = {-2. * pc_in_m, -2. * pc_in_m, -2. * pc_in_m,
+                         4. * pc_in_m,  4. * pc_in_m,  4. * pc_in_m};
+  const CoordinateVector< int_fast32_t > cell_layout(4, 4, 4);
+  const Abundances abundances;
+  Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false, abundances);
+  SupernovaHandler handler(1.e44);
 
-  distribution.add_stellar_feedback(grid, 0.);
-  DensityGrid::iterator cell =
-      static_cast< DensityGrid * >(&grid)->get_cell(position);
-  assert_condition(cell.get_hydro_variables().get_energy_term() == 0.);
-  distribution.add_stellar_feedback(grid, 10. * Myr_in_s);
-  assert_condition(cell.get_hydro_variables().get_energy_term() == 1.e44);
+  HydroDensitySubGrid thermal_grid(box, cell_layout);
+  for (auto cell = thermal_grid.hydro_begin();
+       cell != thermal_grid.hydro_end(); ++cell) {
+    cell.get_hydro_variables().set_primitives_density(1.67262192e-21);
+    cell.get_hydro_variables().set_primitives_pressure(1.e-13);
+  }
+  thermal_grid.initialize_hydrodynamic_variables(hydro, false);
+  handler.inject_sne(thermal_grid, hydro, position, 10. * pc_in_m,
+                     40. * pc_in_m, 1., 64);
+  handler.inject_sne(thermal_grid, hydro, position, 10. * pc_in_m,
+                     40. * pc_in_m, 1., 64);
+  for (auto cell = thermal_grid.hydro_begin();
+       cell != thermal_grid.hydro_end(); ++cell) {
+    assert_values_equal_rel(cell.get_hydro_variables().get_energy_term(),
+                            2.e44 / 64., 1.e-12);
+  }
+
+  HydroDensitySubGrid momentum_grid(box, cell_layout);
+  for (auto cell = momentum_grid.hydro_begin();
+       cell != momentum_grid.hydro_end(); ++cell) {
+    cell.get_hydro_variables().set_primitives_density(1.67262192e-21);
+    cell.get_hydro_variables().set_primitives_pressure(1.e-13);
+  }
+  momentum_grid.initialize_hydrodynamic_variables(hydro, false);
+  // r_inj is not below r_st/3, so this remnant is unresolved.
+  handler.inject_sne(momentum_grid, hydro, position, 2.5 * pc_in_m,
+                     6. * pc_in_m, 1., 56);
+  bool injected_momentum = false;
+  for (auto cell = momentum_grid.hydro_begin();
+       cell != momentum_grid.hydro_end(); ++cell) {
+    injected_momentum =
+        injected_momentum ||
+        cell.get_hydro_variables().get_primitives_velocity().norm() > 0.;
+    assert_condition(cell.get_hydro_variables().get_energy_term() == 0.);
+  }
+  assert_condition(injected_momentum);
 
   // restart test
   {

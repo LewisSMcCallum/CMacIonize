@@ -784,7 +784,11 @@ public:
     }
 
 
-    if (_total_time - _last_sf > _update_interval) {
+    if (_total_time - _last_sf >= _update_interval) {
+
+      // Use the actual elapsed time so that a late hydro step does not discard
+      // star formation between the scheduled update and the current time.
+      const double star_formation_interval = _total_time - _last_sf;
 
 
 
@@ -855,9 +859,11 @@ public:
 
 
 
-      // 0.073 factor is to take into account we only form stars over 8Msol
+      // 0.207 is the Kroupa IMF mass fraction in stars above 8 Msol.
       // mass_to_generate in units of Msol to match IMF
-      double mass_to_generate = _update_interval*_star_formation_rate/1.988e30*0.207*(std::pow(running_mass/init_running_mass,1.4));
+      const double mass_to_generate =
+          star_formation_interval * _star_formation_rate / 1.988e30 * 0.207 *
+          std::pow(running_mass / init_running_mass, 1.4);
 
 
        std::cout << "SHOULD BE GENERATING " << mass_to_generate - _excess_mass<< std::endl;
@@ -934,8 +940,8 @@ public:
        double lifetime = a0z + a1z*std::log10(m_cur) + a2z*(std::log10(m_cur)*std::log10(m_cur));
        lifetime = std::pow(10.0,lifetime);
        lifetime = lifetime*3.154e+7;
-        double offset =
-              _random_generator.get_uniform_random_double() * _update_interval;
+        double offset = _random_generator.get_uniform_random_double() *
+                        star_formation_interval;
         _source_lifetimes.push_back(lifetime-offset);
         _source_luminosities.push_back(lum_from_mass(m_cur));
         _source_indices.push_back(_next_index);

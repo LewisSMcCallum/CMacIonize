@@ -57,12 +57,36 @@ int main(int argc, char **argv) {
   }
 
   const double dt = 0.001;
-  const Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false);
+  const Abundances abundances;
+  const Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false, abundances);
   const InflowHydroBoundary inflow_boundary;
   const ReflectiveHydroBoundary reflective_boundary;
 
   test_grid1.initialize_hydrodynamic_variables(hydro, false);
   test_grid2.initialize_hydrodynamic_variables(hydro, false);
+
+  // A constant gravity kick should change kinetic, but not internal, energy.
+  const double gravity_box[6] = {0., 0., 0., 1., 1., 1.};
+  HydroDensitySubGrid gravity_grid(
+      gravity_box, CoordinateVector< int_fast32_t >(1, 1, 1));
+  auto gravity_cell = gravity_grid.hydro_begin();
+  gravity_cell.get_hydro_variables().set_primitives_density(2.);
+  gravity_cell.get_hydro_variables().set_primitives_velocity(
+      CoordinateVector<>(1., 2., 3.));
+  gravity_cell.get_hydro_variables().set_primitives_pressure(4.);
+  gravity_cell.get_hydro_variables().set_gravitational_acceleration(
+      CoordinateVector<>(4., 5., 6.));
+  gravity_grid.initialize_hydrodynamic_variables(hydro, false);
+  const double old_internal_energy =
+      gravity_cell.get_hydro_variables().get_conserved_total_energy() -
+      0.5 * gravity_cell.get_hydro_variables().get_conserved_momentum().norm2() /
+          gravity_cell.get_hydro_variables().get_conserved_mass();
+  gravity_grid.update_conserved_variables(0.01);
+  const double new_internal_energy =
+      gravity_cell.get_hydro_variables().get_conserved_total_energy() -
+      0.5 * gravity_cell.get_hydro_variables().get_conserved_momentum().norm2() /
+          gravity_cell.get_hydro_variables().get_conserved_mass();
+  assert_values_equal_tol(old_internal_energy, new_internal_energy, 1.e-12);
 
   for (uint_fast32_t istep = 0; istep < 300; ++istep) {
 

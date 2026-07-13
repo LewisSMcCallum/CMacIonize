@@ -24,6 +24,7 @@
  * @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
  */
 
+#include "Assert.hpp"
 #include "Hydro.hpp"
 
 #include <fstream>
@@ -37,7 +38,26 @@
  */
 int main(int argc, char **argv) {
 
-  Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false);
+  const Abundances abundances;
+  Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false, abundances);
+
+  // Check the multidimensional advective term in the primitive predictor.
+  HydroVariables predicted;
+  predicted.set_primitives_density(2.);
+  predicted.set_primitives_velocity(CoordinateVector<>(2., 3., 4.));
+  predicted.set_primitives_pressure(5.);
+  predicted.primitive_gradients(1) = CoordinateVector<>(1., 2., 3.);
+  predicted.primitive_gradients(2) = CoordinateVector<>(4., 5., 6.);
+  predicted.primitive_gradients(3) = CoordinateVector<>(7., 8., 9.);
+  hydro.predict_primitive_variables(predicted, 0.01);
+  assert_values_equal_tol(predicted.get_primitives_density(), 1.7, 1.e-12);
+  assert_values_equal_tol(predicted.get_primitives_velocity().x(), 1.8,
+                          1.e-12);
+  assert_values_equal_tol(predicted.get_primitives_velocity().y(), 2.53,
+                          1.e-12);
+  assert_values_equal_tol(predicted.get_primitives_velocity().z(), 3.26,
+                          1.e-12);
+  assert_values_equal_tol(predicted.get_primitives_pressure(), 3.75, 1.e-12);
 
   HydroVariables variables[100];
   IonizationVariables ionvariables[100];
