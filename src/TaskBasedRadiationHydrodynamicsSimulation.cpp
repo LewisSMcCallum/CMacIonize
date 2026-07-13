@@ -1514,10 +1514,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool _throttle_ion_state = params->get_value< bool >(
      "TaskBasedRadiationHydrodynamicsSimulation:throttle ion state", false);
     
-  double maximum_neutral_fraction;
-
-
-
   const bool _time_dependent_ionization = params->get_value<bool> (
     "TaskBasedRadiationHydrodynamicsSimulation:time dependent ionization", false);
 #ifndef HAVE_GSL
@@ -1527,13 +1523,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 #endif
 
 
-  if (_throttle_ion_state || _time_dependent_ionization) {
-    maximum_neutral_fraction = 1.e-3;
-  } else {
-      maximum_neutral_fraction = params->get_value< double >(
+  const double maximum_neutral_fraction = params->get_value< double >(
       "TaskBasedRadiationHydrodynamicsSimulation:maximum neutral fraction",
       -1.);
-  }
   
 
 
