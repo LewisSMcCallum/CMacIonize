@@ -1,0 +1,98 @@
+# Development run for the July 9 Swiggum stellar history.
+# Configure this build with -DHYDROGEN_ONLY=ON.
+
+SimulationBox:
+  anchor: [-500. pc, -500. pc, -500. pc]
+  sides: [1. kpc, 1. kpc, 1. kpc]
+  periodicity: [true, true, false]
+
+DensityFunction:
+  type: Homogeneous
+  density: 1. cm^-3
+  temperature: 8000. K
+  neutral fraction H: 0.999
+
+DensityGrid:
+  type: Cartesian
+  number of cells: [128, 128, 128]
+
+DensitySubGridCreator:
+  number of subgrids: [8, 8, 8]
+  periodicity: [true, true, false]
+
+HydroBoundaryManager:
+  boundary x high: periodic
+  boundary x low: periodic
+  boundary y high: periodic
+  boundary y low: periodic
+  boundary z high: outflow
+  boundary z low: outflow
+
+Hydro:
+  polytropic index: 1.6666666666666667
+  maximum velocity: 5000. km s^-1
+
+GalacticShearingBox:
+  enabled: true
+  solar radius: 8.2 kpc
+  circular velocity: 232. km s^-1
+  shear parameter: 1.0
+  radial centre: 0. pc
+  initialize background shear: true
+
+PhotonSourceDistribution:
+  type: SwiggumFile
+  filename: ../data/sn_history_july9_imf_sample0_minus100_to_plus20myr.csv.gz
+  history start time: -100. Myr
+  luminosity adjust: 1.0
+  supernova energy: 1.e51 erg
+
+# Required fallback spectrum; SwiggumFile selects its per-star WMBasic spectrum.
+PhotonSourceSpectrum:
+  type: Monochromatic
+  frequency: 3.28847e15 Hz
+  total flux: -1. m^-2 s^-1
+
+CrossSections:
+  type: Verner
+
+RecombinationRates:
+  type: Verner
+
+TemperatureCalculator:
+  # Leave this false so time-dependent ionization reaches the GSL solver.
+  do temperature calculation: false
+
+TaskBasedRadiationHydrodynamicsSimulation:
+  total time: 120. Myr
+  snapshot time: 0.5 Myr
+  radiation time: 0.05 Myr
+  maximum timestep: 0.01 Myr
+  number of iterations: 5
+  number of photons: 1000000
+  source copy level: 4
+  maximum neutral fraction: -1.0
+  time dependent ionization: true
+  do radiation: true
+  do stellar feedback: true
+  do explicit temperature calculation: true
+  do radiative cooling: true
+  use cooling tables: true
+  cooling temperature floor: 10. K
+  output folder: .
+  random seed: 42
+
+DensityGridWriter:
+  type: Gadget
+  prefix: swiggum_
+  padding: 4
+  compression: true
+
+DensityGridWriterFields:
+  Coordinates: 1
+  Density: 1
+  NumberDensity: 1
+  Velocities: 1
+  Pressure: 1
+  Temperature: 1
+  NeutralFractionH: 1

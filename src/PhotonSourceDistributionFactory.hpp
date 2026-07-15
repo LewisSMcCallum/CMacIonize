@@ -48,6 +48,7 @@
 #include "MixedDrivingPhotonSourceDistribution.hpp"
 #include "StellarClusterPhotonSourceDistribution.hpp"
 #include "SinkStarPhotonSourceDistribution.hpp"
+#include "SwiggumFilePhotonSourceDistribution.hpp"
 
 
 // library dependent implementations
@@ -140,6 +141,8 @@ public:
       return new SinkStarPhotonSourceDistribution(params, log);
     } else if (type == "StellarCluster") {
       return new StellarClusterPhotonSourceDistribution(params, log);
+    } else if (type == "SwiggumFile") {
+      return new SwiggumFilePhotonSourceDistribution(params, log);
     } else if (type  == "TextFile") {
       return new TextFilePhotonSourceDistribution(params,log);
     } else if (type == "UniformRandom") {
@@ -206,6 +209,8 @@ public:
       return new SinkStarPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(StellarClusterPhotonSourceDistribution).name()) {
       return new StellarClusterPhotonSourceDistribution(restart_reader);
+    } else if (tag == typeid(SwiggumFilePhotonSourceDistribution).name()) {
+      return new SwiggumFilePhotonSourceDistribution(restart_reader, log);
     } else if (tag == typeid(UniformRandomPhotonSourceDistribution).name()) {
       return new UniformRandomPhotonSourceDistribution(restart_reader);
 #ifdef HAVE_HDF5

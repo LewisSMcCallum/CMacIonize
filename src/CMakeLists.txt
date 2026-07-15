@@ -84,6 +84,12 @@ configure_file(${PROJECT_SOURCE_DIR}/data/DeRijckeCooling.tar.gz
 execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf ${DR_DATA}
                 WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/data/)
 set(DERIJCKEDATALOCATION ${PROJECT_BINARY_DIR}/data/DeRijckeCooling/)
+
+# Stellar trajectories for the Swiggum shearing-box development setup.
+configure_file(
+  ${PROJECT_SOURCE_DIR}/data/sn_history_july9_imf_sample0_minus100_to_plus20myr.csv.gz
+  ${PROJECT_BINARY_DIR}/data/sn_history_july9_imf_sample0_minus100_to_plus20myr.csv.gz
+  COPYONLY)
 message(STATUS "DeRijckeDataLocation.hpp: ${DERIJCKEDATALOCATION}")
 configure_file(${PROJECT_SOURCE_DIR}/src/DeRijckeDataLocation.hpp.in
                ${PROJECT_BINARY_DIR}/src/DeRijckeDataLocation.hpp @ONLY)
@@ -215,6 +221,7 @@ set(LIBSHAREDENGINE_SOURCES
   Signals.cpp
   SPHNGSnapshotDensityFunction.cpp
   SPHNGVoronoiGeneratorDistribution.cpp
+  SwiggumFilePhotonSourceDistribution.cpp
   TemperatureCalculator.cpp
   VernerCrossSections.cpp
   VernerRecombinationRates.cpp

@@ -39,6 +39,7 @@
 #include "DistributedPhotonSource.hpp"
 #include "ExternalPotentialFactory.hpp"
 #include "HydroBoundaryManager.hpp"
+#include "GalacticShearingBox.hpp"
 #include "HydroDensitySubGrid.hpp"
 #include "HydroMaskFactory.hpp"
 #include "LineCoolingData.hpp"
@@ -1445,6 +1446,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   // initialize the simulation box
   const SimulationBox simulation_box(*params);
+  const GalacticShearingBox galactic_shearing_box(*params, log);
 
   ExternalPotential *external_potential = nullptr;
   if (params->get_value< bool >(
@@ -1820,6 +1822,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   time_logger.start("initial time step");
   double requested_timestep = DBL_MAX;
   if (restart_reader == nullptr) {
+    galactic_shearing_box.initialize(*grid_creator);
     for (auto cellit = grid_creator->begin();
          cellit != grid_creator->original_end(); ++cellit) {
       requested_timestep =
@@ -2824,6 +2827,23 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       }
     }
     stop_parallel_timing_block();
+
+    // Apply the local Galactic Coriolis and tidal terms after the conservative
+    // hydro update. Keeping this separate from gravity avoids adding spurious
+    // work for the velocity-dependent Coriolis acceleration.
+    if (galactic_shearing_box.enabled()) {
+      AtomicValue< size_t > igrid(0);
+#ifdef HAVE_OPENMP
+#pragma omp parallel default(shared)
+#endif
+      while (igrid.value() < grid_creator->number_of_original_subgrids()) {
+        const size_t this_igrid = igrid.post_increment();
+        if (this_igrid < grid_creator->number_of_original_subgrids()) {
+          galactic_shearing_box.apply(
+              *grid_creator->get_subgrid(this_igrid), hydro, actual_timestep);
+        }
+      }
+    }
 
     // apply the mask (if applicable)
     if (hydro_mask != nullptr) {
