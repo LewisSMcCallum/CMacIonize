@@ -97,7 +97,7 @@ def main():
         extent=extent,
         vmin=vmin,
         vmax=vmax,
-        cmap="magma",
+        cmap="hot",
         interpolation="nearest",
     )
     title = axis.set_title(f"history time = {first_time - 100.0:.2f} Myr")

@@ -42,7 +42,7 @@ GalacticShearingBox:
 
 PhotonSourceDistribution:
   type: SwiggumFile
-  filename: ../data/sn_history_july9_imf_sample0_minus100_to_plus20myr.csv.gz
+  filename: ../../data/sn_history_july9_imf_sample0_minus100_to_plus20myr.csv.gz
   history start time: -100. Myr
   luminosity adjust: 1.0
   supernova energy: 1.e51 erg
