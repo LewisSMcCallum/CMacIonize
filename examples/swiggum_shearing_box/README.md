@@ -49,8 +49,12 @@ From the directory containing the snapshots:
 ```bash
 python ../../examples/swiggum_shearing_box/plot_density_gif.py \
   'swiggum_*.hdf5' swiggum_density.gif \
-  --grid-size 128 128 128 --subgrids 8 8 8
+  --grid-size 128 128 128 --subgrids 8 8 8 --track-stars
 ```
 
 The script plots the top-down gas surface density and uses `h5py`, `numpy`,
-`matplotlib` and Pillow.
+`matplotlib` and Pillow. With `--track-stars`, crosses show living ionizing
+stars with size set by Q_H0; circles show supernova remnants expanding at
+10 km/s and fading for 1 Myr. Projected grids are cached in the ignored
+`.swiggum_plot_cache` directory, so subsequent runs only read new or changed
+snapshots. Omit `--track-stars` for a density-only animation.
