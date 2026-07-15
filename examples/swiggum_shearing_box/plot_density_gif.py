@@ -18,6 +18,10 @@ PC_IN_M = 3.0856775814913673e16
 MYR_IN_S = 3.15576e13
 CACHE_VERSION = 1
 
+# Display controls for supernova circles.
+SN_CIRCLE_SPEED_KMS = 10.0
+SN_CIRCLE_FADE_TIME_MYR = 1.0
+
 
 def luminosity_from_mass(mass):
     """Return Q_H0 using the same table and interpolation as CMacIonize."""
@@ -245,15 +249,16 @@ def main():
         remnant_artists = []
         for star in stars:
             age_myr = history_time - star["death"]
-            if 0.0 <= age_myr < 1.0:
+            if 0.0 <= age_myr < SN_CIRCLE_FADE_TIME_MYR:
                 position = interpolate_position(star, star["death"])
                 if point_in_box(position, half_sides_pc):
-                    # 10 km/s = 10.227 pc/Myr. Circle radius is in plotted kpc.
-                    radius_kpc = 10.0e3 * age_myr * MYR_IN_S / (1000.0 * PC_IN_M)
+                    radius_kpc = (SN_CIRCLE_SPEED_KMS * 1.0e3 * age_myr *
+                                  MYR_IN_S / (1000.0 * PC_IN_M))
                     remnant = plt.Circle(
                         position[:2] / 1000.0, radius_kpc, fill=False,
                         edgecolor="cyan", linewidth=1.2,
-                        alpha=1.0 - age_myr, zorder=3,
+                        alpha=1.0 - age_myr / SN_CIRCLE_FADE_TIME_MYR,
+                        zorder=3,
                     )
                     axis.add_patch(remnant)
                     remnant_artists.append(remnant)

@@ -57,4 +57,6 @@ The script plots the top-down gas surface density and uses `h5py`, `numpy`,
 stars with size set by Q_H0; circles show supernova remnants expanding at
 10 km/s and fading for 1 Myr. Projected grids are cached in the ignored
 `.swiggum_plot_cache` directory, so subsequent runs only read new or changed
-snapshots. Omit `--track-stars` for a density-only animation.
+snapshots. Omit `--track-stars` for a density-only animation. The constants
+`SN_CIRCLE_SPEED_KMS` and `SN_CIRCLE_FADE_TIME_MYR` near the top of the script
+control the displayed circle expansion and lifetime.
