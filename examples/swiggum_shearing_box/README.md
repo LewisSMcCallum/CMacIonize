@@ -60,3 +60,19 @@ stars with size set by Q_H0; circles show supernova remnants expanding at
 snapshots. Omit `--track-stars` for a density-only animation. The constants
 `SN_CIRCLE_SPEED_KMS` and `SN_CIRCLE_FADE_TIME_MYR` near the top of the script
 control the displayed circle expansion and lifetime.
+
+For detailed diagnostics of one snapshot (including HEALPix maps, requiring
+`healpy`):
+
+```bash
+python ../../examples/swiggum_shearing_box/plot_snapshot_diagnostics.py \
+  swiggum_0020.hdf5 --grid-size 256 256 256 --subgrids 8 8 8 \
+  --nside 64
+```
+
+This writes `_cartesian.png`, `_sky.png`, and `_xray.png` figures beside the
+snapshot. The Halpha panels use the requested relative tracer
+`n_e^2 T^-0.9`. The three X-ray panels are intrinsic hydrogen free-free
+estimates for 0.2–0.6, 0.6–2.3, and 2.3–5.0 keV; they omit metal lines and
+foreground absorption and should not be interpreted as calibrated eROSITA
+count-rate predictions.
