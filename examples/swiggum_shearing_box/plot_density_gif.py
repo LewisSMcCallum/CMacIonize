@@ -19,8 +19,8 @@ MYR_IN_S = 3.15576e13
 CACHE_VERSION = 1
 
 # Display controls for supernova circles.
-SN_CIRCLE_SPEED_KMS = 10.0
-SN_CIRCLE_FADE_TIME_MYR = 1.0
+SN_CIRCLE_SPEED_KMS = 25.0
+SN_CIRCLE_FADE_TIME_MYR = 3.0
 
 
 def luminosity_from_mass(mass):
