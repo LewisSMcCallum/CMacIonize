@@ -653,7 +653,8 @@ inline void
 execute_task(const size_t itask,
              DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
              ThreadSafeVector< Task > &tasks, const double timestep,
-             const Hydro &hydro, const HydroBoundaryManager &boundary_manager) {
+             const Hydro &hydro, const HydroBoundaryManager &boundary_manager,
+             const bool advect_ionization = false) {
 
   const Task &task = tasks[itask];
   HydroDensitySubGrid &subgrid = *grid_creator.get_subgrid(task.get_subgrid());
@@ -677,21 +678,21 @@ execute_task(const size_t itask,
     subgrid.predict_primitive_variables(hydro, 0.5 * timestep);
     break;
   case TASKTYPE_FLUXSWEEP_INTERNAL:
-    subgrid.inner_flux_sweep(hydro, timestep);
+    subgrid.inner_flux_sweep(hydro, timestep, advect_ionization);
     break;
   case TASKTYPE_FLUXSWEEP_EXTERNAL_NEIGHBOUR:
     subgrid.outer_flux_sweep(task.get_interaction_direction(), hydro,
                              *grid_creator.get_subgrid(task.get_buffer()),
-                             timestep);
+                             timestep, advect_ionization);
     break;
   case TASKTYPE_FLUXSWEEP_EXTERNAL_BOUNDARY:
     subgrid.outer_ghost_flux_sweep(task.get_interaction_direction(), hydro,
                                    boundary_manager.get_boundary_condition(
                                        task.get_interaction_direction()),
-                                   timestep);
+                                   timestep, advect_ionization);
     break;
   case TASKTYPE_UPDATE_CONSERVED:
-    subgrid.update_conserved_variables(timestep);
+    subgrid.update_conserved_variables(timestep, advect_ionization);
     break;
   case TASKTYPE_UPDATE_PRIMITIVES:
     subgrid.update_primitive_variables(hydro);
@@ -1518,6 +1519,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     
   const bool _time_dependent_ionization = params->get_value<bool> (
     "TaskBasedRadiationHydrodynamicsSimulation:time dependent ionization", false);
+
+  const bool _advect_ionization = params->get_value< bool >(
+    "TaskBasedRadiationHydrodynamicsSimulation:advect ionization", false);
 #ifndef HAVE_GSL
  // if (_time_dependent_ionization) {
   //  cmac_error("Cant do full time dependent ionization without GSL.")
@@ -2802,7 +2806,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           cpucycle_tick(task_start);
 
           execute_task(current_task, *grid_creator, *tasks, actual_timestep,
-                       hydro, hydro_boundary_manager);
+                       hydro, hydro_boundary_manager, _advect_ionization);
           (*tasks)[current_task].stop();
 
           cpucycle_tick(task_stop);

@@ -383,6 +383,19 @@ public:
                                   HydroVariables &left_state,
                                   HydroVariables &right_state, const double dx,
                                   const double A, const double dt) const {
+    IonizationVariables left_ionization;
+    IonizationVariables right_ionization;
+    do_flux_calculation(i, left_state, left_ionization, right_state, right_ionization, dx, A, dt, false);
+  }
+
+  inline void do_flux_calculation(const uint_fast8_t i,
+                                  HydroVariables &left_state,
+                                  IonizationVariables &left_ionization,
+                                  HydroVariables &right_state,
+                                  IonizationVariables &right_ionization,
+                                  const double dx,
+                                  const double A, const double dt,
+                                  const bool advect_ionization = false) const {
 
     const double halfdx = 0.5 * dx;
     double rhoL = left_state.get_primitives_density() +
@@ -550,6 +563,15 @@ public:
     right_state.delta_conserved(2) += pflux.y();
     right_state.delta_conserved(3) += pflux.z();
     right_state.delta_conserved(4) += Eflux;
+
+    if (advect_ionization) {
+      for (int_fast32_t j = 0; j < NUMBER_OF_IONNAMES; ++j) {
+        const double upwind_fraction = (mflux > 0.) ?
+            left_ionization.get_ionic_fraction(j) : right_ionization.get_ionic_fraction(j);
+        left_ionization.increase_delta_ionic_fraction(j, -mflux * upwind_fraction);
+        right_ionization.increase_delta_ionic_fraction(j, mflux * upwind_fraction);
+      }
+    }
   }
 
   /**
@@ -569,6 +591,18 @@ public:
                                         const HydroBoundary &boundary,
                                         const double dx, const double A,
                                         const double dt) const {
+    IonizationVariables left_ionization;
+    do_ghost_flux_calculation(i, posR, left_state, left_ionization, boundary, dx, A, dt, false);
+  }
+
+  inline void do_ghost_flux_calculation(const uint_fast8_t i,
+                                        const CoordinateVector<> posR,
+                                        HydroVariables &left_state,
+                                        IonizationVariables &left_ionization,
+                                        const HydroBoundary &boundary,
+                                        const double dx, const double A,
+                                        const double dt,
+                                        const bool advect_ionization = false) const {
 
     // the sign bit is set (1) for negative values
     int_fast8_t orientation = 1 - 2 * std::signbit(dx);
@@ -706,6 +740,13 @@ public:
     left_state.delta_conserved(2) -= pflux.y();
     left_state.delta_conserved(3) -= pflux.z();
     left_state.delta_conserved(4) -= Eflux;
+
+    if (advect_ionization) {
+      for (int_fast32_t j = 0; j < NUMBER_OF_IONNAMES; ++j) {
+        const double upwind_fraction = left_ionization.get_ionic_fraction(j);
+        left_ionization.increase_delta_ionic_fraction(j, -mflux * upwind_fraction);
+      }
+    }
   }
 
   /**
