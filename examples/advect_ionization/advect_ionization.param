@@ -1,0 +1,82 @@
+# simulation box
+SimulationBox:
+  anchor: [-5. pc, -5. pc, -5. pc]
+  sides: [10. pc, 10. pc, 10. pc]
+  periodicity: [true, true, true]
+
+# density grid
+DensityGrid:
+  type: Cartesian
+  number of cells: [16, 16, 16]
+
+# density function using blocks
+DensityFunction:
+  type: BlockSyntax
+  filename: blocks.yaml
+
+# assumed abundances
+Abundances:
+  helium: 0.
+
+# disable temperature calculation
+TemperatureCalculator:
+  do temperature calculation: false
+
+# Hydrodynamics options
+HydroIntegrator:
+  polytropic index: 1.66667
+  boundary x low: periodic
+  boundary x high: periodic
+  boundary y low: periodic
+  boundary y high: periodic
+  boundary z low: periodic
+  boundary z high: periodic
+
+# task-based radiation hydrodynamics simulation parameters
+TaskBasedRadiationHydrodynamicsSimulation:
+  do radiation: false
+  CFL: 0.2
+  total time: 0.1 Myr
+  snapshot time: 0.1 Myr
+  advect ionization: true
+  output folder: .
+
+# output options
+DensityGridWriter:
+  type: AsciiFile
+  prefix: advection_
+  padding: 3
+
+RecombinationRates:
+  type: FixedValue
+  hydrogen_1: 0. m^3 s^-1
+  helium_1: 0. m^3 s^-1
+  carbon_2: 0. m^3 s^-1
+  carbon_3: 0. m^3 s^-1
+  nitrogen_1: 0. m^3 s^-1
+  nitrogen_2: 0. m^3 s^-1
+  nitrogen_3: 0. m^3 s^-1
+  oxygen_1: 0. m^3 s^-1
+  oxygen_2: 0. m^3 s^-1
+  neon_1: 0. m^3 s^-1
+  neon_2: 0. m^3 s^-1
+  sulphur_2: 0. m^3 s^-1
+  sulphur_3: 0. m^3 s^-1
+  sulphur_4: 0. m^3 s^-1
+
+CrossSections:
+  type: FixedValue
+  hydrogen_0: 0. m^2
+  helium_0: 0. m^2
+  carbon_1: 0. m^2
+  carbon_2: 0. m^2
+  nitrogen_0: 0. m^2
+  nitrogen_1: 0. m^2
+  nitrogen_2: 0. m^2
+  oxygen_0: 0. m^2
+  oxygen_1: 0. m^2
+  neon_0: 0. m^2
+  neon_1: 0. m^2
+  sulphur_1: 0. m^2
+  sulphur_2: 0. m^2
+  sulphur_3: 0. m^2

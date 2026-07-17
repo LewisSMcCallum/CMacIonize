@@ -126,3 +126,13 @@ void AsciiFileDensityGridWriter::write(
     }
   }
 }
+
+void AsciiFileDensityGridWriter::write(
+    DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
+    const uint_fast32_t counter, ParameterFile &params, double time) {
+
+  DensitySubGridCreator< DensitySubGrid > *cast_grid_creator =
+      reinterpret_cast< DensitySubGridCreator< DensitySubGrid > * >(
+          &grid_creator);
+  write(*cast_grid_creator, counter, params, time);
+}
