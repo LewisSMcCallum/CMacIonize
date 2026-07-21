@@ -1,0 +1,46 @@
+SimulationBox:
+  anchor: [-5. pc, -5. pc, -5. pc]
+  sides: [10. pc, 10. pc, 10. pc]
+  periodicity: [true, true, true]
+
+DensityGrid:
+  type: Cartesian
+  number of cells: [64, 4, 4]
+
+DensitySubGridCreator:
+  number of subgrids: [4, 2, 2]
+  periodicity: [true, true, true]
+
+DensityFunction:
+  type: BlockSyntax
+  filename: advection_ionization.yml
+
+Abundances:
+  helium: 0.
+
+TemperatureCalculator:
+  do temperature calculation: false
+
+Hydro:
+  polytropic index: 1.66667
+
+HydroBoundaryManager:
+  boundary x low: periodic
+  boundary x high: periodic
+  boundary y low: periodic
+  boundary y high: periodic
+  boundary z low: periodic
+  boundary z high: periodic
+
+TaskBasedRadiationHydrodynamicsSimulation:
+  do radiation: false
+  CFL: 0.2
+  total time: 0.1 Myr
+  snapshot time: 0.1 Myr
+  advect ionization: true
+  output folder: .
+
+DensityGridWriter:
+  type: AsciiFile
+  prefix: advection_ionization_
+  padding: 3
