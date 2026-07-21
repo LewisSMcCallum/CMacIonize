@@ -106,6 +106,10 @@ private:
    *  @f$x_{\rm{}H}@f$. */
   const double _neutral_fraction;
 
+  /*! @brief Use the observational vertical density profile instead of the
+   * hydrostatic-equilibrium profile. */
+  const bool _observational_disc;
+
   /**
    * @brief Get the mean particle mass @f$\mu{} m_p@f$ corresponding to the
    * given neutral fraction.
@@ -183,13 +187,15 @@ public:
    * @param temperature Constant initial temperature, @f$T@f$ (in K).
    * @param neutral_fraction Constant initial neutral fraction for hydrogen,
    * @f$x_{\rm{}H}@f$.
+   * @param observational_disc Use the observational vertical density profile?
    */
   inline DiscPatchDensityFunction(const double disc_z,
                                   const double surface_density,
                                   const double scale_height,
                                   const double gas_fraction,
                                   const double temperature,
-                                  const double neutral_fraction)
+                                  const double neutral_fraction,
+                                  const bool observational_disc = true)
       : _disc_z(disc_z), _b_inv(1. / scale_height),
         _exponent(-2. * scale_height /
                   get_gas_disc_scale_height(surface_density, temperature,
@@ -198,7 +204,8 @@ public:
                       get_mass_fraction_factor(_exponent) * _b_inv /
                       PhysicalConstants::get_physical_constant(
                           PHYSICALCONSTANT_PROTON_MASS)),
-        _temperature(temperature), _neutral_fraction(neutral_fraction) {}
+        _temperature(temperature), _neutral_fraction(neutral_fraction),
+        _observational_disc(observational_disc) {}
 
   /**
    * @brief ParameterFile constructor.
@@ -212,6 +219,8 @@ public:
    *  - temperature: Constant initial temperature (default: 1.e4 K)
    *  - neutral fraction: Constant initial neutral fraction for hydrogen
    *    (default: 1.e-6)
+   *  - observationaldisc: Use the observational vertical density profile. If
+   *    false, use the hydrostatic-equilibrium profile (default: true)
    *
    * @param params ParameterFile to read from.
    */
@@ -227,7 +236,9 @@ public:
             params.get_physical_value< QUANTITY_TEMPERATURE >(
                 "DensityFunction:temperature", "1.e4 K"),
             params.get_value< double >("DensityFunction:neutral fraction",
-                                       1e-6)) {}
+                                       1e-6),
+            params.get_value< bool >("DensityFunction:observationaldisc",
+                                     true)) {}
 
   /**
    * @brief Virtual destructor.
@@ -242,18 +253,24 @@ public:
    */
   virtual DensityValues operator()(const Cell &cell) {
 
-   // HEY FUTURE ME! If you're gonna swap this back remember this equation is in cm^-3 not m^-3.
-    const double abs_z = std::abs(cell.get_cell_midpoint().z() - _disc_z)/3.086e+19;
-    const double nH = 0.47*std::exp(-0.5*std::pow(abs_z/0.09,2)) + 0.13*std::exp(-0.5*std::pow(abs_z/0.225,2))
-         + 0.077*std::exp(-1*(abs_z/0.403)) +
-           0.025*std::exp(-abs_z);
-
-  //  const double dz = cell.get_cell_midpoint().z() - _disc_z;
-  //  const double cosh = std::cosh(dz * _b_inv);
-  //  const double nH = _density_norm * std::pow(cosh, _exponent);
+    double number_density;
+    if (_observational_disc) {
+      // The observational fit is in cm^-3 and uses |z| in kpc.
+      const double abs_z =
+          std::abs(cell.get_cell_midpoint().z() - _disc_z) / 3.086e19;
+      const double nH =
+          0.47 * std::exp(-0.5 * std::pow(abs_z / 0.09, 2)) +
+          0.13 * std::exp(-0.5 * std::pow(abs_z / 0.225, 2)) +
+          0.077 * std::exp(-abs_z / 0.403) + 0.025 * std::exp(-abs_z);
+      number_density = nH * 1.e6;
+    } else {
+      const double dz = cell.get_cell_midpoint().z() - _disc_z;
+      const double cosh = std::cosh(dz * _b_inv);
+      number_density = _density_norm * std::pow(cosh, _exponent);
+    }
 
     DensityValues values;
-    values.set_number_density(nH*1e6);
+    values.set_number_density(number_density);
     values.set_temperature(_temperature);
     values.set_ionic_fraction(ION_H_n, _neutral_fraction);
 

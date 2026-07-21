@@ -25,6 +25,7 @@
  */
 #include "DiscPatchDensityFunction.hpp"
 #include "DiscPatchExternalPotential.hpp"
+#include "Assert.hpp"
 #include <cinttypes>
 #include <fstream>
 
@@ -44,7 +45,14 @@ int main(int argc, char **argv) {
   const double surface_density = 30. * Msol / (pc * pc);
   DiscPatchExternalPotential potential(0., surface_density, scale_height);
   DiscPatchDensityFunction density_function(0., surface_density, scale_height,
-                                            0.1, 8000., 1.e-6);
+                                            0.1, 8000., 1.e-6, false);
+  DiscPatchDensityFunction observational_density_function(
+      0., surface_density, scale_height, 0.1, 8000., 1.e-6, true);
+
+  const DummyCell midplane_cell(0., 0., 0.);
+  assert_values_equal_tol(
+      observational_density_function(midplane_cell).get_number_density(),
+      0.702e6, 1.e-12);
 
   std::ofstream ofile("test_discpatchexternalpotential.txt");
   ofile << "#z\taz\n";
