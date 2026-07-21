@@ -27,6 +27,8 @@
 #define MIXEDDRIVINGPHOTONSOURCEDISTRIBUTION_HPP
 
 #include "Log.hpp"
+#include "ExternalPotential.hpp"
+#include "GalacticShearingBox.hpp"
 #include "ParameterFile.hpp"
 #include "PhotonSourceDistribution.hpp"
 #include "RandomGenerator.hpp"
@@ -58,6 +60,9 @@ private:
 
   /*! @brief Positions of the sources (in m). */
   std::vector< CoordinateVector<> > _source_positions;
+
+  /*! @brief Velocities inherited from the gas at source birth (in m s^-1). */
+  std::vector< CoordinateVector<> > _source_velocities;
 
   /*! @brief Remaining lifetime of the sources (in s). */
   std::vector< double > _source_lifetimes;
@@ -110,6 +115,12 @@ private:
   const double _scaleheight;
 
   const double _peak_fraction;
+
+  /*! @brief Density exponent used for the density-selected birth CDF. */
+  const double _clustering_factor;
+
+  /*! @brief Whether sources move after formation. */
+  const bool _float_sources;
 
   /*! @brief Pseudo-random number generator. */
 
@@ -296,6 +307,8 @@ public:
       const double lum_adjust=1.0,
       const double scaleheight=0.0,
       const double peak_fraction=0.5,
+      const double clustering_factor=2.0,
+      const bool float_sources=false,
       const double holmes_time=0.0,
       const double holmes_sh=3e18,
       const double holmes_lum=5e46,
@@ -307,10 +320,15 @@ public:
       : _star_formation_rate(star_formation_rate), _update_interval(update_interval),
         _output_file(nullptr), _number_of_updates(1), _next_index(0),
         _sne_energy(sne_energy), _lum_adjust(lum_adjust), _scaleheight(scaleheight),
-        _peak_fraction(peak_fraction),_holmes_time(holmes_time),
+        _peak_fraction(peak_fraction), _clustering_factor(clustering_factor),
+        _float_sources(float_sources), _holmes_time(holmes_time),
         _holmes_sh(holmes_sh),_holmes_lum(holmes_lum),_number_of_holmes(number_of_holmes),
         _read_file(read_file), _filename(filename), _time(time),
         _random_generator(seed), _log(log){
+
+    if (_clustering_factor <= 0.) {
+      cmac_error("The star-formation clustering factor must be positive.");
+    }
 
     novahandler = new SupernovaHandler(_sne_energy);
 
@@ -412,6 +430,8 @@ public:
         if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end()) {
             
             _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
+            // Historical source files do not contain velocities.
+            _source_velocities.push_back(CoordinateVector<double>());
 
             _source_luminosities.push_back(luminosity);
             
@@ -489,6 +509,10 @@ public:
    *    (default: 0. Myr)
    *  - output sources: Whether or not to write the source positions to a file
    *    (default: false)
+   *  - clustering factor: Density exponent for the CDF used to select
+   *    density-born stars (default: 2; one restores mass weighting)
+   *  - float sources: Move stars with the gas gravitational acceleration and
+   *    Galactic-frame source terms (default: false)
    *
    * @param params ParameterFile to read from.
    * @param log Log to write logging info to.
@@ -511,6 +535,8 @@ public:
             params.get_physical_value<QUANTITY_LENGTH> (
               "PhotonSourceDistribution:scale height","0.0 m"),
             params.get_value< double >("PhotonSourceDistribution:peak fraction",0.5),
+            params.get_value< double >("PhotonSourceDistribution:clustering factor",2.0),
+            params.get_value< bool >("PhotonSourceDistribution:float sources",false),
             params.get_physical_value<QUANTITY_TIME> (
                 "PhotonSourceDistribution:holmes time","50 Myr"),
             params.get_physical_value<QUANTITY_LENGTH>(
@@ -685,6 +711,7 @@ public:
         }
         _to_do_feedback.push_back(_source_positions[i]);
         _source_positions.erase(_source_positions.begin() + i);
+        _source_velocities.erase(_source_velocities.begin() + i);
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _source_luminosities.erase(_source_luminosities.begin() + i);
         _spectrum_index.erase(_spectrum_index.begin() + i);
@@ -762,6 +789,10 @@ public:
         }
 
         _source_positions.push_back(CoordinateVector<double>(x,y,z));
+        auto grid = grid_creator->get_subgrid(_source_positions.back());
+        auto cell = (*grid).get_hydro_cell(_source_positions.back());
+        _source_velocities.push_back(
+            cell.get_hydro_variables().get_primitives_velocity());
 
         double lifetime = 1e99;
 
@@ -799,11 +830,12 @@ public:
 
 
 
-      std::vector<double> cumulative_mass(total_cells);
+      std::vector<double> cumulative_weight(total_cells);
 
       AtomicValue< size_t > igrid(0);
       i = 0;
       double running_mass = 0.0;
+      double running_weight = 0.0;
       while (igrid.value() < grid_creator->number_of_original_subgrids()) {
         const size_t this_igrid = igrid.post_increment();
         if (this_igrid < grid_creator->number_of_original_subgrids()) {
@@ -819,7 +851,17 @@ public:
             }
 
             running_mass+= cell_mass;
-            cumulative_mass[i] = running_mass;
+            // A density exponent of one reproduces the original mass-weighted
+            // CDF.  The volume factor makes larger exponents resolution
+            // independent: weight is proportional to rho^p dV.
+            double cell_weight = 0.;
+            if (cell_mass > 0.) {
+              cell_weight = it.get_volume() * std::pow(
+                  std::max(0., it.get_hydro_variables().get_primitives_density()),
+                  _clustering_factor);
+            }
+            running_weight += cell_weight;
+            cumulative_weight[i] = running_weight;
 
             i += 1;
 
@@ -829,6 +871,18 @@ public:
       }
       if (_number_of_updates == 1) {
           init_running_mass = running_mass;
+      }
+
+      if (running_mass <= 0. || init_running_mass <= 0. ||
+          running_weight <= 0.) {
+        if (_log != nullptr) {
+          _log->write_warning(
+              "No positive mass or density weight available for star formation.");
+        }
+        _last_sf = _total_time;
+        updated = true;
+        ++_number_of_updates;
+        return updated;
       }
 
 
@@ -843,7 +897,7 @@ public:
 
       for (size_t i=0;i<total_cells;i++) {
 
-        cumulative_mass[i] = cumulative_mass[i]/running_mass;
+        cumulative_weight[i] = cumulative_weight[i] / running_weight;
       }
 
 
@@ -881,6 +935,7 @@ public:
 
           double source_pos_val = _random_generator.get_uniform_random_double();
           CoordinateVector<> cell_midpoint;
+          CoordinateVector<> source_velocity;
           double cell_length = 0;
 
           AtomicValue< size_t > igrid(0);
@@ -893,9 +948,11 @@ public:
               for (auto it = subgrid.hydro_begin(); it != subgrid.hydro_end();
                    ++it) {
 
-                if (cumulative_mass[i] >= source_pos_val){
+                if (cumulative_weight[i] >= source_pos_val){
 
                   cell_midpoint = it.get_cell_midpoint();
+                  source_velocity =
+                      it.get_hydro_variables().get_primitives_velocity();
                   cell_length = std::pow(it.get_volume(),1./3.);
                   goto afterloop;
 
@@ -916,6 +973,7 @@ public:
         blur[2] = _random_generator.get_uniform_random_double()*cell_length - (0.5*cell_length);
 
         _source_positions.push_back(cell_midpoint + blur);
+        _source_velocities.push_back(source_velocity);
 
       } else {
         double x =
@@ -931,6 +989,14 @@ public:
                       _random_generator.get_uniform_random_double());
 
         _source_positions.push_back(CoordinateVector<double>(x,y,z));
+        CoordinateVector<> source_velocity;
+        if (grid_creator->get_box().inside(_source_positions.back())) {
+          auto grid = grid_creator->get_subgrid(_source_positions.back());
+          auto cell = (*grid).get_hydro_cell(_source_positions.back());
+          source_velocity =
+              cell.get_hydro_variables().get_primitives_velocity();
+        }
+        _source_velocities.push_back(source_velocity);
 
       }
         double a0z = 9.955209529401348;
@@ -997,6 +1063,45 @@ public:
   }
 
 
+  /**
+   * @brief Move stellar sources with the external potential and local shear.
+   *
+   * Gas supplies the initial velocity at formation.  Thereafter the source is
+   * treated as a collisionless particle: first the local gas gravitational
+   * acceleration (external potential plus self gravity, when enabled), then
+   * the same Coriolis/tidal rotation used for gas, followed by drift.
+   */
+  virtual void float_sources(
+      DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+      const double timestep, const ExternalPotential *external_potential,
+      const GalacticShearingBox *galactic_shearing_box) override {
+    if (!_float_sources || timestep <= 0.) {
+      return;
+    }
+    for (size_t i = 0; i < _source_positions.size(); ++i) {
+      if (grid_creator->get_box().inside(_source_positions[i])) {
+        HydroDensitySubGrid &subgrid =
+            *grid_creator->get_subgrid(_source_positions[i]);
+        const auto cell = subgrid.get_hydro_cell(_source_positions[i]);
+        _source_velocities[i] +=
+            cell.get_hydro_variables().get_gravitational_acceleration() *
+            timestep;
+      } else if (external_potential != nullptr) {
+        // A source can leave through a vertical boundary before disappearing.
+        _source_velocities[i] += external_potential->get_acceleration(
+                                    _source_positions[i]) *
+                                timestep;
+      }
+      if (galactic_shearing_box != nullptr) {
+        galactic_shearing_box->apply_to_source(_source_positions[i],
+                                                _source_velocities[i],
+                                                timestep);
+      }
+      _source_positions[i] += _source_velocities[i] * timestep;
+    }
+  }
+
+
 // --------------------------------------
 
   /**
@@ -1012,6 +1117,8 @@ public:
     restart_writer.write(_excess_mass);
     restart_writer.write(_scaleheight);
     restart_writer.write(_peak_fraction);
+    restart_writer.write(_clustering_factor);
+    restart_writer.write(_float_sources);
     restart_writer.write(init_running_mass);
     restart_writer.write(_num_sne);
     restart_writer.write(_holmes_time);
@@ -1028,6 +1135,13 @@ public:
       restart_writer.write(size);
       for (std::vector< CoordinateVector<> >::size_type i = 0; i < size; ++i) {
         _source_positions[i].write_restart_file(restart_writer);
+      }
+    }
+    {
+      const auto size = _source_velocities.size();
+      restart_writer.write(size);
+      for (std::vector< CoordinateVector<> >::size_type i = 0; i < size; ++i) {
+        _source_velocities[i].write_restart_file(restart_writer);
       }
     }
     {
@@ -1078,6 +1192,8 @@ public:
         _excess_mass(restart_reader.read<double>()),
         _scaleheight(restart_reader.read<double>()),
         _peak_fraction(restart_reader.read<double>()),
+        _clustering_factor(restart_reader.read<double>()),
+        _float_sources(restart_reader.read<bool>()),
         init_running_mass(restart_reader.read<double>()),
         _num_sne(restart_reader.read<double>()),
         _holmes_time(restart_reader.read<double>()),
@@ -1096,6 +1212,14 @@ public:
       _source_positions.resize(size);
       for (std::vector< CoordinateVector<> >::size_type i = 0; i < size; ++i) {
         _source_positions[i] = CoordinateVector<>(restart_reader);
+      }
+    }
+    {
+      const std::vector< CoordinateVector<> >::size_type size =
+          restart_reader.read< std::vector< CoordinateVector<> >::size_type >();
+      _source_velocities.resize(size);
+      for (std::vector< CoordinateVector<> >::size_type i = 0; i < size; ++i) {
+        _source_velocities[i] = CoordinateVector<>(restart_reader);
       }
     }
     {

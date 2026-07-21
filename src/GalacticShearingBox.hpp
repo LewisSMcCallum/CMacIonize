@@ -69,6 +69,30 @@ public:
 
   inline bool enabled() const { return _enabled; }
 
+  /**
+   * @brief Apply the Galactic-frame velocity update to a collisionless source.
+   *
+   * This is the same exact Coriolis/tidal rotation used for the gas.  The
+   * position is held fixed during this operator-split source update.
+   */
+  inline void apply_to_source(const CoordinateVector<> &position,
+                              CoordinateVector<> &velocity,
+                              const double timestep) const {
+    if (!_enabled || timestep <= 0.) {
+      return;
+    }
+    const double angle = 2. * _omega * timestep;
+    const double cosine = std::cos(angle);
+    const double sine = std::sin(angle);
+    const double equilibrium_y =
+        _shear_parameter * _omega * (position.x() - _radial_centre);
+    const double residual_y = velocity.y() - equilibrium_y;
+
+    const double old_x = velocity.x();
+    velocity[0] = old_x * cosine - residual_y * sine;
+    velocity[1] = equilibrium_y + old_x * sine + residual_y * cosine;
+  }
+
   /** @brief Add the equilibrium linear shear to the initial velocity field. */
   inline void initialize(
       DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) const {

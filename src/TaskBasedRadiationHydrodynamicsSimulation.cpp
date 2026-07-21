@@ -2870,7 +2870,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     }
 
     if (sourcedistribution != nullptr) {
-      sourcedistribution->float_sources(grid_creator,actual_timestep);
+      sourcedistribution->float_sources(grid_creator, actual_timestep,
+                                        external_potential,
+                                        &galactic_shearing_box);
       sourcedistribution->accrete_gas(grid_creator,hydro);
     }
 

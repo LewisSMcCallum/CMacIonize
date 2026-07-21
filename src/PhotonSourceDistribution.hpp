@@ -34,6 +34,8 @@
 /*! @brief Size of a variable that stores the number of photon sources. */
 typedef uint_fast32_t photonsourcenumber_t;
 class RandomGenerator;
+class ExternalPotential;
+class GalacticShearingBox;
 
 /**
  * @brief General interface for photon source distribution functors.
@@ -100,6 +102,19 @@ public:
   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) {return false;}
 
   virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {}
+
+  /**
+   * @brief Move sources with the external and Galactic-frame source terms.
+   *
+   * The two-argument form is retained for older source distributions.  A
+   * distribution that needs these source terms can override this overload.
+   */
+  virtual void float_sources(
+      DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+      double timestep, const ExternalPotential *external_potential,
+      const GalacticShearingBox *galactic_shearing_box) {
+    float_sources(grid_creator, timestep);
+  }
 
   virtual void accrete_gas(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro) {}
 
