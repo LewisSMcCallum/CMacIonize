@@ -150,11 +150,12 @@ public:
    *
    * @param timestep Integration time step size (in s).
    */
-  inline void update_conserved_variables(const double timestep) {
+  inline void update_conserved_variables(const double timestep, const bool advect_ionization = false) {
 
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     for (int_fast32_t i = 0; i < tot_num_cells; ++i) {
+      const double old_mass = _hydro_variables[i].get_conserved_mass();
       const CoordinateVector<> a =
           _hydro_variables[i].get_gravitational_acceleration();
       const CoordinateVector<> p = _hydro_variables[i].get_conserved_momentum();
@@ -179,6 +180,24 @@ public:
         _hydro_variables[i].primitive_gradients(j) = CoordinateVector<>(0.);
         _primitive_variable_limiters[10 * i + 2 * j] = DBL_MAX;
         _primitive_variable_limiters[10 * i + 2 * j + 1] = -DBL_MAX;
+      }
+
+      if (advect_ionization) {
+        const double new_mass = _hydro_variables[i].get_conserved_mass();
+        if (new_mass > 0.) {
+          for (int_fast32_t j = 0; j < NUMBER_OF_IONNAMES; ++j) {
+            const double old_fraction = _ionization_variables[i].get_ionic_fraction(j);
+            const double delta_fraction = _ionization_variables[i].get_delta_ionic_fraction(j);
+            double new_fraction = (old_mass * old_fraction + delta_fraction * timestep) / new_mass;
+            if (new_fraction < 0.) {
+              new_fraction = 0.;
+            } else if (new_fraction > 1.) {
+              new_fraction = 1.;
+            }
+            _ionization_variables[i].set_ionic_fraction(j, new_fraction);
+          }
+        }
+        _ionization_variables[i].reset_delta_ionic_fractions();
       }
 
       cmac_assert(_hydro_variables[i].get_conserved_mass() ==
@@ -299,7 +318,7 @@ public:
    * @param hydro Hydro instance to use.
    * @param dt Current system time step (in s).
    */
-  inline void inner_flux_sweep(const Hydro &hydro, const double dt) {
+  inline void inner_flux_sweep(const Hydro &hydro, const double dt, const bool advect_ionization = false) {
 
     // we do three separate sweeps: one for every coordinate direction
     for (int_fast32_t ix = 0; ix < _number_of_cells[0] - 1; ++ix) {
@@ -310,9 +329,9 @@ public:
           const int_fast32_t index100 =
               (ix + 1) * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           // x direction
-          hydro.do_flux_calculation(0, _hydro_variables[index000],
-                                    _hydro_variables[index100], _cell_size[0],
-                                    _cell_areas[0], dt);
+          hydro.do_flux_calculation(0, _hydro_variables[index000], _ionization_variables[index000],
+                                    _hydro_variables[index100], _ionization_variables[index100], _cell_size[0],
+                                    _cell_areas[0], dt, advect_ionization);
         }
       }
     }
@@ -324,9 +343,9 @@ public:
           const int_fast32_t index010 =
               ix * _number_of_cells[3] + (iy + 1) * _number_of_cells[2] + iz;
           // y direction
-          hydro.do_flux_calculation(1, _hydro_variables[index000],
-                                    _hydro_variables[index010], _cell_size[1],
-                                    _cell_areas[1], dt);
+          hydro.do_flux_calculation(1, _hydro_variables[index000], _ionization_variables[index000],
+                                    _hydro_variables[index010], _ionization_variables[index010], _cell_size[1],
+                                    _cell_areas[1], dt, advect_ionization);
         }
       }
     }
@@ -338,9 +357,9 @@ public:
           const int_fast32_t index001 =
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz + 1;
           // z direction
-          hydro.do_flux_calculation(2, _hydro_variables[index000],
-                                    _hydro_variables[index001], _cell_size[2],
-                                    _cell_areas[2], dt);
+          hydro.do_flux_calculation(2, _hydro_variables[index000], _ionization_variables[index000],
+                                    _hydro_variables[index001], _ionization_variables[index001], _cell_size[2],
+                                    _cell_areas[2], dt, advect_ionization);
         }
       }
     }
@@ -357,7 +376,7 @@ public:
    */
   inline void outer_flux_sweep(const int_fast32_t direction, const Hydro &hydro,
                                HydroDensitySubGrid &neighbour,
-                               const double dt) {
+                               const double dt, const bool advect_ionization = false) {
 
     int_fast32_t i, start_index_left, start_index_right, row_increment,
         row_length, column_increment, column_length;
@@ -455,9 +474,9 @@ public:
             start_index_left + ic * column_increment + ir * row_increment;
         const int_fast32_t index_right =
             start_index_right + ic * column_increment + ir * row_increment;
-        hydro.do_flux_calculation(i, left_grid->_hydro_variables[index_left],
-                                  right_grid->_hydro_variables[index_right], dx,
-                                  A, dt);
+        hydro.do_flux_calculation(i, left_grid->_hydro_variables[index_left], left_grid->_ionization_variables[index_left],
+                                  right_grid->_hydro_variables[index_right], right_grid->_ionization_variables[index_right], dx,
+                                  A, dt, advect_ionization);
       }
     }
   }
@@ -475,7 +494,7 @@ public:
   inline void outer_ghost_flux_sweep(const int_fast32_t direction,
                                      const Hydro &hydro,
                                      const HydroBoundary &boundary,
-                                     const double dt) {
+                                     const double dt, const bool advect_ionization = false) {
 
     int_fast32_t i, start_index_left, row_increment, row_length,
         column_increment, column_length;
@@ -561,7 +580,7 @@ public:
             start_index_left + ic * column_increment + ir * row_increment;
         hydro.do_ghost_flux_calculation(
             i, get_cell_midpoint(index_left) + offset,
-            _hydro_variables[index_left], boundary, dx, A, dt);
+            _hydro_variables[index_left], _ionization_variables[index_left], boundary, dx, A, dt, advect_ionization);
       }
     }
   }

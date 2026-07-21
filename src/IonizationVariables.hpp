@@ -103,6 +103,8 @@ private:
 
   double _prev_ionic_fractions[NUMBER_OF_IONNAMES];
 
+  double _delta_ionic_fractions[NUMBER_OF_IONNAMES];
+
   /*! @brief Mean intensity integrals of ionizing radiation (without
    *  normalization factor, in m^3). */
   double _mean_intensity[NUMBER_OF_IONNAMES];
@@ -143,6 +145,7 @@ public:
       _ionic_fractions[i] = 0.;
       _mean_intensity[i] = 0.;
       _prev_ionic_fractions[i] = 0;
+      _delta_ionic_fractions[i] = 0.;
     }
     for (int_fast32_t i = 0; i < NUMBER_OF_REEMISSIONPROBABILITIES; ++i) {
       _reemission_probabilities[i] = 0.;
@@ -200,6 +203,7 @@ public:
       _ionic_fractions[i] = other._ionic_fractions[i];
       _mean_intensity[i] = other._mean_intensity[i];
       _prev_ionic_fractions[i] = other._prev_ionic_fractions[i];
+      _delta_ionic_fractions[i] = other._delta_ionic_fractions[i];
 #ifdef DO_OUTPUT_COOLING
       _cooling[i] = other._cooling[i];
 #endif
@@ -347,6 +351,24 @@ public:
     inline void set_prev_ionic_fraction(const int_fast32_t ion,
                                  const double ionic_fraction) {
     _prev_ionic_fractions[ion] = ionic_fraction;
+  }
+
+  inline double get_delta_ionic_fraction(const int_fast32_t ion) const {
+    return _delta_ionic_fractions[ion];
+  }
+
+  inline void set_delta_ionic_fraction(const int_fast32_t ion, const double val) {
+    _delta_ionic_fractions[ion] = val;
+  }
+
+  inline void increase_delta_ionic_fraction(const int_fast32_t ion, const double val) {
+    _delta_ionic_fractions[ion] += val;
+  }
+
+  inline void reset_delta_ionic_fractions() {
+    for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
+      _delta_ionic_fractions[i] = 0.;
+    }
   }
 
   /**
@@ -545,6 +567,7 @@ public:
       _ionic_fractions[i] = restart_reader.read< double >();
       _prev_ionic_fractions[i] = restart_reader.read< double >();
       _mean_intensity[i] = restart_reader.read< double >();
+      _delta_ionic_fractions[i] = 0.;
 #ifdef DO_OUTPUT_COOLING
       _cooling[i] = restart_reader.read< double >();
 #endif

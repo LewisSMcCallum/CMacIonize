@@ -28,6 +28,79 @@
 #include "HydroDensitySubGrid.hpp"
 
 #include <fstream>
+#include <vector>
+
+/**
+ * @brief Check conservative first-order advection around a periodic 1-D grid.
+ *
+ * Uniform hydro states give an exactly known upwind update:
+ * x_i(new) = (1-C) x_i(old) + C x_(i-1)(old), where C is the Courant number.
+ */
+void test_ionization_advection(const Hydro &hydro) {
+  const int_fast32_t number_of_cells = 16;
+  const int_fast32_t cells_per_subgrid = number_of_cells / 2;
+  const double left_box[6] = {0., 0., 0., 0.5, 1., 1.};
+  const double right_box[6] = {0.5, 0., 0., 0.5, 1., 1.};
+  HydroDensitySubGrid left_grid(
+      left_box, CoordinateVector< int_fast32_t >(cells_per_subgrid, 1, 1));
+  HydroDensitySubGrid right_grid(
+      right_box, CoordinateVector< int_fast32_t >(cells_per_subgrid, 1, 1));
+
+  std::vector< double > initial_fraction(number_of_cells);
+  int_fast32_t index = 0;
+  HydroDensitySubGrid *grids[2] = {&left_grid, &right_grid};
+  for (int_fast32_t igrid = 0; igrid < 2; ++igrid) {
+    for (auto cell = grids[igrid]->hydro_begin();
+         cell != grids[igrid]->hydro_end(); ++cell) {
+      cell.get_hydro_variables().set_primitives_density(1.);
+      cell.get_hydro_variables().set_primitives_velocity(
+          CoordinateVector<>(1., 0., 0.));
+      cell.get_hydro_variables().set_primitives_pressure(1.);
+      initial_fraction[index] = (index < number_of_cells / 2) ? 0.2 : 0.8;
+      cell.get_ionization_variables().set_ionic_fraction(
+          ION_H_n, initial_fraction[index]);
+      ++index;
+    }
+    grids[igrid]->initialize_hydrodynamic_variables(hydro, false);
+  }
+
+  const double courant_number = 0.25;
+  const double timestep = courant_number / number_of_cells;
+  left_grid.inner_flux_sweep(hydro, timestep, true);
+  right_grid.inner_flux_sweep(hydro, timestep, true);
+  left_grid.outer_flux_sweep(TRAVELDIRECTION_FACE_X_P, hydro, right_grid,
+                             timestep, true);
+  // Connect the second subgrid back to the first across the periodic boundary.
+  right_grid.outer_flux_sweep(TRAVELDIRECTION_FACE_X_P, hydro, left_grid,
+                              timestep, true);
+  left_grid.update_conserved_variables(timestep, true);
+  right_grid.update_conserved_variables(timestep, true);
+  left_grid.update_primitive_variables(hydro);
+  right_grid.update_primitive_variables(hydro);
+
+  double initial_neutral_mass = 0.;
+  double final_neutral_mass = 0.;
+  index = 0;
+  for (int_fast32_t igrid = 0; igrid < 2; ++igrid) {
+    for (auto cell = grids[igrid]->hydro_begin();
+         cell != grids[igrid]->hydro_end(); ++cell) {
+      const int_fast32_t upwind =
+          (index + number_of_cells - 1) % number_of_cells;
+      const double expected =
+          (1. - courant_number) * initial_fraction[index] +
+          courant_number * initial_fraction[upwind];
+      const double actual =
+          cell.get_ionization_variables().get_ionic_fraction(ION_H_n);
+      assert_values_equal_tol(actual, expected, 1.e-12);
+      assert_condition(actual >= 0. && actual <= 1.);
+      initial_neutral_mass += initial_fraction[index] / number_of_cells;
+      final_neutral_mass +=
+          cell.get_hydro_variables().get_conserved_mass() * actual;
+      ++index;
+    }
+  }
+  assert_values_equal_tol(final_neutral_mass, initial_neutral_mass, 1.e-12);
+}
 
 /**
  * @brief Unit test for the HydroDensitySubGrid class.
@@ -48,12 +121,14 @@ int main(int argc, char **argv) {
        ++cellit) {
     cellit.get_hydro_variables().set_primitives_density(1.);
     cellit.get_hydro_variables().set_primitives_pressure(1.);
+    cellit.get_ionization_variables().set_ionic_fraction(ION_H_n, 1.);
   }
 
   for (auto cellit = test_grid2.hydro_begin(); cellit != test_grid2.hydro_end();
        ++cellit) {
     cellit.get_hydro_variables().set_primitives_density(0.125);
     cellit.get_hydro_variables().set_primitives_pressure(0.1);
+    cellit.get_ionization_variables().set_ionic_fraction(ION_H_n, 0.1);
   }
 
   const double dt = 0.001;
@@ -64,6 +139,8 @@ int main(int argc, char **argv) {
 
   test_grid1.initialize_hydrodynamic_variables(hydro, false);
   test_grid2.initialize_hydrodynamic_variables(hydro, false);
+
+  test_ionization_advection(hydro);
 
   // A constant gravity kick should change kinetic, but not internal, energy.
   const double gravity_box[6] = {0., 0., 0., 1., 1., 1.};
@@ -126,40 +203,50 @@ int main(int argc, char **argv) {
     test_grid2.predict_primitive_variables(hydro, 0.5 * dt);
 
     // flux exchanges
-    test_grid1.inner_flux_sweep(hydro, dt);
-    test_grid2.inner_flux_sweep(hydro, dt);
+    test_grid1.inner_flux_sweep(hydro, dt, true);
+    test_grid2.inner_flux_sweep(hydro, dt, true);
     test_grid1.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_X_N, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid1.outer_flux_sweep(TRAVELDIRECTION_FACE_X_P, hydro, test_grid2,
-                                dt);
+                                dt, true);
     test_grid2.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_X_P, hydro,
-                                      reflective_boundary, dt);
+                                      reflective_boundary, dt, true);
 
     test_grid1.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Y_N, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid1.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Y_P, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid1.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Z_N, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid1.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Z_P, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid2.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Y_N, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid2.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Y_P, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid2.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Z_N, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
     test_grid2.outer_ghost_flux_sweep(TRAVELDIRECTION_FACE_Z_P, hydro,
-                                      inflow_boundary, dt);
+                                      inflow_boundary, dt, true);
 
     // conserved variable update
-    test_grid1.update_conserved_variables(dt);
-    test_grid2.update_conserved_variables(dt);
+    test_grid1.update_conserved_variables(dt, true);
+    test_grid2.update_conserved_variables(dt, true);
 
     // primitive variable update
     test_grid1.update_primitive_variables(hydro);
     test_grid2.update_primitive_variables(hydro);
   }
+
+  // verify that ionization state was indeed advected!
+  bool gained_neutral_h = false;
+  for (auto cellit = test_grid2.hydro_begin(); cellit != test_grid2.hydro_end(); ++cellit) {
+    if (cellit.get_ionization_variables().get_ionic_fraction(ION_H_n) > 0.11) {
+      gained_neutral_h = true;
+      break;
+    }
+  }
+  assert_condition(gained_neutral_h);
 
   /// write a restart file
   {

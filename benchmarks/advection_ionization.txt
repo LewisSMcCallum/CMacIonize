@@ -1,0 +1,25 @@
+Ionization-state advection benchmark
+
+This benchmark translates a square neutral-hydrogen profile through a uniform
+periodic flow. Radiation and ionization updates are disabled, so the exact
+solution is the initial profile shifted by v*t. The analysis script compares
+the final profile with the cell-averaged analytic solution, writes a diagnostic
+plot and metrics file, and returns a non-zero status if the tolerances fail.
+
+Configure the build, enter rundir/benchmarks/advection_ionization, and either
+run the commands manually or submit advection_ionization.sbatch.
+
+Manual commands:
+
+../../CMacIonize --task-based-rhd --params advection_ionization.param
+python3 advection_ionization.py
+
+The analysis writes advection_ionization.png and
+advection_ionization_metrics.txt. Its process exit status is zero for a pass
+and non-zero for a failed comparison.
+
+List of files necessary for this benchmark test:
+input:advection_ionization.param
+input:advection_ionization.yml
+input:advection_ionization.py
+input:advection_ionization.sbatch
