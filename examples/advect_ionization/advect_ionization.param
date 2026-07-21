@@ -9,6 +9,10 @@ DensityGrid:
   type: Cartesian
   number of cells: [16, 16, 16]
 
+DensitySubGridCreator:
+  number of subgrids: [2, 2, 2]
+  periodicity: [true, true, true]
+
 # density function using blocks
 DensityFunction:
   type: BlockSyntax
@@ -22,9 +26,11 @@ Abundances:
 TemperatureCalculator:
   do temperature calculation: false
 
-# Hydrodynamics options
-HydroIntegrator:
+# Hydrodynamics options used by task-based radiation hydrodynamics
+Hydro:
   polytropic index: 1.66667
+
+HydroBoundaryManager:
   boundary x low: periodic
   boundary x high: periodic
   boundary y low: periodic

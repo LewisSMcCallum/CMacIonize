@@ -32,6 +32,30 @@
 #include "Utilities.hpp"
 #include <fstream>
 
+namespace {
+
+/** @brief Write either kind of split grid without casting between templates. */
+template < class SubGridType >
+void write_split_grid(const std::string &filename,
+                      DensitySubGridCreator< SubGridType > &grid_creator) {
+  std::ofstream file(filename);
+  file << "#x (m)\ty (m)\tz (m)\tn (m^-3)\tvolume (m^3)\tneutral H fraction\n";
+
+  for (auto gridit = grid_creator.begin();
+       gridit != grid_creator.original_end(); ++gridit) {
+    for (auto cellit = (*gridit).begin(); cellit != (*gridit).end(); ++cellit) {
+      const CoordinateVector<> x = cellit.get_cell_midpoint();
+      const IonizationVariables &ionization =
+          cellit.get_ionization_variables();
+      file << x.x() << "\t" << x.y() << "\t" << x.z() << "\t"
+           << ionization.get_number_density() << "\t" << cellit.get_volume()
+           << "\t" << ionization.get_ionic_fraction(ION_H_n) << "\n";
+    }
+  }
+}
+
+} // namespace
+
 /**
  * @brief Constructor.
  *
@@ -107,32 +131,16 @@ void AsciiFileDensityGridWriter::write(
     DensitySubGridCreator< DensitySubGrid > &grid_creator,
     const uint_fast32_t counter, ParameterFile &params, double time) {
 
-  std::string filename =
+  const std::string filename =
       Utilities::compose_filename(_output_folder, _prefix, "txt", counter, 3);
-  std::ofstream file(filename);
-
-  file << "#x (m)\ty (m)\tz (m)\tn (m^-3)\tvolume (m^3)\tneutral H fraction\n";
-
-  for (auto gridit = grid_creator.begin();
-       gridit != grid_creator.original_end(); ++gridit) {
-    for (auto cellit = (*gridit).begin(); cellit != (*gridit).end(); ++cellit) {
-      const CoordinateVector<> x = cellit.get_cell_midpoint();
-      const double n = cellit.get_ionization_variables().get_number_density();
-      const double xH =
-          cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
-      const double volume = cellit.get_volume();
-      file << x.x() << "\t" << x.y() << "\t" << x.z() << "\t" << n << "\t"
-           << volume << "\t" << xH << "\n";
-    }
-  }
+  write_split_grid(filename, grid_creator);
 }
 
 void AsciiFileDensityGridWriter::write(
     DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
     const uint_fast32_t counter, ParameterFile &params, double time) {
 
-  DensitySubGridCreator< DensitySubGrid > *cast_grid_creator =
-      reinterpret_cast< DensitySubGridCreator< DensitySubGrid > * >(
-          &grid_creator);
-  write(*cast_grid_creator, counter, params, time);
+  const std::string filename =
+      Utilities::compose_filename(_output_folder, _prefix, "txt", counter, 3);
+  write_split_grid(filename, grid_creator);
 }

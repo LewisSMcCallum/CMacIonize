@@ -32,18 +32,13 @@ def main():
     # Initial profile is 0.9 inside [-2.5 pc, 2.5 pc] and 0.1 elsewhere.
     # It advects at vx = 10 km/s for t = 0.1 Myr.
     # Displacement d = vx * t = 10,000 m/s * 0.1e6 * 3.15576e7 s = 3.15576e16 m ~ 1.0227 pc
-    # With inflow (open) boundary conditions:
-    # Any advected state from x < -5 pc is filled with the background value (0.1).
+    # Wrap the departure point through the periodic x boundary.
     d_pc = 1.0227
     analytical_fracs = []
     for x in xs_pc_1:
-        x_init = x - d_pc
-        if x_init >= -5.0 and x_init <= 5.0:
-            # Evaluate initial condition at x_init
-            if x_init >= -2.5 and x_init <= 2.5:
-                val = 0.9
-            else:
-                val = 0.1
+        x_init = (x - d_pc + 5.0) % 10.0 - 5.0
+        if x_init >= -2.5 and x_init <= 2.5:
+            val = 0.9
         else:
             val = 0.1
         analytical_fracs.append(val)

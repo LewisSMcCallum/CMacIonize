@@ -15,7 +15,8 @@ block[1]:
   sides: [5. pc, 10. pc, 10. pc]
   type: cube
   number density: 100. cm^-3
-  initial temperature: 8000. K
+  # Keep the pressure equal across the ionization-state discontinuity.
+  initial temperature: 13818.181818 K
   neutral fraction H: 0.9
   neutral fraction He: 0.0
   initial velocity: [10. km s^-1, 0. m s^-1, 0. m s^-1]
