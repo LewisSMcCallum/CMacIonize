@@ -44,8 +44,8 @@
 namespace {
 
 // Do not allow one exceptionally stiff cell to monopolise a radiation step.
-// MSBDF is intended for these stiff chemistry systems; the limit is a last
-// line of defence, not a normal accuracy control.
+// Keep the established RKF45 integration method, with this limit as a last
+// line of defence rather than a normal accuracy control.
 constexpr unsigned long int TIME_DEPENDENT_ODE_MAX_STEPS = 10000;
 
 int integrate_time_dependent_ode(gsl_odeiv2_system *system, const double ts,
@@ -55,7 +55,7 @@ int integrate_time_dependent_ode(gsl_odeiv2_system *system, const double ts,
   }
   double t = 0.;
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-      system, gsl_odeiv2_step_msbdf, std::max(initial_step, 1.e-30), 1.e-4,
+      system, gsl_odeiv2_step_rkf45, std::max(initial_step, 1.e-30), 1.e-4,
       0.0);
   gsl_odeiv2_driver_set_nmax(driver, TIME_DEPENDENT_ODE_MAX_STEPS);
   const int status = gsl_odeiv2_driver_apply(driver, &t, ts, state);
@@ -1587,6 +1587,5 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
     
   }
-
 
 
