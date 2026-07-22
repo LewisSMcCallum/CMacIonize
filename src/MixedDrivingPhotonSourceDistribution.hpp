@@ -1078,7 +1078,8 @@ public:
   virtual void float_sources(
       DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
       const double timestep, const ExternalPotential *external_potential,
-      const GalacticShearingBox *galactic_shearing_box) override {
+      const GalacticShearingBox *galactic_shearing_box,
+      const CoordinateVector< bool > &periodicity) override {
     if (!_float_sources || timestep <= 0.) {
       return;
     }
@@ -1109,6 +1110,21 @@ public:
                                                 timestep);
       }
       _source_positions[i] += _source_velocities[i] * timestep;
+
+      // Source particles obey the same ordinary periodic boundaries as the
+      // gas.  (The Galactic shearing box still has no shearing remap.)
+      const CoordinateVector<> &anchor = grid_creator->get_box().get_anchor();
+      const CoordinateVector<> &sides = grid_creator->get_box().get_sides();
+      for (uint_fast8_t axis = 0; axis < 3; ++axis) {
+        if (periodicity[axis]) {
+          double offset = std::fmod(_source_positions[i][axis] - anchor[axis],
+                                    sides[axis]);
+          if (offset < 0.) {
+            offset += sides[axis];
+          }
+          _source_positions[i][axis] = anchor[axis] + offset;
+        }
+      }
       if (!grid_creator->get_box().inside(_source_positions[i])) {
         if (_log != nullptr) {
           _log->write_warning(

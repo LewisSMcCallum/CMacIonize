@@ -116,6 +116,19 @@ public:
     float_sources(grid_creator, timestep);
   }
 
+  /**
+   * @brief Move sources while respecting the simulation-box periodicity.
+   */
+  virtual void float_sources(
+      DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+      double timestep, const ExternalPotential *external_potential,
+      const GalacticShearingBox *galactic_shearing_box,
+      const CoordinateVector< bool > &periodicity) {
+    (void)periodicity;
+    float_sources(grid_creator, timestep, external_potential,
+                  galactic_shearing_box);
+  }
+
   virtual void accrete_gas(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro) {}
 
   virtual std::vector<CoordinateVector<double>> get_sink_positions() {
