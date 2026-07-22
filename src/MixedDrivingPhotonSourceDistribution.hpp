@@ -279,6 +279,57 @@ size_t findClosestIndex(double value, const std::vector<double>& values) {
 
     }
 
+    void initialize_spectra(Log *log) {
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(35000,40,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(37000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(41000,40,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(42000,40,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(43000,40,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(44000,40,log));
+      _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,40,log));
+      _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+    }
+
+    /** Recover the spectrum bin from a luminosity in legacy restart files. */
+    size_t spectrum_index_from_luminosity(const double luminosity) {
+      if (_holmes_lum > 0. &&
+          std::abs(luminosity - _holmes_lum) < 1.e-12 * _holmes_lum) {
+        return 14;
+      }
+      const std::vector<double> masses =
+          {57.95, 46.94, 38.08, 34.39, 30.98, 28.0, 25.29, 22.90,
+           20.76, 18.80, 17.08, 15.55};
+      const std::vector<double> log_luminosities =
+          {49.64, 49.44, 49.22, 49.10, 48.99, 48.88, 48.75, 48.61,
+           48.44, 48.27, 48.06, 47.88};
+      const double log_luminosity =
+          std::log10(std::max(luminosity / _lum_adjust, 1.e-99));
+      double mass = masses.back();
+      if (log_luminosity >= log_luminosities.front()) {
+        mass = masses.front();
+      } else {
+        for (size_t i = 0; i + 1 < masses.size(); ++i) {
+          if (log_luminosities[i] >= log_luminosity &&
+              log_luminosity >= log_luminosities[i + 1]) {
+            const double fraction =
+                (log_luminosity - log_luminosities[i]) /
+                (log_luminosities[i + 1] - log_luminosities[i]);
+            mass = masses[i] + fraction * (masses[i + 1] - masses[i]);
+            break;
+          }
+        }
+      }
+      return findClosestIndex(interpolate(mass, stellarMasses, temperatures),
+                              avail_temps);
+    }
+
 
 
 public:
@@ -337,21 +388,7 @@ public:
 
     
 
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(34000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(35000,40,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(36000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(37000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(39000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(40000,25,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(41000,40,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(42000,40,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(43000,40,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(44000,40,log));
-    _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(45000,40,log));
-    _all_spectra.push_back(new Pegase3PhotonSourceSpectrum(1e10,0.02,log));
+    initialize_spectra(log);
 
 
 
@@ -1336,6 +1373,10 @@ public:
           _cum_imf.push_back(part_integral/full_area);
         }
 
+  initialize_spectra(nullptr);
+  for (const double luminosity : _source_luminosities) {
+    _spectrum_index.push_back(spectrum_index_from_luminosity(luminosity));
+  }
   novahandler = new SupernovaHandler(_sne_energy);
   }
 };
