@@ -2062,6 +2062,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
            ++isource) {
         const CoordinateVector<> position =
             sourcedistribution->get_position(isource);
+        if (!simulation_box.get_box().inside(position)) {
+          if (log) {
+            log->write_warning("Ignoring photon source outside the simulation box.");
+          }
+          continue;
+        }
         DensitySubGridCreator< HydroDensitySubGrid >::iterator gridit =
             grid_creator->get_subgrid(position);
         levels[gridit.get_index()] = source_copy_level;
@@ -2182,7 +2188,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
     if(sourcedistribution != nullptr) {
 
-      if (sourcedistribution->get_total_luminosity() > 0.) {
+    bool has_active_source = false;
+    for (photonsourcenumber_t isource = 0;
+         isource < sourcedistribution->get_number_of_sources(); ++isource) {
+      if (simulation_box.get_box().inside(
+              sourcedistribution->get_position(isource))) {
+        has_active_source = true;
+        break;
+      }
+    }
+    if (sourcedistribution->get_total_luminosity() > 0. && has_active_source) {
         time_logger.start("radiation transfer");
 
         {
@@ -3060,6 +3075,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                ++isource) {
             const CoordinateVector<> position =
                 sourcedistribution->get_position(isource);
+            if (!simulation_box.get_box().inside(position)) {
+              if (log) {
+                log->write_warning(
+                    "Ignoring photon source outside the simulation box.");
+              }
+              continue;
+            }
             DensitySubGridCreator< HydroDensitySubGrid >::iterator gridit =
                 grid_creator->get_subgrid(position);
             levels[gridit.get_index()] = source_copy_level;

@@ -71,9 +71,22 @@ public:
     std::vector< size_t > overhead;
     const photonsourcenumber_t number_of_sources =
         distribution.get_number_of_sources();
+    double active_weight = 0.;
+    for (photonsourcenumber_t isource = 0; isource < number_of_sources;
+         ++isource) {
+      if (grid_creator.get_box().inside(distribution.get_position(isource))) {
+        active_weight += distribution.get_weight(isource);
+      }
+    }
+
     for (photonsourcenumber_t isource = 0; isource < number_of_sources;
          ++isource) {
       const CoordinateVector<> position = distribution.get_position(isource);
+      // A moved source can be outside the grid before its distribution has
+      // removed it.  Never turn that position into an unchecked subgrid index.
+      if (!grid_creator.get_box().inside(position)) {
+        continue;
+      }
       typename DensitySubGridCreator< _subgrid_type_ >::iterator first_cell =
           grid_creator.get_subgrid(position);
       std::vector< size_t > subgrids(1, first_cell.get_index());
@@ -86,7 +99,7 @@ public:
         }
       }
       const size_t number_this_source =
-          number_of_photons * distribution.get_weight(isource);
+          number_of_photons * distribution.get_weight(isource) / active_weight;
       const size_t number_per_copy = number_this_source / subgrids.size();
       const size_t breakpoint = number_this_source % subgrids.size();
       const size_t old_size = _subgrids.size();
@@ -102,6 +115,10 @@ public:
       }
       overhead.push_back(old_size + breakpoint);
       number_done += number_this_source;
+    }
+    if (overhead.empty()) {
+      _locks = new std::vector< ThreadLock >();
+      return;
     }
     const size_t num_overhead = number_of_photons - number_done;
     RandomGenerator random_generator;

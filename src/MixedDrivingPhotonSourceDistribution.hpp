@@ -146,6 +146,9 @@ private:
 
   double _last_sf = 0.;
 
+  /*! @brief Whether moving sources changed the source-copy hierarchy. */
+  bool _sources_changed = false;
+
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
@@ -693,7 +696,8 @@ public:
     _total_time += actual_timestep;
 
 
-    bool updated = false;
+    bool updated = _sources_changed;
+    _sources_changed = false;
 
 
 
@@ -1078,7 +1082,14 @@ public:
     if (!_float_sources || timestep <= 0.) {
       return;
     }
-    for (size_t i = 0; i < _source_positions.size(); ++i) {
+    size_t i = 0;
+    while (i < _source_positions.size()) {
+      const bool was_inside =
+          grid_creator->get_box().inside(_source_positions[i]);
+      size_t old_subgrid = 0;
+      if (was_inside) {
+        old_subgrid = grid_creator->get_subgrid(_source_positions[i]).get_index();
+      }
       if (grid_creator->get_box().inside(_source_positions[i])) {
         HydroDensitySubGrid &subgrid =
             *grid_creator->get_subgrid(_source_positions[i]);
@@ -1098,6 +1109,28 @@ public:
                                                 timestep);
       }
       _source_positions[i] += _source_velocities[i] * timestep;
+      if (!grid_creator->get_box().inside(_source_positions[i])) {
+        if (_log != nullptr) {
+          _log->write_warning(
+              "Removing MixedDriving source after it left the simulation box.");
+        }
+        _source_positions.erase(_source_positions.begin() + i);
+        _source_velocities.erase(_source_velocities.begin() + i);
+        _source_lifetimes.erase(_source_lifetimes.begin() + i);
+        _source_luminosities.erase(_source_luminosities.begin() + i);
+        _spectrum_index.erase(_spectrum_index.begin() + i);
+        if (i < _source_indices.size()) {
+          _source_indices.erase(_source_indices.begin() + i);
+        }
+        _sources_changed = true;
+      } else {
+        if (was_inside &&
+            old_subgrid !=
+                grid_creator->get_subgrid(_source_positions[i]).get_index()) {
+          _sources_changed = true;
+        }
+        ++i;
+      }
     }
   }
 
