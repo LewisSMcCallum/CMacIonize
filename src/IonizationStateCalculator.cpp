@@ -1173,9 +1173,7 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   gsl_odeiv2_system sys = {hydrogen_helium_ode_system, nullptr, 3, coefficients};
   const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
   if (status != GSL_SUCCESS) {
-      cmac_warning("Hydrogen-helium time-dependent solver failed; using equilibrium state for this cell.");
-      compute_ionization_states_hydrogen_helium(alphaH, alphaHe, alphaHe2,
-          jH, jHe, nH, AHe, T, h0, he0, hep, gammaH, gammaHe1, gammaHe2);
+      cmac_warning("Hydrogen-helium time-dependent solver failed; retaining the state at the start of this radiation substep.");
       return;
   }
 
@@ -1268,16 +1266,6 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     const CollisionalRates &collisional_rates,
     IonizationVariables &ionization_variables, double ts) {
 
-#if defined(HAS_CARBON) || defined(HAS_NITROGEN) || defined(HAS_OXYGEN) || \
-    defined(HAS_NEON) || defined(HAS_SULPHUR)
-  const auto use_equilibrium_fallback = [&]() {
-    cmac_warning("Metal time-dependent solver failed; using equilibrium state for this cell.");
-    compute_ionization_states_metals(
-        j_metals, ne, T, T4, nh0, nhe0, nhp, recombination_rates,
-        charge_transfer_rates, collisional_rates, ionization_variables);
-  };
-#endif
-
 #ifdef HAS_CARBON
   const double jCp1 = j_metals[0];
   const double jCp2 = j_metals[1];
@@ -1345,8 +1333,9 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
 
       if (status != GSL_SUCCESS) {
-          use_equilibrium_fallback();
-          return;
+          cmac_warning("Carbon time-dependent solver failed; retaining the state at the start of this radiation substep.");
+          y[0] = ionization_variables.get_ionic_fraction(ION_C_p1);
+          y[1] = ionization_variables.get_ionic_fraction(ION_C_p2);
       }
       //set new 
       ionization_variables.set_ionic_fraction(ION_C_p1, std::min(1.0,std::max(y[0],1e-14)));
@@ -1399,8 +1388,10 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
 
       if (status != GSL_SUCCESS) {
-          use_equilibrium_fallback();
-          return;
+          cmac_warning("Nitrogen time-dependent solver failed; retaining the state at the start of this radiation substep.");
+          y[0] = ionization_variables.get_ionic_fraction(ION_N_n);
+          y[1] = ionization_variables.get_ionic_fraction(ION_N_p1);
+          y[2] = ionization_variables.get_ionic_fraction(ION_N_p2);
       }
       //set new 
       ionization_variables.set_ionic_fraction(ION_N_n, std::min(1.0,std::max(y[0],1e-14)));
@@ -1459,8 +1450,11 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
 
       if (status != GSL_SUCCESS) {
-          use_equilibrium_fallback();
-          return;
+          cmac_warning("Oxygen time-dependent solver failed; retaining the state at the start of this radiation substep.");
+          y[0] = ionization_variables.get_ionic_fraction(ION_O_n);
+          y[1] = ionization_variables.get_ionic_fraction(ION_O_p1);
+          y[2] = ionization_variables.get_ionic_fraction(ION_O_p2);
+          y[3] = ionization_variables.get_ionic_fraction(ION_O_p3);
       }
       //set new 
       ionization_variables.set_ionic_fraction(ION_O_n, std::min(1.0,std::max(y[0],1e-14)));
@@ -1515,8 +1509,11 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
 
       if (status != GSL_SUCCESS) {
-          use_equilibrium_fallback();
-          return;
+          cmac_warning("Neon time-dependent solver failed; retaining the state at the start of this radiation substep.");
+          y[0] = ionization_variables.get_ionic_fraction(ION_Ne_n);
+          y[1] = ionization_variables.get_ionic_fraction(ION_Ne_p1);
+          y[2] = ionization_variables.get_ionic_fraction(ION_Ne_p2);
+          y[3] = ionization_variables.get_ionic_fraction(ION_Ne_p3);
       }
       //set new 
       ionization_variables.set_ionic_fraction(ION_Ne_n, std::min(1.0,std::max(y[0],1e-14)));
@@ -1573,8 +1570,10 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
 
       if (status != GSL_SUCCESS) {
-          use_equilibrium_fallback();
-          return;
+          cmac_warning("Sulphur time-dependent solver failed; retaining the state at the start of this radiation substep.");
+          y[0] = ionization_variables.get_ionic_fraction(ION_S_p1);
+          y[1] = ionization_variables.get_ionic_fraction(ION_S_p2);
+          y[2] = ionization_variables.get_ionic_fraction(ION_S_p3);
       }
       //set new 
       ionization_variables.set_ionic_fraction(ION_S_p1, std::min(1.0,std::max(y[0],1e-14)));
@@ -1588,7 +1587,6 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
     
   }
-
 
 
 
