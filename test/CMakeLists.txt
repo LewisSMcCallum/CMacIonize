@@ -278,6 +278,22 @@ add_unit_test(NAME testIonizationStateCalculator
               SOURCES ${TESTIONIZATIONSTATECALCULATOR_SOURCES}
               LIBS LegacyEngine)
 
+## Unit test for SwiggumFilePhotonSourceDistribution restart ordering
+set(TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES
+    testSwiggumFilePhotonSourceDistribution.cpp
+)
+add_unit_test(NAME testSwiggumFilePhotonSourceDistribution
+              SOURCES ${TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES}
+              LIBS SharedEngine)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_swiggum_file_photon_source_distribution.csv
+    ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_file_photon_source_distribution.csv
+    COPYONLY)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_swiggum_file_photon_source_distribution.yml
+    ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_file_photon_source_distribution.yml
+    COPYONLY)
+
 ## Unit test for AMRDensityGrid
 set(TESTAMRDENSITYGRID_SOURCES
     testAMRDensityGrid.cpp

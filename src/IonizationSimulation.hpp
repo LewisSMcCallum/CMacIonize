@@ -29,6 +29,7 @@
 #include "AbundanceModel.hpp"
 #include "Abundances.hpp"
 #include "ChargeTransferRates.hpp"
+#include "CollisionalRates.hpp"
 #include "IonizationPhotonShootJobMarket.hpp"
 #include "LineCoolingData.hpp"
 #include "ParameterFile.hpp"
@@ -171,6 +172,9 @@ private:
 
   /*! @brief Abundances. */
   const Abundances _abundances;
+
+  /*! @brief Collisional ionization rates used by the temperature calculator. */
+  const CollisionalRates _collisional_rates;
 
   /// internal timers
 

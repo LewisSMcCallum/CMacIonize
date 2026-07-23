@@ -72,6 +72,12 @@ std::string quote_for_shell(const std::string &value) {
   return quoted;
 }
 
+Box<> read_box(RestartReader &restart_reader) {
+  const CoordinateVector<> anchor(restart_reader);
+  const CoordinateVector<> sides(restart_reader);
+  return Box<>(anchor, sides);
+}
+
 } // namespace
 
 SwiggumFilePhotonSourceDistribution::SwiggumFilePhotonSourceDistribution(
@@ -99,8 +105,7 @@ SwiggumFilePhotonSourceDistribution::SwiggumFilePhotonSourceDistribution(
 SwiggumFilePhotonSourceDistribution::SwiggumFilePhotonSourceDistribution(
     RestartReader &restart_reader, Log *log)
     : _filename(restart_reader.read< std::string >()),
-      _box(CoordinateVector<>(restart_reader),
-           CoordinateVector<>(restart_reader)),
+      _box(read_box(restart_reader)),
       _history_start_time(restart_reader.read< double >()),
       _history_time(restart_reader.read< double >()),
       _luminosity_adjustment(restart_reader.read< double >()),

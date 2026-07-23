@@ -190,7 +190,6 @@ IonizationSimulation::IonizationSimulation(const bool write_output,
     _density_grid_writer = DensityGridWriterFactory::generate(
         output_folder, _parameter_file, false, _log);
   }
-  CollisionalRates _collisional_rates;
   // used to calculate both the ionization state and the temperature
   _temperature_calculator = new TemperatureCalculator(
       total_luminosity, _abundances, _line_cooling_data, *_recombination_rates,

@@ -747,8 +747,10 @@ public:
       if (_source_lifetimes[i] <= 0.) {
         // remove the element
         if (_output_file != nullptr) {
-          *_output_file << _total_time << "\t0.\t0.\t0.\t2\t"
-                        << _source_indices[i] << "\t0\t0\tSNe\n";    
+          *_output_file << _total_time << "\t" << _source_positions[i].x()
+                        << "\t" << _source_positions[i].y() << "\t"
+                        << _source_positions[i].z() << "\t2\t"
+                        << _source_indices[i] << "\t0\t0\tSNe\n";
         }
         _to_do_feedback.push_back(_source_positions[i]);
         _source_positions.erase(_source_positions.begin() + i);

@@ -1,0 +1,9 @@
+SimulationBox:
+  anchor: [-100. pc, -200. pc, -300. pc]
+  sides: [500. pc, 600. pc, 700. pc]
+
+PhotonSourceDistribution:
+  filename: test_swiggum_file_photon_source_distribution.csv
+  history start time: 0. Myr
+  luminosity adjust: 0.1
+  supernova energy: 1.e51 erg

@@ -41,31 +41,6 @@
 #include <gsl/gsl_odeiv2.h>
 #include <gsl/gsl_errno.h>
 
-namespace {
-
-// Do not allow one exceptionally stiff cell to monopolise a radiation step.
-// Keep the established RKF45 integration method, with this limit as a last
-// line of defence rather than a normal accuracy control.
-constexpr unsigned long int TIME_DEPENDENT_ODE_MAX_STEPS = 10000;
-
-int integrate_time_dependent_ode(gsl_odeiv2_system *system, const double ts,
-                                 const double initial_step, double *state) {
-  if (ts <= 0.) {
-    return GSL_SUCCESS;
-  }
-  double t = 0.;
-  gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-      system, gsl_odeiv2_step_rkf45, std::max(initial_step, 1.e-30), 1.e-4,
-      0.0);
-  gsl_odeiv2_driver_set_nmax(driver, TIME_DEPENDENT_ODE_MAX_STEPS);
-  const int status = gsl_odeiv2_driver_apply(driver, &t, ts, state);
-  gsl_odeiv2_driver_free(driver);
-  return status;
-}
-
-} // namespace
-
-
 /**
  * @brief Constructor.
  *
@@ -1063,44 +1038,75 @@ double IonizationStateCalculator::compute_ionization_state_hydrogen(
 
   return std::max(1.e-14,xn);
 }
+int hydrogen_ode_system(double t, const double y[], double f[], void *params) {
+    (void)(t); // Avoid unused parameter warning
+
+    // Extract rate coefficients and total density from params
+    double *coefficients = static_cast<double*>(params);
+    double k_coll = coefficients[0];
+    double k_photo = coefficients[1];
+    double k_rec = coefficients[2];
+    double n_total = coefficients[3];
+
+    // Neutral fraction
+    double x = y[0];
+
+    // ODE for the neutral fraction x
+    f[0] = -k_coll * x * (1 - x) * n_total - k_photo * x + k_rec * (1 - x) * (1 - x) * n_total;
+
+
+    // Preventing negative growth for negative values
+      if (y[0] < 1e-14) {
+          f[0] = std::max(f[0], 0.0);
+      }
+      // Preventing positive growth for values greater than 1
+      else if (y[0] > 1.0) {
+              f[0] = std::min(f[0], 0.0);
+      }
+
+    return GSL_SUCCESS;
+}
+
 double IonizationStateCalculator::compute_time_dependent_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
-  const double xn_old = std::min(1., std::max(old_xn, 1.e-14));
-  if (ts <= 0.) {
-    return xn_old;
+
+  double coefficients[4] = {gammaH, jH, alphaH, nH};
+  // Initial conditions: n_H, n_H_plus
+  double y[1] = {old_xn}; // Example initial population densities
+
+    // Time domain
+  double t = 0.0;
+
+    // Set up the solver
+  gsl_odeiv2_system sys = {hydrogen_ode_system, nullptr, 1, coefficients};
+
+  gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+        &sys, gsl_odeiv2_step_rkf45, ts/1000., 1e-4, 0.0);
+
+
+  int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+
+  if (status != GSL_SUCCESS) {
+      cmac_warning("Error in solver! xn = %g",y[0]);
+     // xn = 1e-14;
   }
 
-  // With rates fixed during one radiation substep, the hydrogen equation is
-  // a Riccati equation.  Integrating it analytically is both exact for this
-  // approximation and prevents a stiff cell from taking millions of RK steps.
-  const double a = nH * (gammaH + alphaH);
-  const double b = -(nH * gammaH + jH + 2. * nH * alphaH);
-  const double c = nH * alphaH;
-  const double discriminant = b * b - 4. * a * c;
+  gsl_odeiv2_driver_free(driver);
 
-  if (!(a > 0.) || !(discriminant > 0.) || !std::isfinite(discriminant)) {
-    return compute_ionization_state_hydrogen(alphaH, jH, nH, gammaH, xn_old,
-                                              ts);
+  double xn = y[0];
+
+  xn = std::max(xn,1e-14);
+  xn = std::min(xn,1.);
+
+  if (xn != xn) {
+    cmac_warning("Nan H0 in solver. Setting 0.999");
+    xn = 0.999;
   }
 
-  const double root_se = std::sqrt(discriminant);
-  const double stable_root = (-b - root_se) / (2. * a);
-  const double other_root = (-b + root_se) / (2. * a);
-  const double initial_denominator = xn_old - other_root;
-  if (std::abs(initial_denominator) < 1.e-14) {
-    return std::min(1., std::max(stable_root, 1.e-14));
-  }
 
-  const double exponent = -root_se * ts;
-  const double ratio = (xn_old - stable_root) / initial_denominator;
-  const double q = exponent < -700. ? 0. : ratio * std::exp(exponent);
-  const double denominator = 1. - q;
-  const double xn = (stable_root - q * other_root) / denominator;
-  if (!std::isfinite(xn) || std::abs(denominator) < 1.e-14) {
-    return compute_ionization_state_hydrogen(alphaH, jH, nH, gammaH, xn_old,
-                                              ts);
-  }
-  return std::min(1., std::max(xn, 1.e-14));
+
+  return xn;
 }
 
 int hydrogen_helium_ode_system(double t, const double y[], double f[], void *params) {
@@ -1120,7 +1126,7 @@ int hydrogen_helium_ode_system(double t, const double y[], double f[], void *par
     double gammaHe2 = coefficients[9];
     double sqrtT = coefficients[10];
     double alpha_e_2sP = coefficients[11];
-    
+
 
     // Neutral fraction
     double xh = y[0];
@@ -1170,12 +1176,26 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
 
   double y[3] = {h0,he0,hep};
 
+  double t = 0.0;
+
   gsl_odeiv2_system sys = {hydrogen_helium_ode_system, nullptr, 3, coefficients};
-  const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+
+  gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+  int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
+
+
+
   if (status != GSL_SUCCESS) {
-      cmac_warning("Hydrogen-helium time-dependent solver failed; retaining the state at the start of this radiation substep.");
-      return;
+      std::cout << h0 << " " << he0 << " " << hep << std::endl;
+      std::cout <<  alphaH << " " << alphaHe <<  " " << alphaHe2 << " " << jH << " "  << jHe << " "  << gammaH << " "  << gammaHe1 << " "  << gammaHe2 << std::endl;
+      std::cout << nH << " "  << AHe << " "  << T << " "  << std::endl;
+      cmac_error("Error in solver!");
   }
+
+
+  gsl_odeiv2_driver_free(driver);
 
   h0 = std::max(y[0],1e-14);
   he0 = std::max(y[1],1e-14);
@@ -1329,14 +1349,19 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                         + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_C_p2,T4);
 
 
+      double t = 0.0;
+
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_carbon - 1, &params};
-      const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1.e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
       if (status != GSL_SUCCESS) {
-          cmac_warning("Carbon time-dependent solver failed; retaining the state at the start of this radiation substep.");
-          y[0] = ionization_variables.get_ionic_fraction(ION_C_p1);
-          y[1] = ionization_variables.get_ionic_fraction(ION_C_p2);
+          cmac_error("Error in solver!");
       }
+
+      gsl_odeiv2_driver_free(driver);
       //set new 
       ionization_variables.set_ionic_fraction(ION_C_p1, std::min(1.0,std::max(y[0],1e-14)));
       ionization_variables.set_ionic_fraction(ION_C_p2, std::min(1.0,std::max(y[1],1e-14)));
@@ -1384,15 +1409,19 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       params.coefficients[2][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_N_p2,T4)
                         + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_N_p2,T4);
 
+      double t = 0.0;
+
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_nitrogen - 1, &params};
-      const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
       if (status != GSL_SUCCESS) {
-          cmac_warning("Nitrogen time-dependent solver failed; retaining the state at the start of this radiation substep.");
-          y[0] = ionization_variables.get_ionic_fraction(ION_N_n);
-          y[1] = ionization_variables.get_ionic_fraction(ION_N_p1);
-          y[2] = ionization_variables.get_ionic_fraction(ION_N_p2);
+          cmac_error("Error in solver!");
       }
+
+      gsl_odeiv2_driver_free(driver);
       //set new 
       ionization_variables.set_ionic_fraction(ION_N_n, std::min(1.0,std::max(y[0],1e-14)));
       ionization_variables.set_ionic_fraction(ION_N_p1, std::min(1.0,std::max(y[1],1e-14)));
@@ -1446,16 +1475,19 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       params.coefficients[3][4] = nh0*charge_transfer_rates.get_charge_transfer_recombination_rate_H(ION_O_p3,T4)
                         + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_O_p3,T4);
 
+      double t = 0.0;
+
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_oxygen - 1, &params};
-      const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
       if (status != GSL_SUCCESS) {
-          cmac_warning("Oxygen time-dependent solver failed; retaining the state at the start of this radiation substep.");
-          y[0] = ionization_variables.get_ionic_fraction(ION_O_n);
-          y[1] = ionization_variables.get_ionic_fraction(ION_O_p1);
-          y[2] = ionization_variables.get_ionic_fraction(ION_O_p2);
-          y[3] = ionization_variables.get_ionic_fraction(ION_O_p3);
+          cmac_error("Error in solver!");
       }
+
+      gsl_odeiv2_driver_free(driver);
       //set new 
       ionization_variables.set_ionic_fraction(ION_O_n, std::min(1.0,std::max(y[0],1e-14)));
       ionization_variables.set_ionic_fraction(ION_O_p1, std::min(1.0,std::max(y[1],1e-14)));
@@ -1505,16 +1537,19 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                         + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_Ne_p2,T4);
 
 
+      double t = 0.0;
+
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_neon - 1, &params};
-      const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
       if (status != GSL_SUCCESS) {
-          cmac_warning("Neon time-dependent solver failed; retaining the state at the start of this radiation substep.");
-          y[0] = ionization_variables.get_ionic_fraction(ION_Ne_n);
-          y[1] = ionization_variables.get_ionic_fraction(ION_Ne_p1);
-          y[2] = ionization_variables.get_ionic_fraction(ION_Ne_p2);
-          y[3] = ionization_variables.get_ionic_fraction(ION_Ne_p3);
+          cmac_error("Error in solver!");
       }
+
+      gsl_odeiv2_driver_free(driver);
       //set new 
       ionization_variables.set_ionic_fraction(ION_Ne_n, std::min(1.0,std::max(y[0],1e-14)));
       ionization_variables.set_ionic_fraction(ION_Ne_p1, std::min(1.0,std::max(y[1],1e-14)));
@@ -1566,15 +1601,19 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                         + nhe0*charge_transfer_rates.get_charge_transfer_recombination_rate_He(ION_S_p3,T4);
 
 
+      double t = 0.0;
+
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_sulphur - 1, &params};
-      const int status = integrate_time_dependent_ode(&sys, ts, ts / 100., y);
+      gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
+          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+
+      int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
       if (status != GSL_SUCCESS) {
-          cmac_warning("Sulphur time-dependent solver failed; retaining the state at the start of this radiation substep.");
-          y[0] = ionization_variables.get_ionic_fraction(ION_S_p1);
-          y[1] = ionization_variables.get_ionic_fraction(ION_S_p2);
-          y[2] = ionization_variables.get_ionic_fraction(ION_S_p3);
+          cmac_error("Error in solver!");
       }
+
+      gsl_odeiv2_driver_free(driver);
       //set new 
       ionization_variables.set_ionic_fraction(ION_S_p1, std::min(1.0,std::max(y[0],1e-14)));
       ionization_variables.set_ionic_fraction(ION_S_p2, std::min(1.0,std::max(y[1],1e-14)));
@@ -1587,5 +1626,3 @@ void IonizationStateCalculator::compute_time_dependent_metals(
     
     
   }
-
-
