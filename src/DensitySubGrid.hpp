@@ -815,6 +815,11 @@ public:
   }
 
   /**
+   * @brief Make a geometry-preserving copy for source subgrid replication.
+   */
+  virtual DensitySubGrid *clone() const { return new DensitySubGrid(*this); }
+
+  /**
    * @brief Get the number of cells in a single subgrid.
    *
    * @return Number of cells in the subgrid.
@@ -1138,7 +1143,7 @@ public:
    * @param position Position (in m).
    * @return True if the given position is in the box of the subgrid.
    */
-  inline bool is_in_box(const CoordinateVector<> position) const {
+  virtual bool is_in_box(const CoordinateVector<> position) const {
     return position[0] >= _anchor[0] &&
            position[0] <= _anchor[0] + _cell_size[0] * _number_of_cells[0] &&
            position[1] >= _anchor[1] &&
@@ -1154,8 +1159,9 @@ public:
    * @param input_direction Direction from which the photon enters the grid.
    * @return TravelDirection of the photon after it has traversed this grid.
    */
-  inline int_fast32_t interact(PhotonPacket &photon,
-                               const int_fast32_t input_direction, const double max_photon_distance) {
+  virtual int_fast32_t interact(PhotonPacket &photon,
+                                const int_fast32_t input_direction,
+                                const double max_photon_distance) {
 
     cmac_assert_message(input_direction >= 0 &&
                             input_direction < TRAVELDIRECTION_NUMBER,
@@ -1739,7 +1745,8 @@ public:
    * @param index Index of a cell.
    * @return Coordinates of the midpoint of that cell (in m).
    */
-  inline CoordinateVector<> get_cell_midpoint(const uint_fast32_t index) const {
+  virtual CoordinateVector<>
+  get_cell_midpoint(const uint_fast32_t index) const {
 
     CoordinateVector< int_fast32_t > three_index;
     get_three_index(index, three_index);
@@ -1799,8 +1806,7 @@ public:
      * @return Cell volume (in m^3).
      */
     virtual double get_volume() const {
-      return _subgrid->_cell_size[0] * _subgrid->_cell_size[1] *
-             _subgrid->_cell_size[2];
+      return _subgrid->get_cell_volume(_index);
     }
 
     /**
@@ -1934,11 +1940,29 @@ public:
    * @param position Position (in m).
    * @return Iterator to the corresponding cell.
    */
-  inline iterator get_cell(const CoordinateVector<> position) {
+  virtual iterator get_cell(const CoordinateVector<> position) {
     CoordinateVector< int_fast32_t > three_index;
     return iterator(get_start_index(position - _anchor, TRAVELDIRECTION_INSIDE,
                                     three_index),
                     *this);
+  }
+
+  /**
+   * @brief Get the volume of a cell.
+   *
+   * This geometry hook lets the task-based transport operate on curvilinear
+   * cells without changing the cell iterator or chemistry code.
+   */
+  virtual double get_cell_volume(const uint_fast32_t) const {
+    return _cell_size[0] * _cell_size[1] * _cell_size[2];
+  }
+
+  /**
+   * @brief Get the input port used by the neighbour across an output port.
+   */
+  virtual int_fast32_t
+  get_neighbour_input_direction(const int_fast32_t output_direction) const {
+    return TravelDirections::output_to_input_direction(output_direction);
   }
 
   /**

@@ -77,6 +77,8 @@ public:
       const uint_fast32_t ngb = grid.get_neighbour(i);
       if (ngb != NEIGHBOUR_OUTSIDE) {
         _local_buffer_flags[i] = true;
+        _local_buffers[i].set_direction(
+            grid.get_neighbour_input_direction(i));
         _local_buffers[i].reset();
       } else {
         _local_buffer_flags[i] = false;

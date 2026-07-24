@@ -74,7 +74,7 @@ public:
     double active_weight = 0.;
     for (photonsourcenumber_t isource = 0; isource < number_of_sources;
          ++isource) {
-      if (grid_creator.get_box().inside(distribution.get_position(isource))) {
+      if (grid_creator.contains(distribution.get_position(isource))) {
         active_weight += distribution.get_weight(isource);
       }
     }
@@ -84,7 +84,7 @@ public:
       const CoordinateVector<> position = distribution.get_position(isource);
       // A moved source can be outside the grid before its distribution has
       // removed it.  Never turn that position into an unchecked subgrid index.
-      if (!grid_creator.get_box().inside(position)) {
+      if (!grid_creator.contains(position)) {
         continue;
       }
       typename DensitySubGridCreator< _subgrid_type_ >::iterator first_cell =
