@@ -1,0 +1,42 @@
+SimulationBox:
+  anchor: [-8. pc, -8. pc, -8. pc]
+  sides: [16. pc, 16. pc, 16. pc]
+DensityGrid:
+  type: Spherical
+SphericalDensityGrid:
+  centre: [0. pc, 0. pc, 0. pc]
+  minimum radius: 0.05 pc
+  maximum radius: 8.0 pc
+  radial spacing: linear
+  angular cells per face: 32
+  number of radial cells: 48
+  angular subgrids per face: 4
+  number of radial subgrids: 6
+DensityFunction:
+  type: Homogeneous
+  density: 30. cm^-3
+  temperature: 8000. K
+Abundances:
+  helium: 0.
+TemperatureCalculator:
+  do temperature calculation: false
+PhotonSourceDistribution:
+  type: AsciiFile
+  filename: two_sources.yml
+PhotonSourceSpectrum:
+  type: Monochromatic
+  frequency: 13.6 eV
+TaskBasedIonizationSimulation:
+  number of photons: 1000000
+  number of iterations: 10
+  source copy level: 1
+  output folder: output_spherical
+DensityGridWriter:
+  type: AsciiFile
+  prefix: spherical_highres_
+CrossSections:
+  type: FixedValue
+  hydrogen_0: 6.3e-18 cm^2
+RecombinationRates:
+  type: FixedValue
+  hydrogen_1: 2.7e-13 cm^3 s^-1

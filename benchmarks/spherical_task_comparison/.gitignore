@@ -1,0 +1,9 @@
+output_cartesian/
+output_spherical/
+*.used-values
+diagnostics_*.txt
+input_spectrum.txt
+leaking_spectrum.txt
+memory*.txt
+photon_statistics.txt
+time_log.txt

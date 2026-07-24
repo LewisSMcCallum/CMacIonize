@@ -1,0 +1,30 @@
+SimulationBox:
+  anchor: [-1248.1001 pc, -1248.1001 pc, -1248.1001 pc]
+  sides: [2496.2002 pc, 2496.2002 pc, 2496.2002 pc]
+
+DensityGrid:
+  type: Spherical
+SphericalDensityGrid:
+  centre: [0. pc, 0. pc, 0. pc]
+  minimum radius: 0.1 pc
+  maximum radius: 1248.1001 pc
+  radial spacing: file
+  radial edges filename: edenhofer_cubed_n128_r517.hdf5
+  angular cells per face: 128
+  number of radial cells: 517
+  angular subgrids per face: 8
+  number of radial subgrids: 11
+
+DensityFunction:
+  type: SphericalHDF5
+  filename: edenhofer_cubed_n128_r517.hdf5
+  temperature: 100. K
+  dust to gas: 0.01
+  fraction silicates: 1.
+
+# Add the PhotonSourceDistribution, spectrum, chemistry and task-based
+# iteration settings appropriate for the production run.
+DensityGridWriter:
+  type: Gadget
+  prefix: edenhofer_ionization_
+  compression: true

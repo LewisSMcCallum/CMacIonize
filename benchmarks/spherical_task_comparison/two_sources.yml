@@ -1,0 +1,7 @@
+number of sources: 2
+source[0]:
+  position: [0.5 pc, 0.0 pc, 0.0 pc]
+  luminosity: 2.0e47 s^-1
+source[1]:
+  position: [5.0 pc, 1.0 pc, 0.5 pc]
+  luminosity: 2.0e47 s^-1

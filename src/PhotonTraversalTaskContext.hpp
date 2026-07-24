@@ -114,7 +114,7 @@ public:
     const uint_fast32_t current_buffer_index = task.get_buffer();
     PhotonBuffer &photon_buffer = _buffers[current_buffer_index];
     const uint_fast32_t igrid = photon_buffer.get_subgrid_index();
-    DensitySubGrid &this_grid = *_grid_creator.get_subgrid(igrid);
+    _subgrid_type_ &this_grid = *_grid_creator.get_subgrid(igrid);
 
     // set the ownership of this grid to the current thread (in case this task
     // was stolen)
@@ -184,7 +184,7 @@ public:
           new_index = _buffers.get_free_buffer();
           PhotonBuffer &buffer = _buffers[new_index];
           buffer.set_subgrid_index(ngb);
-          buffer.set_direction(TravelDirections::output_to_input_direction(i));
+          buffer.set_direction(this_grid.get_neighbour_input_direction(i));
           this_grid.set_active_buffer(i, new_index);
         }
 

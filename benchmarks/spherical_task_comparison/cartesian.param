@@ -1,0 +1,37 @@
+SimulationBox:
+  anchor: [-8. pc, -8. pc, -8. pc]
+  sides: [16. pc, 16. pc, 16. pc]
+DensityGrid:
+  type: Cartesian
+  number of cells: [32, 32, 32]
+DensitySubGridCreator:
+  number of subgrids: [4, 4, 4]
+  periodicity: [false, false, false]
+DensityFunction:
+  type: Homogeneous
+  density: 30. cm^-3
+  temperature: 8000. K
+Abundances:
+  helium: 0.
+TemperatureCalculator:
+  do temperature calculation: false
+PhotonSourceDistribution:
+  type: AsciiFile
+  filename: two_sources.yml
+PhotonSourceSpectrum:
+  type: Monochromatic
+  frequency: 13.6 eV
+TaskBasedIonizationSimulation:
+  number of photons: 200000
+  number of iterations: 5
+  source copy level: 1
+  output folder: output_cartesian
+DensityGridWriter:
+  type: AsciiFile
+  prefix: cartesian_
+CrossSections:
+  type: FixedValue
+  hydrogen_0: 6.3e-18 cm^2
+RecombinationRates:
+  type: FixedValue
+  hydrogen_1: 2.7e-13 cm^3 s^-1

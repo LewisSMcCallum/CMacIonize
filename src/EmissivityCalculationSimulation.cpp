@@ -36,6 +36,29 @@
 #include "Timer.hpp"
 #include "WorkEnvironment.hpp"
 
+namespace {
+/**
+ * @brief Get the number of cells directly from a snapshot dataset.
+ *
+ * Unlike DensityGrid:number of cells, this also works for non-Cartesian grids.
+ */
+inline hsize_t get_snapshot_cell_count(const hid_t group) {
+  const hid_t dataset =
+      H5Dopen(group, "NumberDensity", H5P_DEFAULT);
+  if (dataset < 0) {
+    cmac_error("Failed to open dataset \"NumberDensity\".");
+  }
+  const hid_t dataspace = H5Dget_space(dataset);
+  hsize_t size[1];
+  if (H5Sget_simple_extent_dims(dataspace, size, nullptr) != 1) {
+    cmac_error("Dataset \"NumberDensity\" should be one-dimensional.");
+  }
+  H5Sclose(dataspace);
+  H5Dclose(dataset);
+  return size[0];
+}
+} // namespace
+
 /**
  * @brief Add program specific command line parameters.
  *
@@ -179,11 +202,7 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
     log->write_status("Creating output datasets...");
   }
 
-  const CoordinateVector< uint_fast32_t > number_of_cells =
-      simulation_parameters.get_value< CoordinateVector< uint_fast32_t > >(
-          "DensityGrid:number of cells", CoordinateVector< uint_fast32_t >(-1));
-  const uint_fast32_t total_number_of_cells =
-      number_of_cells.x() * number_of_cells.y() * number_of_cells.z();
+  const hsize_t total_number_of_cells = get_snapshot_cell_count(parttype0);
 
   for (int_fast32_t i = 0; i < NUMBER_OF_EMISSIONLINES; ++i) {
     if (do_line[i]) {

@@ -31,13 +31,19 @@
 #include "DensityFunction.hpp"
 #include "DensitySubGrid.hpp"
 #include "Error.hpp"
+#include "Configuration.hpp"
+#ifdef HAVE_HDF5
+#include "HDF5Tools.hpp"
+#endif
 #include "OpenMP.hpp"
 #include "ParameterFile.hpp"
 #include "HydroDensitySubGrid.hpp"
+#include "SphericalDensitySubGrid.hpp"
 
 #include <cinttypes>
 #include <vector>
 #include <cmath>
+#include <typeinfo>
 
 /**
  * @brief Class responsible for creating DensitySubGrid instances that make up
@@ -70,6 +76,129 @@ private:
   /*! @brief Periodicity flags. */
   const CoordinateVector< bool > _periodicity;
 
+  /*! @brief Use the cubed-sphere geometry (static task solver only)? */
+  const bool _spherical;
+
+  CoordinateVector<> _spherical_centre;
+  double _minimum_radius;
+  double _maximum_radius;
+  bool _logarithmic_radius;
+  std::vector< double > _radial_edges;
+
+  inline static CoordinateVector< int_fast32_t >
+  parameter_cells(ParameterFile &params) {
+    if (params.get_value< std::string >("DensityGrid:type", "Cartesian") ==
+        "Spherical") {
+      const int_fast32_t angular = params.get_value< int_fast32_t >(
+          "SphericalDensityGrid:angular cells per face", 32);
+      return CoordinateVector< int_fast32_t >(
+          6 * angular, angular,
+          params.get_value< int_fast32_t >(
+              "SphericalDensityGrid:number of radial cells", 64));
+    }
+    return params.get_value< CoordinateVector< int_fast32_t > >(
+        "DensityGrid:number of cells",
+        CoordinateVector< int_fast32_t >(64));
+  }
+
+  inline static CoordinateVector< int_fast32_t >
+  parameter_subgrids(ParameterFile &params) {
+    if (params.get_value< std::string >("DensityGrid:type", "Cartesian") ==
+        "Spherical") {
+      const int_fast32_t angular = params.get_value< int_fast32_t >(
+          "SphericalDensityGrid:angular subgrids per face", 2);
+      return CoordinateVector< int_fast32_t >(
+          6 * angular, angular,
+          params.get_value< int_fast32_t >(
+              "SphericalDensityGrid:number of radial subgrids", 4));
+    }
+    return params.get_value< CoordinateVector< int_fast32_t > >(
+        "DensitySubGridCreator:number of subgrids",
+        CoordinateVector< int_fast32_t >(8));
+  }
+
+  inline static int_fast8_t spherical_face(const CoordinateVector<> &x) {
+    int_fast8_t axis = 0;
+    if (std::abs(x[1]) > std::abs(x[axis])) {
+      axis = 1;
+    }
+    if (std::abs(x[2]) > std::abs(x[axis])) {
+      axis = 2;
+    }
+    return 2 * axis + (x[axis] < 0.);
+  }
+
+  inline static CoordinateVector<> spherical_normal(const int_fast8_t f) {
+    static const double a[6][3] = {{1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
+                                    {0, -1, 0}, {0, 0, 1},  {0, 0, -1}};
+    return CoordinateVector<>(a[f][0], a[f][1], a[f][2]);
+  }
+
+  inline static CoordinateVector<> spherical_u_axis(const int_fast8_t f) {
+    static const double a[6][3] = {{0, 1, 0}, {0, -1, 0}, {-1, 0, 0},
+                                    {1, 0, 0}, {0, 1, 0},  {0, 1, 0}};
+    return CoordinateVector<>(a[f][0], a[f][1], a[f][2]);
+  }
+
+  inline static CoordinateVector<> spherical_v_axis(const int_fast8_t f) {
+    static const double a[6][3] = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1},
+                                    {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}};
+    return CoordinateVector<>(a[f][0], a[f][1], a[f][2]);
+  }
+
+  inline static double spherical_dot(const CoordinateVector<> &a,
+                                     const CoordinateVector<> &b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  }
+
+  inline void spherical_coordinates(const CoordinateVector<> &position,
+                                    int_fast8_t &face, double &u, double &v,
+                                    double &radius) const {
+    const CoordinateVector<> x = position - _spherical_centre;
+    radius = x.norm();
+    face = spherical_face(x);
+    const double denominator = spherical_dot(spherical_normal(face), x);
+    u = spherical_dot(spherical_u_axis(face), x) / denominator;
+    v = spherical_dot(spherical_v_axis(face), x) / denominator;
+  }
+
+  inline size_t spherical_subgrid_index(const int_fast8_t face, const double u,
+                                        const double v,
+                                        const double radius) const {
+    const int_fast32_t nu = _number_of_subgrids[0] / 6;
+    const int_fast32_t iu = std::min(
+        nu - 1, std::max< int_fast32_t >(0, std::floor(0.5 * (u + 1.) * nu)));
+    const int_fast32_t iv = std::min(
+        _number_of_subgrids[1] - 1,
+        std::max< int_fast32_t >(
+            0, std::floor(0.5 * (v + 1.) * _number_of_subgrids[1])));
+    double fraction;
+    if (!_radial_edges.empty()) {
+      const std::vector< double >::const_iterator edge =
+          std::upper_bound(_radial_edges.begin(), _radial_edges.end(), radius);
+      const int_fast32_t cell = std::min(
+          static_cast< int_fast32_t >(_radial_edges.size()) - 2,
+          std::max< int_fast32_t >(0, edge - _radial_edges.begin() - 1));
+      return (face * nu + iu) * _number_of_subgrids[1] *
+                 _number_of_subgrids[2] +
+             iv * _number_of_subgrids[2] +
+             cell / _subgrid_number_of_cells[2];
+    } else if (_logarithmic_radius) {
+      fraction = std::log(radius / _minimum_radius) /
+                 std::log(_maximum_radius / _minimum_radius);
+    } else {
+      fraction =
+          (radius - _minimum_radius) / (_maximum_radius - _minimum_radius);
+    }
+    const int_fast32_t ir = std::min(
+        _number_of_subgrids[2] - 1,
+        std::max< int_fast32_t >(
+            0, std::floor(fraction * _number_of_subgrids[2])));
+    const int_fast32_t ix = face * nu + iu;
+    return ix * _number_of_subgrids[1] * _number_of_subgrids[2] +
+           iv * _number_of_subgrids[2] + ir;
+  }
+
 public:
   /**
    * @brief Constructor.
@@ -82,7 +211,10 @@ public:
   inline DensitySubGridCreator(
       const Box<> box, const CoordinateVector< int_fast32_t > number_of_cells,
       const CoordinateVector< int_fast32_t > number_of_subgrids,
-      const CoordinateVector< bool > periodicity)
+      const CoordinateVector< bool > periodicity, const bool spherical = false,
+      const CoordinateVector<> spherical_centre = CoordinateVector<>(0.),
+      const double minimum_radius = 0., const double maximum_radius = 0.,
+      const bool logarithmic_radius = false)
       : _box(box), _subgrid_sides(box.get_sides()[0] / number_of_subgrids[0],
                                   box.get_sides()[1] / number_of_subgrids[1],
                                   box.get_sides()[2] / number_of_subgrids[2]),
@@ -91,7 +223,10 @@ public:
         _subgrid_number_of_cells(number_of_cells[0] / number_of_subgrids[0],
                                  number_of_cells[1] / number_of_subgrids[1],
                                  number_of_cells[2] / number_of_subgrids[2]),
-        _periodicity(periodicity) {
+        _periodicity(periodicity), _spherical(spherical),
+        _spherical_centre(spherical_centre), _minimum_radius(minimum_radius),
+        _maximum_radius(maximum_radius),
+        _logarithmic_radius(logarithmic_radius), _radial_edges() {
 
     for (uint_fast8_t i = 0; i < 3; ++i) {
       if (number_of_cells[i] % number_of_subgrids[i] != 0) {
@@ -119,16 +254,62 @@ public:
    */
   inline DensitySubGridCreator(const Box<> box, ParameterFile &params)
       : DensitySubGridCreator(
-            box,
-            params.get_value< CoordinateVector< int_fast32_t > >(
-                "DensityGrid:number of cells",
-                CoordinateVector< int_fast32_t >(64)),
-            params.get_value< CoordinateVector< int_fast32_t > >(
-                "DensitySubGridCreator:number of subgrids",
-                CoordinateVector< int_fast32_t >(8)),
-            params.get_value< CoordinateVector< bool > >(
-                "DensitySubGridCreator:periodicity",
-                CoordinateVector< bool >(false))) {}
+            box, parameter_cells(params), parameter_subgrids(params),
+            params.get_value< std::string >("DensityGrid:type", "Cartesian") ==
+                    "Spherical"
+                ? CoordinateVector< bool >(false)
+                : params.get_value< CoordinateVector< bool > >(
+                      "DensitySubGridCreator:periodicity",
+                      CoordinateVector< bool >(false)),
+            params.get_value< std::string >("DensityGrid:type", "Cartesian") ==
+                "Spherical",
+            params.has_value("SphericalDensityGrid:centre")
+                ? params.get_physical_vector< QUANTITY_LENGTH >(
+                      "SphericalDensityGrid:centre")
+                : box.get_anchor() + 0.5 * box.get_sides(),
+            params.get_physical_value< QUANTITY_LENGTH >(
+                "SphericalDensityGrid:minimum radius", "0.01 pc"),
+            params.get_physical_value< QUANTITY_LENGTH >(
+                "SphericalDensityGrid:maximum radius", "10. pc"),
+            params.get_value< std::string >(
+                "SphericalDensityGrid:radial spacing", "linear") ==
+                "logarithmic") {
+    if (_spherical && typeid(_subgrid_type_) != typeid(DensitySubGrid)) {
+      cmac_error("SphericalDensityGrid is only supported by the task-based "
+                 "static ionization solver.");
+    }
+    if (_spherical && (_minimum_radius <= 0. ||
+                       _maximum_radius <= _minimum_radius)) {
+      cmac_error("Spherical radii must satisfy 0 < minimum < maximum.");
+    }
+    if (_spherical &&
+        params.get_value< std::string >(
+            "SphericalDensityGrid:radial spacing", "linear") == "file") {
+#ifdef HAVE_HDF5
+      const std::string filename = params.get_filename(
+          "SphericalDensityGrid:radial edges filename");
+      HDF5Tools::initialize();
+      HDF5Tools::HDF5File file =
+          HDF5Tools::open_file(filename, HDF5Tools::HDF5FILEMODE_READ);
+      HDF5Tools::HDF5Group group =
+          HDF5Tools::open_group(file, "/SphericalGrid");
+      _radial_edges =
+          HDF5Tools::read_dataset< double >(group, "RadialEdges");
+      HDF5Tools::close_group(group);
+      HDF5Tools::close_file(file);
+      const size_t expected =
+          parameter_cells(params)[2] + static_cast< size_t >(1);
+      if (_radial_edges.size() != expected) {
+        cmac_error("Expected %zu radial edges in \"%s\", found %zu.", expected,
+                   filename.c_str(), _radial_edges.size());
+      }
+      _minimum_radius = _radial_edges.front();
+      _maximum_radius = _radial_edges.back();
+#else
+      cmac_error("File radial spacing requires HDF5 support.");
+#endif
+    }
+  }
 
   /**
    * @brief Destructor.
@@ -194,6 +375,17 @@ public:
   inline Box<> get_box() const { return _box; }
 
   /**
+   * @brief Check whether a position lies in the active grid volume.
+   */
+  inline bool contains(const CoordinateVector<> position) const {
+    if (!_spherical) {
+      return _box.inside(position);
+    }
+    const double radius = (position - _spherical_centre).norm();
+    return radius >= _minimum_radius && radius <= _maximum_radius;
+  }
+
+  /**
    * @brief Get the 3D integer coordinates of the given subgrid index within
    * the subgrid grid layout.
    *
@@ -225,6 +417,27 @@ public:
    */
   inline uint_fast8_t get_neighbours(const size_t index,
                                      size_t neighbours[6]) const {
+
+    if (_spherical) {
+      static const int ports[6] = {
+          TRAVELDIRECTION_FACE_X_N, TRAVELDIRECTION_FACE_X_P,
+          TRAVELDIRECTION_FACE_Y_N, TRAVELDIRECTION_FACE_Y_P,
+          TRAVELDIRECTION_FACE_Z_N, TRAVELDIRECTION_FACE_Z_P};
+      uint_fast8_t count = 0;
+      for (int i = 0; i < 6; ++i) {
+        const size_t neighbour = _subgrids[index]->get_neighbour(ports[i]);
+        if (neighbour != NEIGHBOUR_OUTSIDE) {
+          bool duplicate = false;
+          for (uint_fast8_t j = 0; j < count; ++j) {
+            duplicate = duplicate || neighbours[j] == neighbour;
+          }
+          if (!duplicate) {
+            neighbours[count++] = neighbour;
+          }
+        }
+      }
+      return count;
+    }
 
     const CoordinateVector< int_fast32_t > p = get_grid_position(index);
     uint_fast8_t number_of_neighbours = 0;
@@ -323,6 +536,113 @@ public:
     const int_fast32_t iz =
         index - ix * _number_of_subgrids[1] * _number_of_subgrids[2] -
         iy * _number_of_subgrids[2];
+    if (_spherical) {
+      const int_fast32_t nu = _number_of_subgrids[0] / 6;
+      const int_fast8_t face = ix / nu;
+      const int_fast32_t iu = ix % nu;
+      const double u0 = -1. + 2. * iu / nu;
+      const double u1 = -1. + 2. * (iu + 1) / nu;
+      const double v0 = -1. + 2. * iy / _number_of_subgrids[1];
+      const double v1 = -1. + 2. * (iy + 1) / _number_of_subgrids[1];
+      std::vector< double > radial_edges(_subgrid_number_of_cells[2] + 1);
+      const int_fast32_t total_radial_cells =
+          _subgrid_number_of_cells[2] * _number_of_subgrids[2];
+      for (int_fast32_t i = 0; i <= _subgrid_number_of_cells[2]; ++i) {
+        const double fraction =
+            static_cast< double >(iz * _subgrid_number_of_cells[2] + i) /
+            total_radial_cells;
+        radial_edges[i] =
+            !_radial_edges.empty()
+                ? _radial_edges[iz * _subgrid_number_of_cells[2] + i]
+                : _logarithmic_radius
+                ? _minimum_radius *
+                      std::pow(_maximum_radius / _minimum_radius, fraction)
+                : _minimum_radius +
+                      fraction * (_maximum_radius - _minimum_radius);
+      }
+      DensitySubGrid *base = new SphericalDensitySubGrid(
+          _spherical_centre, face, u0, u1, v0, v1, radial_edges,
+          _subgrid_number_of_cells);
+      _subgrid_type_ *this_grid = dynamic_cast< _subgrid_type_ * >(base);
+      cmac_assert(this_grid != nullptr);
+      for (int_fast32_t i = 0; i < TRAVELDIRECTION_NUMBER; ++i) {
+        this_grid->set_neighbour(i, NEIGHBOUR_OUTSIDE);
+        this_grid->set_active_buffer(i, NEIGHBOUR_OUTSIDE);
+      }
+      this_grid->set_neighbour(TRAVELDIRECTION_INSIDE, index);
+
+      SphericalDensitySubGrid *spherical_grid =
+          static_cast< SphericalDensitySubGrid * >(base);
+      const int ports[4] = {TRAVELDIRECTION_FACE_X_N,
+                            TRAVELDIRECTION_FACE_X_P,
+                            TRAVELDIRECTION_FACE_Y_N,
+                            TRAVELDIRECTION_FACE_Y_P};
+      for (int edge = 0; edge < 4; ++edge) {
+        const bool is_u = edge < 2;
+        const bool positive = edge % 2;
+        int_fast32_t neighbour_ix = ix;
+        int_fast32_t neighbour_iy = iy;
+        int_fast32_t input =
+            TravelDirections::output_to_input_direction(ports[edge]);
+        if ((is_u && ((positive && iu + 1 < nu) || (!positive && iu > 0)))) {
+          neighbour_ix += positive ? 1 : -1;
+        } else if ((!is_u &&
+                    ((positive && iy + 1 < _number_of_subgrids[1]) ||
+                     (!positive && iy > 0)))) {
+          neighbour_iy += positive ? 1 : -1;
+        } else {
+          const double u =
+              is_u ? (positive ? 1.000001 : -1.000001) : 0.5 * (u0 + u1);
+          const double v =
+              is_u ? 0.5 * (v0 + v1)
+                   : (positive ? 1.000001 : -1.000001);
+          CoordinateVector<> q = spherical_normal(face) +
+                                 u * spherical_u_axis(face) +
+                                 v * spherical_v_axis(face);
+          const int_fast8_t target_face = spherical_face(q);
+          const double denominator =
+              spherical_dot(spherical_normal(target_face), q);
+          const double target_u =
+              spherical_dot(spherical_u_axis(target_face), q) / denominator;
+          const double target_v =
+              spherical_dot(spherical_v_axis(target_face), q) / denominator;
+          neighbour_ix =
+              target_face * nu +
+              std::min(nu - 1,
+                       std::max< int_fast32_t >(
+                           0, std::floor(0.5 * (target_u + 1.) * nu)));
+          neighbour_iy = std::min(
+              _number_of_subgrids[1] - 1,
+              std::max< int_fast32_t >(
+                  0, std::floor(0.5 * (target_v + 1.) *
+                                _number_of_subgrids[1])));
+          const double distances[4] = {
+              std::abs(target_u + 1.), std::abs(target_u - 1.),
+              std::abs(target_v + 1.), std::abs(target_v - 1.)};
+          int closest = 0;
+          for (int k = 1; k < 4; ++k) {
+            if (distances[k] < distances[closest]) {
+              closest = k;
+            }
+          }
+          input = ports[closest];
+        }
+        const uint_fast32_t neighbour =
+            neighbour_ix * _number_of_subgrids[1] *
+                _number_of_subgrids[2] +
+            neighbour_iy * _number_of_subgrids[2] + iz;
+        this_grid->set_neighbour(ports[edge], neighbour);
+        spherical_grid->set_neighbour_input_direction(ports[edge], input);
+      }
+      if (iz > 0) {
+        this_grid->set_neighbour(TRAVELDIRECTION_FACE_Z_N, index - 1);
+      }
+      if (iz + 1 < _number_of_subgrids[2]) {
+        this_grid->set_neighbour(TRAVELDIRECTION_FACE_Z_P, index + 1);
+      }
+      return this_grid;
+    }
+
     const double subgrid_box[6] = {
         _box.get_anchor()[0] + ix * _subgrid_sides[0],
         _box.get_anchor()[1] + iy * _subgrid_sides[1],
@@ -466,7 +786,12 @@ public:
         _copies[i] = _subgrids.size();
       }
       for (uint_fast32_t j = 1; j < number_of_copies; ++j) {
-        _subgrids.push_back(new _subgrid_type_(*_subgrids[i]));
+        if (_spherical) {
+          DensitySubGrid *copy = _subgrids[i]->clone();
+          _subgrids.push_back(dynamic_cast< _subgrid_type_ * >(copy));
+        } else {
+          _subgrids.push_back(new _subgrid_type_(*_subgrids[i]));
+        }
         _originals.push_back(i);
       }
     }
@@ -759,6 +1084,12 @@ public:
    * @return Iterator to the subgrid that contains that position.
    */
   inline iterator get_subgrid(const CoordinateVector<> position) {
+    if (_spherical) {
+      int_fast8_t face;
+      double u, v, radius;
+      spherical_coordinates(position, face, u, v, radius);
+      return iterator(spherical_subgrid_index(face, u, v, radius), *this);
+    }
     const int_fast32_t ix =
         std::floor((position.x() - _box.get_anchor().x()) / _subgrid_sides.x());
     const int_fast32_t iy =
@@ -1011,7 +1342,9 @@ std::vector<std::pair<uint_fast32_t, uint_fast32_t>> cells_within_radius(Coordin
   inline DensitySubGridCreator(RestartReader &restart_reader)
       : _box(restart_reader), _subgrid_sides(restart_reader),
         _number_of_subgrids(restart_reader),
-        _subgrid_number_of_cells(restart_reader), _periodicity(restart_reader) {
+        _subgrid_number_of_cells(restart_reader), _periodicity(restart_reader),
+        _spherical(false), _spherical_centre(0.), _minimum_radius(0.),
+        _maximum_radius(0.), _logarithmic_radius(false) {
 
     const size_t number_of_subgrids = restart_reader.read< size_t >();
     _subgrids.resize(number_of_subgrids, nullptr);
