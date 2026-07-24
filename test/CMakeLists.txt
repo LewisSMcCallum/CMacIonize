@@ -278,6 +278,14 @@ add_unit_test(NAME testIonizationStateCalculator
               SOURCES ${TESTIONIZATIONSTATECALCULATOR_SOURCES}
               LIBS LegacyEngine)
 
+## Regression test for moving MixedDriving source periodic coordinates
+set(TESTMIXEDDRIVINGSOURCEPOSITION_SOURCES
+    testMixedDrivingSourcePosition.cpp
+)
+add_unit_test(NAME testMixedDrivingSourcePosition
+              SOURCES ${TESTMIXEDDRIVINGSOURCEPOSITION_SOURCES}
+              LIBS SharedEngine)
+
 ## Unit test for SwiggumFilePhotonSourceDistribution restart ordering
 set(TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES
     testSwiggumFilePhotonSourceDistribution.cpp

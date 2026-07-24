@@ -45,6 +45,29 @@
 #include <unistd.h>
 #include <vector>
 
+/**
+ * @brief Wrap a moving source through ordinary periodic box boundaries.
+ *
+ * @param position Source position to update.
+ * @param box Simulation box.
+ * @param periodicity Periodicity flags for each axis.
+ */
+inline void wrap_mixed_driving_source_position(
+    CoordinateVector<> &position, const Box<> &box,
+    const CoordinateVector< bool > &periodicity) {
+  const CoordinateVector<> &anchor = box.get_anchor();
+  const CoordinateVector<> &sides = box.get_sides();
+  for (uint_fast8_t axis = 0; axis < 3; ++axis) {
+    if (periodicity[axis]) {
+      double offset = std::fmod(position[axis] - anchor[axis], sides[axis]);
+      if (offset < 0.) {
+        offset += sides[axis];
+      }
+      position[axis] = anchor[axis] + offset;
+    }
+  }
+}
+
 
 
 /**
@@ -1174,20 +1197,9 @@ public:
 
       // Source particles obey the same ordinary periodic boundaries as the
       // gas.  (The Galactic shearing box still has no shearing remap.)
-      // DensitySubGridCreator::get_box() returns by value, so references to
-      // its anchor or sides would dangle as soon as these expressions end.
-      const CoordinateVector<> anchor = grid_creator->get_box().get_anchor();
-      const CoordinateVector<> sides = grid_creator->get_box().get_sides();
-      for (uint_fast8_t axis = 0; axis < 3; ++axis) {
-        if (periodicity[axis]) {
-          double offset = std::fmod(_source_positions[i][axis] - anchor[axis],
-                                    sides[axis]);
-          if (offset < 0.) {
-            offset += sides[axis];
-          }
-          _source_positions[i][axis] = anchor[axis] + offset;
-        }
-      }
+      const Box<> box = grid_creator->get_box();
+      wrap_mixed_driving_source_position(_source_positions[i], box,
+                                         periodicity);
       if (!grid_creator->get_box().inside(_source_positions[i])) {
         if (_log != nullptr) {
           _log->write_warning(
