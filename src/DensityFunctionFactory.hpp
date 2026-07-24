@@ -54,6 +54,7 @@
 #include "FLASHSnapshotDensityFunction.hpp"
 #include "GadgetSnapshotDensityFunction.hpp"
 #include "HDF5DensityFunction.hpp"
+#include "SphericalHDF5DensityFunction.hpp"
 #endif
 
 #include <string>
@@ -73,7 +74,8 @@ public:
   static void check_hdf5(std::string type, Log *log = nullptr) {
     if (type == "AmunSnapshot" || type == "BufferedCMacIonizeSnapshot" ||
         type == "CMacIonizeSnapshot" || type == "FLASHSnapshot" ||
-        type == "GadgetSnapshot" || type == "HDF5" || type == "ArepoSnapshot") {
+        type == "GadgetSnapshot" || type == "HDF5" ||
+        type == "SphericalHDF5" || type == "ArepoSnapshot") {
       if (log) {
         log->write_error("Cannot create an instance of ", type,
                          "DensityFunction, since the code was "
@@ -172,6 +174,8 @@ public:
       return new CMacIonizeSnapshotDensityFunction(params, log);
     } else if (type == "HDF5File") {
         return new HDF5DensityFunction(params,log);
+    } else if (type == "SphericalHDF5") {
+      return new SphericalHDF5DensityFunction(params, log);
     } else if (type == "FLASHSnapshot") {
       return new FLASHSnapshotDensityFunction(params, log);
     } else if (type == "GadgetSnapshot") {

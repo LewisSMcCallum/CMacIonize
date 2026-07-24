@@ -31,6 +31,10 @@
 #include "DensityFunction.hpp"
 #include "DensitySubGrid.hpp"
 #include "Error.hpp"
+#include "Configuration.hpp"
+#ifdef HAVE_HDF5
+#include "HDF5Tools.hpp"
+#endif
 #include "OpenMP.hpp"
 #include "ParameterFile.hpp"
 #include "HydroDensitySubGrid.hpp"
@@ -79,6 +83,7 @@ private:
   double _minimum_radius;
   double _maximum_radius;
   bool _logarithmic_radius;
+  std::vector< double > _radial_edges;
 
   inline static CoordinateVector< int_fast32_t >
   parameter_cells(ParameterFile &params) {
@@ -168,7 +173,17 @@ private:
         std::max< int_fast32_t >(
             0, std::floor(0.5 * (v + 1.) * _number_of_subgrids[1])));
     double fraction;
-    if (_logarithmic_radius) {
+    if (!_radial_edges.empty()) {
+      const std::vector< double >::const_iterator edge =
+          std::upper_bound(_radial_edges.begin(), _radial_edges.end(), radius);
+      const int_fast32_t cell = std::min(
+          static_cast< int_fast32_t >(_radial_edges.size()) - 2,
+          std::max< int_fast32_t >(0, edge - _radial_edges.begin() - 1));
+      return (face * nu + iu) * _number_of_subgrids[1] *
+                 _number_of_subgrids[2] +
+             iv * _number_of_subgrids[2] +
+             cell / _subgrid_number_of_cells[2];
+    } else if (_logarithmic_radius) {
       fraction = std::log(radius / _minimum_radius) /
                  std::log(_maximum_radius / _minimum_radius);
     } else {
@@ -211,7 +226,7 @@ public:
         _periodicity(periodicity), _spherical(spherical),
         _spherical_centre(spherical_centre), _minimum_radius(minimum_radius),
         _maximum_radius(maximum_radius),
-        _logarithmic_radius(logarithmic_radius) {
+        _logarithmic_radius(logarithmic_radius), _radial_edges() {
 
     for (uint_fast8_t i = 0; i < 3; ++i) {
       if (number_of_cells[i] % number_of_subgrids[i] != 0) {
@@ -266,6 +281,33 @@ public:
     if (_spherical && (_minimum_radius <= 0. ||
                        _maximum_radius <= _minimum_radius)) {
       cmac_error("Spherical radii must satisfy 0 < minimum < maximum.");
+    }
+    if (_spherical &&
+        params.get_value< std::string >(
+            "SphericalDensityGrid:radial spacing", "linear") == "file") {
+#ifdef HAVE_HDF5
+      const std::string filename = params.get_filename(
+          "SphericalDensityGrid:radial edges filename");
+      HDF5Tools::initialize();
+      HDF5Tools::HDF5File file =
+          HDF5Tools::open_file(filename, HDF5Tools::HDF5FILEMODE_READ);
+      HDF5Tools::HDF5Group group =
+          HDF5Tools::open_group(file, "/SphericalGrid");
+      _radial_edges =
+          HDF5Tools::read_dataset< double >(group, "RadialEdges");
+      HDF5Tools::close_group(group);
+      HDF5Tools::close_file(file);
+      const size_t expected =
+          parameter_cells(params)[2] + static_cast< size_t >(1);
+      if (_radial_edges.size() != expected) {
+        cmac_error("Expected %zu radial edges in \"%s\", found %zu.", expected,
+                   filename.c_str(), _radial_edges.size());
+      }
+      _minimum_radius = _radial_edges.front();
+      _maximum_radius = _radial_edges.back();
+#else
+      cmac_error("File radial spacing requires HDF5 support.");
+#endif
     }
   }
 
@@ -510,7 +552,9 @@ public:
             static_cast< double >(iz * _subgrid_number_of_cells[2] + i) /
             total_radial_cells;
         radial_edges[i] =
-            _logarithmic_radius
+            !_radial_edges.empty()
+                ? _radial_edges[iz * _subgrid_number_of_cells[2] + i]
+                : _logarithmic_radius
                 ? _minimum_radius *
                       std::pow(_maximum_radius / _minimum_radius, fraction)
                 : _minimum_radius +

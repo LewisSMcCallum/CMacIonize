@@ -203,6 +203,7 @@ set(LIBSHAREDENGINE_SOURCES
   FixedValueDiffuseReemissionHandler.hpp
   HDF5PhotonSourceDistribution.cpp
   HDF5DensityFunction.cpp
+  SphericalHDF5DensityFunction.cpp
   HeliumLymanContinuumSpectrum.cpp
   HeliumTwoPhotonContinuumSpectrum.cpp
   HydrogenLymanContinuumSpectrum.cpp
