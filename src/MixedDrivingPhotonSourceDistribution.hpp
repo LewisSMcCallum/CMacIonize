@@ -149,6 +149,9 @@ private:
   /*! @brief Whether moving sources changed the source-copy hierarchy. */
   bool _sources_changed = false;
 
+  /*! @brief Whether file-loaded sources still need their local gas velocity. */
+  bool _initialize_imported_source_velocities = false;
+
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
@@ -470,7 +473,8 @@ public:
         if (std::find(_to_delete.begin(), _to_delete.end(), index) == _to_delete.end()) {
             
             _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
-            // Historical source files do not contain velocities.
+            // Historical source files do not contain velocities. These are
+            // initialized from the local gas on the first grid update.
             _source_velocities.push_back(CoordinateVector<double>());
 
             _source_luminosities.push_back(luminosity);
@@ -514,6 +518,7 @@ public:
 
 
   file.close();
+  _initialize_imported_source_velocities = true;
   }
 
 
@@ -731,6 +736,23 @@ public:
    virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
 
     _total_time += actual_timestep;
+
+    // Historical source catalogues contain positions but no velocities.  A
+    // zero velocity makes every imported star fall towards the centre as soon
+    // as source floating is enabled.  Give these stars the same local gas
+    // velocity that newly formed stars inherit at birth.
+    if (_initialize_imported_source_velocities) {
+      for (size_t isource = 0; isource < _source_positions.size(); ++isource) {
+        if (grid_creator->get_box().inside(_source_positions[isource])) {
+          HydroDensitySubGrid &subgrid =
+              *grid_creator->get_subgrid(_source_positions[isource]);
+          const auto cell = subgrid.get_hydro_cell(_source_positions[isource]);
+          _source_velocities[isource] =
+              cell.get_hydro_variables().get_primitives_velocity();
+        }
+      }
+      _initialize_imported_source_velocities = false;
+    }
 
 
     bool updated = _sources_changed;
@@ -1152,8 +1174,10 @@ public:
 
       // Source particles obey the same ordinary periodic boundaries as the
       // gas.  (The Galactic shearing box still has no shearing remap.)
-      const CoordinateVector<> &anchor = grid_creator->get_box().get_anchor();
-      const CoordinateVector<> &sides = grid_creator->get_box().get_sides();
+      // DensitySubGridCreator::get_box() returns by value, so references to
+      // its anchor or sides would dangle as soon as these expressions end.
+      const CoordinateVector<> anchor = grid_creator->get_box().get_anchor();
+      const CoordinateVector<> sides = grid_creator->get_box().get_sides();
       for (uint_fast8_t axis = 0; axis < 3; ++axis) {
         if (periodicity[axis]) {
           double offset = std::fmod(_source_positions[i][axis] - anchor[axis],
