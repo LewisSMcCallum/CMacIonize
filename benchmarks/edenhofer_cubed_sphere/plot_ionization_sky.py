@@ -84,7 +84,7 @@ def main():
     hp.mollview(sky, coord="G", cmap="magma",
                 unit=rf"$\log_{{10}} N_{{\rm {label}}}\ "
                      r"[{\rm cm}^{-2}]$",
-                title=f"CMacIonize {label} column")
+                title=f"CMacIonize {label} column",min=19,max=21)
     hp.graticule()
     plt.savefig(output, dpi=180, bbox_inches="tight")
     print(f"Wrote {output}")
