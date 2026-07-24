@@ -3,9 +3,9 @@ SimulationBox:
   sides: [16. pc, 16. pc, 16. pc]
 DensityGrid:
   type: Cartesian
-  number of cells: [32, 32, 32]
+  number of cells: [64, 64, 64]
 DensitySubGridCreator:
-  number of subgrids: [4, 4, 4]
+  number of subgrids: [8, 8, 8]
   periodicity: [false, false, false]
 DensityFunction:
   type: Homogeneous
@@ -22,13 +22,13 @@ PhotonSourceSpectrum:
   type: Monochromatic
   frequency: 13.6 eV
 TaskBasedIonizationSimulation:
-  number of photons: 200000
-  number of iterations: 5
+  number of photons: 1000000
+  number of iterations: 10
   source copy level: 1
   output folder: output_cartesian
 DensityGridWriter:
   type: AsciiFile
-  prefix: cartesian_
+  prefix: cartesian_highres_
 CrossSections:
   type: FixedValue
   hydrogen_0: 6.3e-18 cm^2

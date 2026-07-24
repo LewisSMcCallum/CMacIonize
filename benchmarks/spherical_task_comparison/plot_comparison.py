@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compare Cartesian and cubed-sphere task-based ionization outputs."""
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -11,11 +12,23 @@ from scipy.ndimage import map_coordinates
 
 PC = 3.085677581491367e16
 ROOT = Path(__file__).resolve().parent
-NCART = 32
-NANG = 16
-NRAD = 32
 RMIN = 0.05
 RMAX = 8.0
+EXTENT = 8.0
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--high-resolution", action="store_true")
+args = parser.parse_args()
+if args.high_resolution:
+    NCART, NANG, NRAD = 64, 32, 48
+    CART_PATTERN = "output_cartesian/cartesian_highres_*.txt"
+    SPHERICAL_PATTERN = "output_spherical/spherical_highres_*.txt"
+    OUTPUT_NAME = "two_source_comparison_highres.png"
+else:
+    NCART, NANG, NRAD = 32, 16, 32
+    CART_PATTERN = "output_cartesian/cartesian_[0-9][0-9][0-9].txt"
+    SPHERICAL_PATTERN = "output_spherical/spherical_[0-9][0-9][0-9].txt"
+    OUTPUT_NAME = "two_source_comparison.png"
 
 
 def read_output(pattern):
@@ -40,12 +53,13 @@ def face_coordinates(points):
     return face, u, v
 
 
-cart_xyz, cart_values = read_output("output_cartesian/cartesian_*.txt")
+cart_xyz, cart_values = read_output(CART_PATTERN)
 cart = np.empty((NCART, NCART, NCART))
-cart_i = np.floor((cart_xyz + 6.0) * NCART / 12.0).astype(int)
+cart_i = np.floor(
+    (cart_xyz + EXTENT) * NCART / (2.0 * EXTENT)).astype(int)
 cart[cart_i[:, 0], cart_i[:, 1], cart_i[:, 2]] = cart_values
 
-sph_xyz, sph_values = read_output("output_spherical/spherical_*.txt")
+sph_xyz, sph_values = read_output(SPHERICAL_PATTERN)
 sph = np.empty((6, NANG, NANG, NRAD))
 sface, su, sv = face_coordinates(sph_xyz)
 si = np.floor(0.5 * (su + 1.0) * NANG).astype(int)
@@ -59,7 +73,8 @@ sph[sface, np.clip(si, 0, NANG - 1), np.clip(sj, 0, NANG - 1),
 def sample_cartesian(points):
     shape = points.shape[:-1]
     coordinates = (
-        (points.reshape(-1, 3) + 6.0) * NCART / 12.0 - 0.5).T
+        (points.reshape(-1, 3) + EXTENT) * NCART /
+        (2.0 * EXTENT) - 0.5).T
     values = map_coordinates(cart, coordinates, order=1, mode="constant",
                             cval=0.0)
     return values.reshape(shape)
@@ -85,16 +100,16 @@ def sample_spherical(points):
 
 
 # Integrate both solutions on exactly the same Cartesian sampling volume.
-nplot = 128
-edges = np.linspace(-6.0, 6.0, nplot + 1)
+nplot = 160
+edges = np.linspace(-EXTENT, EXTENT, nplot + 1)
 centres = 0.5 * (edges[1:] + edges[:-1])
 x, y, z = np.meshgrid(centres, centres, centres, indexing="ij")
 points = np.stack((x, y, z), axis=-1)
 common = np.linalg.norm(points, axis=-1) <= RMAX
 cart_column = np.sum(sample_cartesian(points) * common, axis=2) * (
-    12.0 * PC / nplot)
+    2.0 * EXTENT * PC / nplot)
 sph_column = np.sum(sample_spherical(points) * common, axis=2) * (
-    12.0 * PC / nplot)
+    2.0 * EXTENT * PC / nplot)
 
 # All-sky columns from the origin, using common rays and radial samples.
 nlon, nlat, nray = 240, 120, 160
@@ -103,7 +118,7 @@ lat = np.linspace(-0.5 * np.pi, 0.5 * np.pi, nlat)
 llon, llat = np.meshgrid(lon, lat)
 directions = np.stack((np.cos(llat) * np.cos(llon),
                        np.cos(llat) * np.sin(llon), np.sin(llat)), axis=-1)
-radii = np.linspace(RMIN, 6.0, nray)
+radii = np.linspace(RMIN, RMAX, nray)
 ray_points = directions[..., None, :] * radii[None, None, :, None]
 cart_sky = np.trapezoid(sample_cartesian(ray_points), radii * PC, axis=2)
 sph_sky = np.trapezoid(sample_spherical(ray_points), radii * PC, axis=2)
@@ -116,9 +131,11 @@ for ax, image, title in zip(
         axes[0], (cart_column, sph_column),
         ("Cartesian: integrated HII density",
          "Cubed sphere: integrated HII density")):
-    plotted = ax.imshow(image.T, origin="lower", extent=(-6, 6, -6, 6),
+    plotted = ax.imshow(
+        image.T, origin="lower",
+        extent=(-EXTENT, EXTENT, -EXTENT, EXTENT),
                         norm="log", vmin=vmin, vmax=vmax, cmap="magma")
-    ax.plot([0.25, 2.5], [0.0, 1.0], "c+", ms=9, mew=1.5)
+    ax.plot([0.5, 5.0], [0.0, 1.0], "c+", ms=9, mew=1.5)
     ax.set(title=title, xlabel="x (pc)", ylabel="y (pc)")
 fig.colorbar(plotted, ax=axes[0], label=r"$N_{\rm HII}$ (m$^{-2}$)")
 
@@ -135,6 +152,6 @@ for ax, image, title in zip(
     ax.set(title=title, xlabel="longitude (deg)", ylabel="latitude (deg)")
 fig.colorbar(plotted_sky, ax=axes[1], label=r"$N_{\rm HII}$ (m$^{-2}$)")
 
-output = ROOT / "two_source_comparison.png"
+output = ROOT / OUTPUT_NAME
 fig.savefig(output, dpi=180)
 print(output)
