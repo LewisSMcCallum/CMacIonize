@@ -38,24 +38,55 @@
 
 namespace {
 /**
- * @brief Get the number of cells directly from a snapshot dataset.
+ * @brief Get the shape of a snapshot dataset.
  *
  * Unlike DensityGrid:number of cells, this also works for non-Cartesian grids.
  */
-inline hsize_t get_snapshot_cell_count(const hid_t group) {
+inline std::vector< hsize_t > get_snapshot_shape(const hid_t group) {
   const hid_t dataset =
       H5Dopen(group, "NumberDensity", H5P_DEFAULT);
   if (dataset < 0) {
     cmac_error("Failed to open dataset \"NumberDensity\".");
   }
   const hid_t dataspace = H5Dget_space(dataset);
-  hsize_t size[1];
-  if (H5Sget_simple_extent_dims(dataspace, size, nullptr) != 1) {
-    cmac_error("Dataset \"NumberDensity\" should be one-dimensional.");
-  }
+  const int dimensions = H5Sget_simple_extent_ndims(dataspace);
+  std::vector< hsize_t > shape(dimensions);
+  H5Sget_simple_extent_dims(dataspace, shape.data(), nullptr);
   H5Sclose(dataspace);
   H5Dclose(dataset);
-  return size[0];
+  return shape;
+}
+
+inline void create_emissivity_dataset(const hid_t group,
+                                      const std::string &name,
+                                      const std::vector< hsize_t > &shape) {
+  const hid_t dataspace =
+      H5Screate_simple(shape.size(), shape.data(), nullptr);
+#ifdef HDF5_OLD_API
+  const hid_t dataset =
+      H5Dcreate(group, name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                H5P_DEFAULT);
+#else
+  const hid_t dataset =
+      H5Dcreate(group, name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+#endif
+  if (dataset < 0) {
+    cmac_error("Failed to create emissivity dataset \"%s\".", name.c_str());
+  }
+  H5Dclose(dataset);
+  H5Sclose(dataspace);
+}
+
+inline void write_emissivity_dataset(const hid_t group,
+                                     const std::string &name,
+                                     const std::vector< double > &values) {
+  const hid_t dataset = H5Dopen(group, name.c_str(), H5P_DEFAULT);
+  if (H5Dwrite(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+               values.data()) < 0) {
+    cmac_error("Failed to write emissivity dataset \"%s\".", name.c_str());
+  }
+  H5Dclose(dataset);
 }
 } // namespace
 
@@ -202,7 +233,12 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
     log->write_status("Creating output datasets...");
   }
 
-  const hsize_t total_number_of_cells = get_snapshot_cell_count(parttype0);
+  const std::vector< hsize_t > snapshot_shape =
+      get_snapshot_shape(parttype0);
+  hsize_t total_number_of_cells = 1;
+  for (size_t i = 0; i < snapshot_shape.size(); ++i) {
+    total_number_of_cells *= snapshot_shape[i];
+  }
 
   for (int_fast32_t i = 0; i < NUMBER_OF_EMISSIONLINES; ++i) {
     if (do_line[i]) {
@@ -212,8 +248,8 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
                              "\" already exists! Values will be overwritten!");
         }
       } else {
-        HDF5Tools::create_dataset< double >(
-            parttype0, EmissivityValues::get_name(i), total_number_of_cells);
+        create_emissivity_dataset(parttype0, EmissivityValues::get_name(i),
+                                  snapshot_shape);
       }
     }
   }
@@ -279,8 +315,9 @@ int EmissivityCalculationSimulation::do_simulation(CommandLineParser &parser,
     }
     for (int_fast32_t line = 0; line < NUMBER_OF_EMISSIONLINES; ++line) {
       if (do_line[line]) {
-        HDF5Tools::append_dataset< double >(
-            parttype0, EmissivityValues::get_name(line), 0, emissivities[line]);
+        write_emissivity_dataset(parttype0,
+                                 EmissivityValues::get_name(line),
+                                 emissivities[line]);
       }
     }
   }

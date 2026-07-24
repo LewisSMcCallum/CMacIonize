@@ -811,15 +811,21 @@ inline std::vector< _datatype_ > read_dataset(hid_t group, std::string name) {
   }
 
   // query dataspace extents
-  hsize_t size[1];
-  hsize_t maxsize[1];
-  const int_fast32_t ndim = H5Sget_simple_extent_dims(filespace, size, maxsize);
+  const int_fast32_t ndim = H5Sget_simple_extent_ndims(filespace);
   if (ndim < 0) {
     cmac_error("Unable to query extent of dataset \"%s\"", name.c_str());
   }
+  std::vector< hsize_t > dimensions(ndim);
+  if (H5Sget_simple_extent_dims(filespace, dimensions.data(), nullptr) < 0) {
+    cmac_error("Unable to query dimensions of dataset \"%s\"", name.c_str());
+  }
+  hsize_t size = 1;
+  for (int_fast32_t i = 0; i < ndim; ++i) {
+    size *= dimensions[i];
+  }
 
   // read dataset
-  _datatype_ *data = new _datatype_[size[0]];
+  _datatype_ *data = new _datatype_[size];
   herr_t hdf5status =
       H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
   if (hdf5status < 0) {
@@ -838,8 +844,8 @@ inline std::vector< _datatype_ > read_dataset(hid_t group, std::string name) {
     cmac_error("Failed to close dataset \"%s\"", name.c_str());
   }
 
-  std::vector< _datatype_ > datavector(size[0]);
-  for (hsize_t i = 0; i < size[0]; ++i) {
+  std::vector< _datatype_ > datavector(size);
+  for (hsize_t i = 0; i < size; ++i) {
     datavector[i] = data[i];
   }
 

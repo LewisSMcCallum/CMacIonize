@@ -39,6 +39,197 @@
 
 #include <vector>
 
+namespace {
+struct SphericalOutputDataset {
+  hid_t dataset;
+  int_fast32_t property;
+  int_fast32_t component;
+};
+
+inline hid_t create_spherical_dataset(
+    const hid_t group, const std::string &name, const hsize_t dimensions[4],
+    const hsize_t chunks[4], const bool compression) {
+  const hid_t dataspace = H5Screate_simple(4, dimensions, nullptr);
+  const hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
+  H5Pset_chunk(properties, 4, chunks);
+  if (compression) {
+    H5Pset_fletcher32(properties);
+    H5Pset_shuffle(properties);
+    H5Pset_deflate(properties, 9);
+  }
+#ifdef HDF5_OLD_API
+  const hid_t dataset =
+      H5Dcreate(group, name.c_str(), H5T_NATIVE_DOUBLE, dataspace, properties);
+#else
+  const hid_t dataset =
+      H5Dcreate(group, name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                H5P_DEFAULT, properties, H5P_DEFAULT);
+#endif
+  H5Pclose(properties);
+  H5Sclose(dataspace);
+  if (dataset < 0) {
+    cmac_error("Failed to create spherical dataset \"%s\".", name.c_str());
+  }
+  return dataset;
+}
+
+inline void write_spherical_block(const hid_t dataset,
+                                  const hsize_t offset[4],
+                                  const hsize_t count[4],
+                                  const std::vector< double > &values) {
+  const hid_t filespace = H5Dget_space(dataset);
+  H5Sselect_hyperslab(filespace, H5S_SELECT_SET, offset, nullptr, count,
+                      nullptr);
+  const hid_t memoryspace = H5Screate_simple(4, count, nullptr);
+  if (H5Dwrite(dataset, H5T_NATIVE_DOUBLE, memoryspace, filespace, H5P_DEFAULT,
+               values.data()) < 0) {
+    cmac_error("Failed to write spherical output block.");
+  }
+  H5Sclose(memoryspace);
+  H5Sclose(filespace);
+}
+
+inline void write_spherical_grid(
+    const hid_t file, DensitySubGridCreator< DensitySubGrid > &grid_creator,
+    const DensityGridWriterFields &fields, const bool compression, Log *log) {
+  const CoordinateVector< int_fast32_t > subgrids =
+      grid_creator.get_subgrid_layout();
+  const CoordinateVector< int_fast32_t > cells =
+      grid_creator.get_subgrid_cell_layout();
+  const int_fast32_t angular_subgrids = subgrids[1];
+  const int_fast32_t angular_cells = angular_subgrids * cells[1];
+  const int_fast32_t radial_cells = subgrids[2] * cells[2];
+  const hsize_t dimensions[4] = {
+      6, static_cast< hsize_t >(angular_cells),
+      static_cast< hsize_t >(angular_cells),
+      static_cast< hsize_t >(radial_cells)};
+  const hsize_t chunks[4] = {
+      1, static_cast< hsize_t >(cells[0]),
+      static_cast< hsize_t >(cells[1]), static_cast< hsize_t >(cells[2])};
+
+  HDF5Tools::HDF5Group geometry =
+      HDF5Tools::create_group(file, "SphericalGrid");
+  CoordinateVector<> centre = grid_creator.get_spherical_centre();
+  HDF5Tools::write_attribute< CoordinateVector<> >(geometry, "Centre", centre);
+  int32_t angular = angular_cells;
+  int32_t radial = radial_cells;
+  HDF5Tools::write_attribute< int32_t >(geometry, "AngularCellsPerFace",
+                                        angular);
+  HDF5Tools::write_attribute< int32_t >(geometry, "RadialCells", radial);
+  std::string ordering = "face,u,v,r";
+  HDF5Tools::write_attribute< std::string >(geometry, "ArrayOrdering",
+                                            ordering);
+  std::string faces = "+x,-x,+y,-y,+z,-z";
+  HDF5Tools::write_attribute< std::string >(geometry, "FaceOrdering", faces);
+  std::vector< double > radial_edges =
+      grid_creator.get_spherical_radial_edges();
+  HDF5Tools::write_dataset< double >(geometry, "RadialEdges", radial_edges);
+  std::vector< double > angular_coordinates(angular_cells);
+  for (int_fast32_t i = 0; i < angular_cells; ++i) {
+    angular_coordinates[i] =
+        -1. + 2. * (static_cast< double >(i) + 0.5) / angular_cells;
+  }
+  HDF5Tools::write_dataset< double >(geometry, "UCoordinates",
+                                     angular_coordinates);
+  HDF5Tools::write_dataset< double >(geometry, "VCoordinates",
+                                     angular_coordinates);
+  HDF5Tools::close_group(geometry);
+
+  HDF5Tools::HDF5Group output =
+      HDF5Tools::create_group(file, "PartType0");
+  std::vector< SphericalOutputDataset > datasets;
+  for (int_fast32_t property = 0; property < DENSITYGRIDFIELD_NUMBER;
+       ++property) {
+    if (!fields.field_present(property)) {
+      continue;
+    }
+    const std::string name = DensityGridWriterFields::get_name(property);
+    if (DensityGridWriterFields::get_type(property) ==
+        DENSITYGRIDFIELDTYPE_VECTOR_DOUBLE) {
+      if (property != DENSITYGRIDFIELD_COORDINATES) {
+        cmac_warning("Skipping vector field \"%s\" in spherical output.",
+                     name.c_str());
+      }
+    } else if (DensityGridWriterFields::is_ion_property(property)) {
+      for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+        if (fields.ion_present(property, ion)) {
+          datasets.push_back(
+              {create_spherical_dataset(output, name + get_ion_name(ion),
+                                        dimensions, chunks, compression),
+               property, ion});
+        }
+      }
+    } else if (DensityGridWriterFields::is_heating_property(property)) {
+      for (int_fast32_t heating = 0; heating < NUMBER_OF_HEATINGTERMS;
+           ++heating) {
+        if (fields.heatingterm_present(property, heating)) {
+          datasets.push_back(
+              {create_spherical_dataset(output, name + get_ion_name(heating),
+                                        dimensions, chunks, compression),
+               property, heating});
+        }
+      }
+    } else {
+      datasets.push_back(
+          {create_spherical_dataset(output, name, dimensions, chunks,
+                                    compression),
+           property, -1});
+    }
+  }
+
+  for (auto grid = grid_creator.begin();
+       grid != grid_creator.original_end(); ++grid) {
+    const CoordinateVector< int_fast32_t > position =
+        grid_creator.get_grid_position(grid.get_index());
+    const hsize_t offset[4] = {
+        static_cast< hsize_t >(position[0] / angular_subgrids),
+        static_cast< hsize_t >((position[0] % angular_subgrids) * cells[0]),
+        static_cast< hsize_t >(position[1] * cells[1]),
+        static_cast< hsize_t >(position[2] * cells[2])};
+    const hsize_t count[4] = {
+        1, static_cast< hsize_t >(cells[0]),
+        static_cast< hsize_t >(cells[1]), static_cast< hsize_t >(cells[2])};
+    std::vector< std::vector< double > > values(
+        datasets.size(),
+        std::vector< double >((*grid).get_number_of_cells()));
+    size_t cell_index = 0;
+    for (auto cell = (*grid).begin(); cell != (*grid).end(); ++cell) {
+      for (size_t field = 0; field < datasets.size(); ++field) {
+        const SphericalOutputDataset &description = datasets[field];
+        if (DensityGridWriterFields::is_ion_property(description.property)) {
+          values[field][cell_index] =
+              DensityGridWriterFields::get_scalar_double_ion_value(
+                  description.property, description.component, cell);
+        } else if (DensityGridWriterFields::is_heating_property(
+                       description.property)) {
+          values[field][cell_index] =
+              DensityGridWriterFields::get_scalar_double_heating_value(
+                  description.property, description.component, cell);
+        } else {
+          values[field][cell_index] =
+              DensityGridWriterFields::get_scalar_double_value(
+                  description.property, cell);
+        }
+      }
+      ++cell_index;
+    }
+    for (size_t field = 0; field < datasets.size(); ++field) {
+      write_spherical_block(datasets[field].dataset, offset, count,
+                            values[field]);
+    }
+  }
+  for (size_t field = 0; field < datasets.size(); ++field) {
+    H5Dclose(datasets[field].dataset);
+  }
+  HDF5Tools::close_group(output);
+  if (log) {
+    log->write_status("Wrote native spherical arrays with dimensions [6, ",
+                      angular_cells, ", ", angular_cells, ", ", radial_cells,
+                      "].");
+  }
+}
+} // namespace
+
 /**
  * @brief Constructor.
  *
@@ -469,6 +660,12 @@ void GadgetDensityGridWriter::write(
   HDF5Tools::write_attribute< double >(group, "Unit time in cgs (U_t)",
                                        unit_time_in_cgs);
   HDF5Tools::close_group(group);
+
+  if (grid_creator.is_spherical()) {
+    write_spherical_grid(file, grid_creator, fields, _compression, _log);
+    HDF5Tools::close_file(file);
+    return;
+  }
 
   // write particles
   // to limit memory usage, we first create all datasets, and then add the data

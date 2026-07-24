@@ -31,8 +31,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("snapshot", type=Path,
                         help="CMacIonize Gadget HDF5 output")
-    parser.add_argument("input_map", type=Path,
-                        help="Edenhofer cubed-sphere input used by the run")
+    parser.add_argument(
+        "input_map", type=Path, nargs="?",
+        help="Input map, only needed for older flattened snapshots")
     parser.add_argument("--component", choices=("ionized", "neutral", "total"),
                         default="ionized")
     parser.add_argument("--output", type=Path)
@@ -42,37 +43,52 @@ def main():
     output = args.output or args.snapshot.with_name(
         args.snapshot.stem + f".{args.component}_sky.png")
 
-    with h5py.File(args.input_map, "r") as source:
+    geometry_file = args.input_map or args.snapshot
+    with h5py.File(geometry_file, "r") as source:
         edges = source["SphericalGrid/RadialEdges"][:]
-        n = source["SphericalGrid/NumberDensity"].shape[1]
+        if "SphericalGrid/NumberDensity" in source:
+            n = source["SphericalGrid/NumberDensity"].shape[1]
+        else:
+            n = source["PartType0/NumberDensity"].shape[1]
     widths = np.diff(edges)
     column = np.zeros((6, n, n), dtype=np.float64)
 
     with h5py.File(args.snapshot, "r") as snapshot:
         cells = snapshot["PartType0"]
-        coordinates = cells["Coordinates"]
         density = cells["NumberDensity"]
         neutral_fraction = cells.get("NeutralFractionH")
         if args.component != "total" and neutral_fraction is None:
             raise KeyError("Snapshot does not contain PartType0/NeutralFractionH")
-        # Gadget output coordinates are relative to the box anchor. The
-        # spherical centre is the centre of the supporting Cartesian box.
-        centre = 0.5 * np.asarray(snapshot["Header"].attrs["BoxSize"])
-        for start in range(0, len(coordinates), args.chunk):
-            stop = min(start + args.chunk, len(coordinates))
-            points = np.asarray(coordinates[start:stop]) - centre
-            radius = np.linalg.norm(points, axis=1)
-            face, u, v = cubed_coordinates(points)
-            iu = np.clip(((u + 1.0) * 0.5 * n).astype(int), 0, n - 1)
-            iv = np.clip(((v + 1.0) * 0.5 * n).astype(int), 0, n - 1)
-            ir = np.clip(np.searchsorted(edges, radius, side="right") - 1,
-                         0, len(widths) - 1)
-            values = np.asarray(density[start:stop])
-            if args.component != "total":
-                neutral = np.asarray(neutral_fraction[start:stop])
-                values *= neutral if args.component == "neutral" else 1.0-neutral
-            np.add.at(column, (face, iu, iv), values * widths[ir])
-            print(f"Read {stop}/{len(coordinates)} cells", flush=True)
+        if density.ndim == 4:
+            # Native spherical output: [face, u, v, radius].
+            for start in range(0, density.shape[-1], 16):
+                stop = min(start + 16, density.shape[-1])
+                values = np.asarray(density[..., start:stop])
+                if args.component != "total":
+                    neutral = np.asarray(neutral_fraction[..., start:stop])
+                    values *= (neutral if args.component == "neutral"
+                               else 1.0-neutral)
+                column += np.sum(values * widths[start:stop], axis=-1)
+        else:
+            # Backward compatibility with older flattened Gadget snapshots.
+            coordinates = cells["Coordinates"]
+            centre = 0.5 * np.asarray(snapshot["Header"].attrs["BoxSize"])
+            for start in range(0, len(coordinates), args.chunk):
+                stop = min(start + args.chunk, len(coordinates))
+                points = np.asarray(coordinates[start:stop]) - centre
+                radius = np.linalg.norm(points, axis=1)
+                face, u, v = cubed_coordinates(points)
+                iu = np.clip(((u + 1.0) * 0.5 * n).astype(int), 0, n - 1)
+                iv = np.clip(((v + 1.0) * 0.5 * n).astype(int), 0, n - 1)
+                ir = np.clip(np.searchsorted(edges, radius, side="right") - 1,
+                             0, len(widths) - 1)
+                values = np.asarray(density[start:stop])
+                if args.component != "total":
+                    neutral = np.asarray(neutral_fraction[start:stop])
+                    values *= (neutral if args.component == "neutral"
+                               else 1.0-neutral)
+                np.add.at(column, (face, iu, iv), values * widths[ir])
+                print(f"Read {stop}/{len(coordinates)} cells", flush=True)
 
     pixels = np.arange(hp.nside2npix(args.display_nside))
     directions = np.asarray(hp.pix2vec(args.display_nside, pixels)).T

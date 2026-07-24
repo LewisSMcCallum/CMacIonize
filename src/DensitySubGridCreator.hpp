@@ -375,6 +375,40 @@ public:
   inline Box<> get_box() const { return _box; }
 
   /**
+   * @brief Is this a cubed-sphere grid?
+   */
+  inline bool is_spherical() const { return _spherical; }
+
+  /**
+   * @brief Get the centre of the cubed-sphere grid (in m).
+   */
+  inline CoordinateVector<> get_spherical_centre() const {
+    return _spherical_centre;
+  }
+
+  /**
+   * @brief Get all radial cell edges of the cubed-sphere grid (in m).
+   */
+  inline std::vector< double > get_spherical_radial_edges() const {
+    const int_fast32_t number_of_cells =
+        _number_of_subgrids[2] * _subgrid_number_of_cells[2];
+    if (!_radial_edges.empty()) {
+      return _radial_edges;
+    }
+    std::vector< double > edges(number_of_cells + 1);
+    for (int_fast32_t i = 0; i <= number_of_cells; ++i) {
+      const double fraction = static_cast< double >(i) / number_of_cells;
+      edges[i] =
+          _logarithmic_radius
+              ? _minimum_radius *
+                    std::pow(_maximum_radius / _minimum_radius, fraction)
+              : _minimum_radius +
+                    fraction * (_maximum_radius - _minimum_radius);
+    }
+    return edges;
+  }
+
+  /**
    * @brief Check whether a position lies in the active grid volume.
    */
   inline bool contains(const CoordinateVector<> position) const {

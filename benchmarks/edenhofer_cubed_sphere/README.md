@@ -31,10 +31,16 @@ SphericalHDF5`, and set `SphericalDensityGrid:radial spacing: file` plus
 `SphericalDensityGrid:radial edges filename` to the same HDF5 file.
 
 Use the Gadget density-grid writer for simulation output (its default fields
-already include coordinates, number density and neutral hydrogen fraction).
-The result can then be plotted without loading the whole snapshot into memory:
+already include number density and neutral hydrogen fraction). For a spherical
+task grid it automatically writes scalar fields as native
+`[face, u, v, radius]` arrays. Compact geometry is stored in `/SphericalGrid`;
+the redundant unstructured `Coordinates` array is omitted. Cartesian output
+retains the normal Gadget layout. The result can be plotted without loading
+the whole snapshot into memory:
 
 ```
-python plot_ionization_sky.py snapshot_010.hdf5 \
-  edenhofer_cubed_n128_r517.hdf5 --component ionized
+python plot_ionization_sky.py snapshot_010.hdf5 --component ionized
 ```
+
+Pass the original input map as the second positional argument only when
+plotting an older flattened Gadget snapshot.
