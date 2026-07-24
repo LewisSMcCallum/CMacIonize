@@ -18,6 +18,38 @@
 #include <cmath>
 
 namespace {
+inline std::vector< float > read_number_density(hid_t group,
+                                                const std::string &name,
+                                                const int_fast32_t angular,
+                                                const int_fast32_t radial) {
+  const hid_t dataset = H5Dopen(group, name.c_str(), H5P_DEFAULT);
+  if (dataset < 0) {
+    cmac_error("Failed to open dataset \"%s\".", name.c_str());
+  }
+  const hid_t dataspace = H5Dget_space(dataset);
+  const int dimensions = H5Sget_simple_extent_ndims(dataspace);
+  if (dimensions != 4) {
+    cmac_error("Dataset \"%s\" should have four dimensions.", name.c_str());
+  }
+  std::vector< hsize_t > shape(dimensions);
+  H5Sget_simple_extent_dims(dataspace, shape.data(), nullptr);
+  if (shape[0] != 6 || shape[1] != static_cast< hsize_t >(angular) ||
+      shape[2] != static_cast< hsize_t >(angular) ||
+      shape[3] != static_cast< hsize_t >(radial)) {
+    cmac_error("Dataset \"%s\" dimensions do not match the spherical grid.",
+               name.c_str());
+  }
+  const size_t size = shape[0] * shape[1] * shape[2] * shape[3];
+  std::vector< float > values(size);
+  if (H5Dread(dataset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+              values.data()) < 0) {
+    cmac_error("Failed to read dataset \"%s\".", name.c_str());
+  }
+  H5Sclose(dataspace);
+  H5Dclose(dataset);
+  return values;
+}
+
 inline int_fast8_t face_for_direction(const CoordinateVector<> &x) {
   int_fast8_t axis = 0;
   if (std::abs(x[1]) > std::abs(x[axis])) {
@@ -72,8 +104,8 @@ SphericalHDF5DensityFunction::SphericalHDF5DensityFunction(
       HDF5Tools::open_file(filename, HDF5Tools::HDF5FILEMODE_READ);
   HDF5Tools::HDF5Group group =
       HDF5Tools::open_group(file, "/SphericalGrid");
-  _number_densities =
-      HDF5Tools::read_dataset< float >(group, "NumberDensity");
+  _number_densities = read_number_density(
+      group, "NumberDensity", _angular_cells, _radial_cells);
   _radial_edges = HDF5Tools::read_dataset< double >(group, "RadialEdges");
   HDF5Tools::close_group(group);
   HDF5Tools::close_file(file);
