@@ -286,6 +286,7 @@ add_unit_test(NAME testMixedDrivingSourcePosition
               SOURCES ${TESTMIXEDDRIVINGSOURCEPOSITION_SOURCES}
               LIBS SharedEngine)
 
+
 ## Regression test for the conservative Galactic shearing-periodic boundary
 set(TESTGALACTICSHEARINGBOX_SOURCES
     testGalacticShearingBox.cpp
@@ -297,6 +298,15 @@ configure_file(
     ${PROJECT_SOURCE_DIR}/test/test_galactic_shearing_box.param
     ${PROJECT_BINARY_DIR}/rundir/test/test_galactic_shearing_box.param
     COPYONLY)
+
+## Regression test for the task-based RHD last-radiation restart state
+set(TESTTASKBASEDRADIATIONRESTART_SOURCES
+    testTaskBasedRadiationRestart.cpp
+)
+add_unit_test(NAME testTaskBasedRadiationRestart
+              SOURCES ${TESTTASKBASEDRADIATIONRESTART_SOURCES}
+              LIBS SharedEngine)
+
 
 ## Unit test for SwiggumFilePhotonSourceDistribution restart ordering
 set(TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES

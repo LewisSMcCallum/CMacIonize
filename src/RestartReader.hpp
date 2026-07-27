@@ -62,6 +62,19 @@ public:
   }
 
   /**
+   * @brief Check whether unread data remains in the restart file.
+   *
+   * This is useful for optional data appended to the end of a restart file,
+   * while retaining compatibility with restart files written by older
+   * versions.
+   *
+   * @return True if at least one unread byte remains.
+   */
+  inline bool has_more_data() {
+    return _file.peek() != std::ifstream::traits_type::eof();
+  }
+
+  /**
    * @brief General read function for basic template data types.
    *
    * @return Value read from the restart file.

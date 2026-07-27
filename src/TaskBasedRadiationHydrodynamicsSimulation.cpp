@@ -25,6 +25,7 @@
  */
 
 #include "TaskBasedRadiationHydrodynamicsSimulation.hpp"
+#include "TaskBasedRadiationRestart.hpp"
 #include "AlveliusTurbulenceForcing.hpp"
 #include "BarnesHutTree.hpp"
 #include "ChargeTransferRates.hpp"
@@ -2151,6 +2152,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     has_next_step = restart_reader->read< bool >();
     actual_timestep = restart_reader->read< double >();
     current_time = restart_reader->read< double >();
+    lastrad_time = TaskBasedRadiationRestart::read_last_radiation_time(
+        *restart_reader, current_time, actual_timestep, hydro_lastrad,
+        hydro_radtime);
+    if (log) {
+      log->write_status(
+          "Restored last radiation time to ",
+          UnitConverter::to_unit_string< QUANTITY_TIME >(lastrad_time,
+                                                         output_time_unit),
+          ".");
+    }
     delete restart_reader;
     restart_reader = nullptr;
   }
@@ -3325,6 +3336,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       restart_writer->write(has_next_step);
       restart_writer->write(actual_timestep);
       restart_writer->write(current_time);
+      TaskBasedRadiationRestart::write_last_radiation_time(*restart_writer,
+                                                           lastrad_time);
 
       delete restart_writer;
       time_logger.end("restart file");
