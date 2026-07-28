@@ -198,7 +198,11 @@ public:
     const CoordinateVector<> d = photon.get_direction();
     CoordinateVector<> p = photon.get_position();
     const double scale = std::max(_radial_edges.back(), 1.);
-    const double epsilon = 1.e-11 * scale;
+    // This offset only has to move a photon a few floating-point spacings
+    // across a face.  Scaling it as 1.e-11 of the complete grid can skip over
+    // very small cells close to the centre of a logarithmic radial grid.
+    const double epsilon =
+        256. * std::numeric_limits< double >::epsilon() * scale;
     // A source may lie exactly on a u/v/r cell face.  Select the downstream
     // cell using the photon direction, just as we do at subgrid boundaries.
     p += epsilon * d;
@@ -232,8 +236,19 @@ public:
     double tau_done = 0.;
     const double tau_target = photon.get_target_optical_depth();
     int_fast32_t output = TRAVELDIRECTION_INSIDE;
+    uint_fast8_t recovery_attempt = 0;
+    uint_fast32_t traversal_steps = 0;
 
     while (is_inside(cell) && tau_done < tau_target) {
+      ++traversal_steps;
+      if (traversal_steps > 100000) {
+        cmac_error("Cubed-sphere photon exceeded 100000 cell crossings "
+                   "(face: %" PRIiFAST8 ", cell: [%" PRIiFAST32 ", %"
+                   PRIiFAST32 ", %" PRIiFAST32 "], position: [%g, %g, %g], "
+                   "direction: [%g, %g, %g]).",
+                   _face, cell[0], cell[1], cell[2], p[0], p[1], p[2], d[0],
+                   d[1], d[2]);
+      }
       const double du = (_u1 - _u0) / _number_of_cells[0];
       const double dv = (_v1 - _v0) / _number_of_cells[1];
       const double ub[2] = {_u0 + cell[0] * du,
@@ -243,7 +258,6 @@ public:
       const CoordinateVector<> x = p - _centre;
       double best = std::numeric_limits< double >::max();
       int best_axis = -1;
-      int best_sign = 0;
 
       for (int side = 0; side < 2; ++side) {
         const CoordinateVector<> plane =
@@ -251,10 +265,10 @@ public:
         const double denominator = dot(plane, d);
         if (denominator != 0.) {
           const double distance = -dot(plane, x) / denominator;
-          if (distance > epsilon && distance < best) {
+          if (std::isfinite(distance) && distance > epsilon &&
+              distance < best) {
             best = distance;
             best_axis = 0;
-            best_sign = side ? 1 : -1;
           }
         }
       }
@@ -264,10 +278,10 @@ public:
         const double denominator = dot(plane, d);
         if (denominator != 0.) {
           const double distance = -dot(plane, x) / denominator;
-          if (distance > epsilon && distance < best) {
+          if (std::isfinite(distance) && distance > epsilon &&
+              distance < best) {
             best = distance;
             best_axis = 1;
-            best_sign = side ? 1 : -1;
           }
         }
       }
@@ -281,25 +295,72 @@ public:
           const double root = std::sqrt(discriminant);
           const double candidates[2] = {-b - root, -b + root};
           for (int k = 0; k < 2; ++k) {
-            if (candidates[k] > epsilon && candidates[k] < best) {
+            if (std::isfinite(candidates[k]) && candidates[k] > epsilon &&
+                candidates[k] < best) {
               best = candidates[k];
               best_axis = 2;
-              best_sign = side ? 1 : -1;
             }
           }
         }
       }
 
-      if (!std::isfinite(best)) {
-        cmac_error("Could not find a cubed-sphere cell exit.");
+      // numeric_limits<double>::max() is finite, so isfinite(best) alone does
+      // not detect a failed cell-exit search.  A ray that lies on an edge or
+      // corner can occasionally need another small downstream displacement.
+      if (best_axis < 0 || !std::isfinite(best) ||
+          best == std::numeric_limits< double >::max()) {
+        if (recovery_attempt < 4) {
+          p += (uint_fast32_t(1) << recovery_attempt) * epsilon * d;
+          ++recovery_attempt;
+
+          double recovery_u, recovery_v, recovery_r;
+          local_coordinates(p, recovery_u, recovery_v, recovery_r);
+          if (recovery_u < _u0) {
+            output = TRAVELDIRECTION_FACE_X_N;
+          } else if (recovery_u > _u1) {
+            output = TRAVELDIRECTION_FACE_X_P;
+          } else if (recovery_v < _v0) {
+            output = TRAVELDIRECTION_FACE_Y_N;
+          } else if (recovery_v > _v1) {
+            output = TRAVELDIRECTION_FACE_Y_P;
+          } else if (recovery_r < _radial_edges.front()) {
+            output = TRAVELDIRECTION_FACE_Z_N;
+          } else if (recovery_r > _radial_edges.back()) {
+            output = TRAVELDIRECTION_FACE_Z_P;
+          }
+          if (output != TRAVELDIRECTION_INSIDE) {
+            photon.set_position(p);
+            return output;
+          }
+          locate(p, cell);
+          continue;
+        }
+        cmac_error("Could not find a finite cubed-sphere cell exit after "
+                   "boundary recovery (face: %" PRIiFAST8
+                   ", cell: [%" PRIiFAST32 ", %" PRIiFAST32 ", %" PRIiFAST32
+                   "], position: [%g, %g, %g], direction: [%g, %g, %g]).",
+                   _face, cell[0], cell[1], cell[2], p[0], p[1], p[2], d[0],
+                   d[1], d[2]);
       }
+      recovery_attempt = 0;
 
       const int_fast32_t active_cell = get_one_index(cell);
       const double tau = get_optical_depth(active_cell, best, photon);
+      if (!std::isfinite(tau) || tau < 0.) {
+        cmac_error("Invalid cubed-sphere optical depth %g for distance %g "
+                   "(face: %" PRIiFAST8 ", cell: [%" PRIiFAST32 ", %"
+                   PRIiFAST32 ", %" PRIiFAST32 "]).",
+                   tau, best, _face, cell[0], cell[1], cell[2]);
+      }
       double distance = best;
       tau_done += tau;
       if (tau_done >= tau_target && tau > 0.) {
         distance *= 1. - (tau_done - tau_target) / tau;
+      }
+      if (!std::isfinite(distance) || distance < 0. || distance > best) {
+        cmac_error("Invalid cubed-sphere path length %g (cell exit: %g, "
+                   "optical depth: %g).",
+                   distance, best, tau);
       }
       update_intensity_counters(active_cell, distance, photon);
       p += distance * d;
@@ -311,20 +372,29 @@ public:
         break;
       }
 
-      cell[best_axis] += best_sign;
-      if (!is_inside(cell)) {
-        if (best_axis == 0) {
-          output = best_sign > 0 ? TRAVELDIRECTION_FACE_X_P
-                                 : TRAVELDIRECTION_FACE_X_N;
-        } else if (best_axis == 1) {
-          output = best_sign > 0 ? TRAVELDIRECTION_FACE_Y_P
-                                 : TRAVELDIRECTION_FACE_Y_N;
-        } else {
-          output = best_sign > 0 ? TRAVELDIRECTION_FACE_Z_P
-                                 : TRAVELDIRECTION_FACE_Z_N;
-        }
+      // Re-locate after crossing instead of changing just one logical index.
+      // This handles the rare case where a ray crosses an edge or corner and
+      // therefore changes two cell indices at the same distance.
+      p += epsilon * d;
+      double next_u, next_v, next_r;
+      local_coordinates(p, next_u, next_v, next_r);
+      if (next_u < _u0) {
+        output = TRAVELDIRECTION_FACE_X_N;
+      } else if (next_u > _u1) {
+        output = TRAVELDIRECTION_FACE_X_P;
+      } else if (next_v < _v0) {
+        output = TRAVELDIRECTION_FACE_Y_N;
+      } else if (next_v > _v1) {
+        output = TRAVELDIRECTION_FACE_Y_P;
+      } else if (next_r < _radial_edges.front()) {
+        output = TRAVELDIRECTION_FACE_Z_N;
+      } else if (next_r > _radial_edges.back()) {
+        output = TRAVELDIRECTION_FACE_Z_P;
       } else {
-        p += epsilon * d;
+        locate(p, cell);
+      }
+      if (output != TRAVELDIRECTION_INSIDE) {
+        break;
       }
     }
 

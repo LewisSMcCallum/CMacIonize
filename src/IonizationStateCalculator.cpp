@@ -653,9 +653,33 @@ void IonizationStateCalculator::calculate_ionization_state(
 
 
   for (auto cellit = subgrid.begin(); cellit != subgrid.end(); ++cellit) {
-    calculate_ionization_state(jfac / cellit.get_volume(),
-                               hfac / cellit.get_volume(),
-                               cellit.get_ionization_variables(),timestep, time_dependent, do_metals);
+    const double cell_volume = cellit.get_volume();
+    const IonizationVariables &variables = cellit.get_ionization_variables();
+    const double mean_intensity_h =
+        variables.get_mean_intensity(ION_H_n);
+#ifdef HAS_HELIUM
+    const double mean_intensity_he =
+        variables.get_mean_intensity(ION_He_n);
+#endif
+    if (!std::isfinite(cell_volume) || cell_volume <= 0. ||
+        !std::isfinite(mean_intensity_h)
+#ifdef HAS_HELIUM
+        || !std::isfinite(mean_intensity_he)
+#endif
+    ) {
+#ifdef HAS_HELIUM
+      cmac_error("Invalid radiation estimator before the ionization-state "
+                 "calculation (volume: %g, H: %g, He: %g).",
+                 cell_volume, mean_intensity_h, mean_intensity_he);
+#else
+      cmac_error("Invalid radiation estimator before the ionization-state "
+                 "calculation (volume: %g, H: %g).",
+                 cell_volume, mean_intensity_h);
+#endif
+    }
+    calculate_ionization_state(jfac / cell_volume, hfac / cell_volume,
+                               cellit.get_ionization_variables(), timestep,
+                               time_dependent, do_metals);
   }
 }
 

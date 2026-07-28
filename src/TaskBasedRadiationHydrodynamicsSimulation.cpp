@@ -2321,7 +2321,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           cmac_assert(number_of_photons_done == numphoton);
 
           bool global_run_flag = true;
-          AtomicValue< uint_fast32_t > num_photon_done(0);
+          AtomicValue< uint_fast64_t > num_photon_done(0);
 
 
           // create task contexts

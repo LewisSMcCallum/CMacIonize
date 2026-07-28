@@ -82,7 +82,7 @@ private:
 
   /*! @brief Counter for the number of continous photon packets that has already
    *  been sourced. */
-  AtomicValue< uint_fast32_t > _number_of_continuous_photons;
+  AtomicValue< uint_fast64_t > _number_of_continuous_photons;
 
   /*! @brief Control variable used to make sure that only one thread can flush
    *  the buffers. */
@@ -122,7 +122,7 @@ public:
       ThreadSafeVector< Task > &tasks,
       std::vector< std::vector< PhotonBuffer > > &continuous_buffers,
       std::vector< TaskQueue * > &queues, TaskQueue &shared_queue,
-      const uint_fast32_t number_of_continuous_photons,
+      const uint_fast64_t number_of_continuous_photons,
       std::vector< ThreadLock > &continuous_source_lock)
       : _continuous_photon_source(continuous_photon_source), _buffers(buffers),
         _random_generators(random_generators),

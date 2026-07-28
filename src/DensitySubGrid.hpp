@@ -608,12 +608,30 @@ protected:
   inline void update_intensity_counters(const int_fast32_t active_cell,
                                         const double distance,
                                         PhotonPacket &photon) {
+    if (!std::isfinite(distance) || distance < 0. ||
+        !std::isfinite(photon.get_weight()) ||
+        !std::isfinite(photon.get_energy())) {
+      cmac_error("Refusing to accumulate an invalid photon estimator "
+                 "(cell: %" PRIiFAST32 ", distance: %g, weight: %g, "
+                 "frequency: %g).",
+                 active_cell, distance, photon.get_weight(),
+                 photon.get_energy());
+    }
     subgrid_cell_lock_lock(active_cell);
     double dmean_intensity[NUMBER_OF_IONNAMES];
     for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
       dmean_intensity[ion] = distance *
                              photon.get_photoionization_cross_section(ion) *
                              photon.get_weight();
+      if (!std::isfinite(dmean_intensity[ion]) ||
+          dmean_intensity[ion] < 0.) {
+        cmac_error("Invalid photon estimator increment for ion %"
+                   PRIiFAST32 " (cell: %" PRIiFAST32 ", increment: %g, "
+                   "distance: %g, cross section: %g, weight: %g).",
+                   ion, active_cell, dmean_intensity[ion], distance,
+                   photon.get_photoionization_cross_section(ion),
+                   photon.get_weight());
+      }
       _ionization_variables[active_cell].increase_mean_intensity(
           ion, dmean_intensity[ion]);
     }

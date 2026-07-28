@@ -591,7 +591,7 @@ void TaskBasedIonizationSimulation::run(
   }
 
   DistributedPhotonSource< DensitySubGrid > *photon_source = nullptr;
-  uint_fast32_t number_of_discrete_photons = 0;
+  uint_fast64_t number_of_discrete_photons = 0;
   if (_photon_source_distribution != nullptr) {
     number_of_discrete_photons = _number_of_photons;
   }
@@ -601,7 +601,7 @@ void TaskBasedIonizationSimulation::run(
 
   const uint_fast32_t number_of_continuous_blocks = _queues.size();
   std::vector< ThreadLock > continuous_source_lock(number_of_continuous_blocks);
-  uint_fast32_t number_of_continuous_photons = 0;
+  uint_fast64_t number_of_continuous_photons = 0;
   std::vector< std::vector< PhotonBuffer > > continuous_buffers(
       number_of_continuous_blocks);
   if (_continuous_photon_source != nullptr) {
@@ -626,7 +626,7 @@ void TaskBasedIonizationSimulation::run(
     continuous_photon_weight = 2. * luminosity_ratio / (luminosity_ratio + 1.);
   }
 
-  const uint_fast32_t fixed_number_of_continuous_photons =
+  const uint_fast64_t fixed_number_of_continuous_photons =
       number_of_continuous_photons;
 
   if (_photon_source_distribution != nullptr) {
@@ -777,18 +777,19 @@ void TaskBasedIonizationSimulation::run(
               "\"TaskBasedIonizationSimulation:number of tasks\" and "
               "\"TaskBasedIonizationSimulation:shared queue size\", or "
               "lower \"TaskBasedIonizationSimulation:number of photons\".",
-              number_of_discrete_photons - number_of_photons_done,
+              static_cast< size_t >(number_of_discrete_photons -
+                                    number_of_photons_done),
               static_cast< size_t >(number_of_discrete_photons));
         }
       }
     }
     if (_continuous_photon_source) {
       number_of_continuous_photons = fixed_number_of_continuous_photons;
-      const uint_fast32_t batch_size = PHOTONBUFFER_SIZE;
-      uint_fast32_t block_index = 0;
-      const uint_fast32_t num_batches =
+      const uint_fast64_t batch_size = PHOTONBUFFER_SIZE;
+      uint_fast64_t block_index = 0;
+      const uint_fast64_t num_batches =
           number_of_continuous_photons / batch_size;
-      for (uint_fast32_t ibatch = 0; ibatch < num_batches; ++ibatch) {
+      for (uint_fast64_t ibatch = 0; ibatch < num_batches; ++ibatch) {
         const size_t new_task = _tasks->get_free_element();
         (*_tasks)[new_task].set_type(TASKTYPE_SOURCE_CONTINUOUS_PHOTON);
         (*_tasks)[new_task].set_buffer(batch_size);
@@ -823,7 +824,7 @@ void TaskBasedIonizationSimulation::run(
 
     _time_log.start("photon propagation");
     bool global_run_flag = true;
-    AtomicValue< uint_fast32_t > num_photon_done(0);
+    AtomicValue< uint_fast64_t > num_photon_done(0);
 
 
 
