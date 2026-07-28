@@ -256,51 +256,82 @@ public:
       const double vb[2] = {_v0 + cell[1] * dv,
                             _v0 + (cell[1] + 1) * dv};
       const CoordinateVector<> x = p - _centre;
-      double best = std::numeric_limits< double >::max();
-      int best_axis = -1;
+      const double no_exit = std::numeric_limits< double >::max();
+      double exit_distance[3] = {no_exit, no_exit, no_exit};
+      int exit_sign[3] = {0, 0, 0};
+      const CoordinateVector<> face_normal = normal(_face);
+      const double face_coordinate = dot(face_normal, x);
+      const double face_direction = dot(face_normal, d);
 
-      for (int side = 0; side < 2; ++side) {
-        const CoordinateVector<> plane =
-            axis_u(_face) - ub[side] * normal(_face);
-        const double denominator = dot(plane, d);
-        if (denominator != 0.) {
-          const double distance = -dot(plane, x) / denominator;
-          if (std::isfinite(distance) && distance > epsilon &&
-              distance < best) {
-            best = distance;
-            best_axis = 0;
-          }
-        }
-      }
-      for (int side = 0; side < 2; ++side) {
-        const CoordinateVector<> plane =
-            axis_v(_face) - vb[side] * normal(_face);
-        const double denominator = dot(plane, d);
-        if (denominator != 0.) {
-          const double distance = -dot(plane, x) / denominator;
-          if (std::isfinite(distance) && distance > epsilon &&
-              distance < best) {
-            best = distance;
-            best_axis = 1;
-          }
-        }
-      }
+      // u and v are ratios of two linear functions along the ray, so the sign
+      // of each derivative is constant while the photon remains on this cube
+      // face. Only intersect the downstream angular face. This prevents a
+      // grazing ray from repeatedly intersecting the face it just crossed.
+      const auto angular_exit =
+          [&](const int axis, const CoordinateVector<> &angular_axis,
+              const double bounds[2]) {
+            const double angular_coordinate = dot(angular_axis, x);
+            const double derivative =
+                dot(angular_axis, d) * face_coordinate -
+                angular_coordinate * face_direction;
+            if (derivative == 0.) {
+              return;
+            }
 
-      // Intersections with the two spherical radial faces.
+            const int side = derivative > 0. ? 1 : 0;
+            const CoordinateVector<> plane =
+                angular_axis - bounds[side] * face_normal;
+            const double denominator = dot(plane, d);
+            if (denominator != 0.) {
+              const double distance = -dot(plane, x) / denominator;
+              if (std::isfinite(distance) && distance > epsilon) {
+                exit_distance[axis] = distance;
+                exit_sign[axis] = side ? 1 : -1;
+              }
+            }
+          };
+
+      angular_exit(0, axis_u(_face), ub);
+      angular_exit(1, axis_v(_face), vb);
+
+      // Intersections with radial faces. A root is an actual cell exit only
+      // when it crosses the inner face inwards or the outer face outwards;
+      // tangent contacts must not change the logical radial cell.
+      const double direction_squared = dot(d, d);
+      const double b = dot(x, d);
+      const double position_squared = dot(x, x);
       for (int side = 0; side < 2; ++side) {
         const double radius = _radial_edges[cell[2] + side];
-        const double b = dot(x, d);
-        const double discriminant = b * b - dot(x, x) + radius * radius;
+        const double discriminant =
+            b * b -
+            direction_squared * (position_squared - radius * radius);
         if (discriminant >= 0.) {
           const double root = std::sqrt(discriminant);
-          const double candidates[2] = {-b - root, -b + root};
+          const double candidates[2] = {
+              (-b - root) / direction_squared,
+              (-b + root) / direction_squared};
           for (int k = 0; k < 2; ++k) {
-            if (std::isfinite(candidates[k]) && candidates[k] > epsilon &&
-                candidates[k] < best) {
-              best = candidates[k];
-              best_axis = 2;
+            const double distance = candidates[k];
+            const double radial_derivative =
+                b + direction_squared * distance;
+            const bool crosses_face =
+                (side == 0 && radial_derivative < 0.) ||
+                (side == 1 && radial_derivative > 0.);
+            if (crosses_face && std::isfinite(distance) &&
+                distance > epsilon && distance < exit_distance[2]) {
+              exit_distance[2] = distance;
+              exit_sign[2] = side ? 1 : -1;
             }
           }
+        }
+      }
+
+      double best = no_exit;
+      int best_axis = -1;
+      for (int axis = 0; axis < 3; ++axis) {
+        if (exit_distance[axis] < best) {
+          best = exit_distance[axis];
+          best_axis = axis;
         }
       }
 
@@ -372,27 +403,32 @@ public:
         break;
       }
 
-      // Re-locate after crossing instead of changing just one logical index.
-      // This handles the rare case where a ray crosses an edge or corner and
-      // therefore changes two cell indices at the same distance.
-      p += epsilon * d;
-      double next_u, next_v, next_r;
-      local_coordinates(p, next_u, next_v, next_r);
-      if (next_u < _u0) {
-        output = TRAVELDIRECTION_FACE_X_N;
-      } else if (next_u > _u1) {
-        output = TRAVELDIRECTION_FACE_X_P;
-      } else if (next_v < _v0) {
-        output = TRAVELDIRECTION_FACE_Y_N;
-      } else if (next_v > _v1) {
-        output = TRAVELDIRECTION_FACE_Y_P;
-      } else if (next_r < _radial_edges.front()) {
-        output = TRAVELDIRECTION_FACE_Z_N;
-      } else if (next_r > _radial_edges.back()) {
-        output = TRAVELDIRECTION_FACE_Z_P;
-      } else {
-        locate(p, cell);
+      // Update logical indices explicitly. A coordinate-based re-location is
+      // ambiguous for a near-tangent ray whose downstream displacement is
+      // smaller than floating-point precision. Update every face reached at
+      // the same distance so exact edge and corner crossings also progress.
+      const double crossing_tolerance =
+          8. * epsilon +
+          64. * std::numeric_limits< double >::epsilon() * std::abs(best);
+      for (int axis = 0; axis < 3; ++axis) {
+        if (exit_sign[axis] != 0 &&
+            std::abs(exit_distance[axis] - best) <= crossing_tolerance) {
+          cell[axis] += exit_sign[axis];
+          if (!is_inside(cell) && output == TRAVELDIRECTION_INSIDE) {
+            if (axis == 0) {
+              output = exit_sign[axis] > 0 ? TRAVELDIRECTION_FACE_X_P
+                                           : TRAVELDIRECTION_FACE_X_N;
+            } else if (axis == 1) {
+              output = exit_sign[axis] > 0 ? TRAVELDIRECTION_FACE_Y_P
+                                           : TRAVELDIRECTION_FACE_Y_N;
+            } else {
+              output = exit_sign[axis] > 0 ? TRAVELDIRECTION_FACE_Z_P
+                                           : TRAVELDIRECTION_FACE_Z_N;
+            }
+          }
+        }
       }
+      p += epsilon * d;
       if (output != TRAVELDIRECTION_INSIDE) {
         break;
       }

@@ -181,6 +181,9 @@ inline void output_queues(const unsigned int iloop,
  *    4)
  *  - enable trackers: Track photon packets travelling through specific
  *    positions? (default: no)
+ *  - initial neutral fraction: Initial hydrogen neutral fraction used by the
+ *    static solver. A negative value preserves the value supplied by the
+ *    density function (default: 0.001).
  *
  * @param num_thread Number of shared memory parallel threads to use.
  * @param parameterfile_name Name of the parameter file to use.
@@ -208,7 +211,7 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
         _time_dependent_timestep(_parameter_file.get_physical_value<QUANTITY_TIME >(
           "TaskBasedIonizationSimulation:time dependent timestep", "0.5 Myr")),
           _initial_neutral_fraction(_parameter_file.get_value< double >(
-            "TaskBasedIonizationSimulation:initial neutral fraction", -1.0)){
+            "TaskBasedIonizationSimulation:initial neutral fraction", 1.e-3)){
 
   set_number_of_threads(num_thread);
 
