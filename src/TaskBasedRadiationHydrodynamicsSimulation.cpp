@@ -732,6 +732,8 @@ inline bool is_hydro_flux_task(const int_fast8_t type) {
  *  - number-of-steps (no abbreviation, optional, integer argument): number of
  *    time steps to execute before halting the code (negative values mean no
  *    limit on the number of time steps, default: -1).
+ *  - rhd-number-of-buffers (no abbreviation, optional, integer argument):
+ *    override the photon buffer count from the parameter file or restart dump.
  *
  * @param parser CommandLineParser that has not yet parsed the command line
  * options.
@@ -751,6 +753,11 @@ void TaskBasedRadiationHydrodynamicsSimulation::add_command_line_parameters(
   parser.add_option("number-of-steps", 0,
                     "Number of time steps to execute before halting the code.",
                     COMMANDLINEOPTION_INTARGUMENT, "-1");
+  parser.add_option(
+      "rhd-number-of-buffers", 0,
+      "Override the task-based RHD photon buffer count. This also updates the "
+      "value stored in subsequent restart files.",
+      COMMANDLINEOPTION_INTARGUMENT, "-1");
 }
 
 /**
@@ -1551,8 +1558,23 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   
 
 
-  const size_t number_of_buffers = params->get_value< size_t >(
-      "TaskBasedRadiationHydrodynamicsSimulation:number of buffers", 50000);
+  const std::string number_of_buffers_key =
+      "TaskBasedRadiationHydrodynamicsSimulation:number of buffers";
+  if (parser.was_found("rhd-number-of-buffers")) {
+    const int_fast32_t number_of_buffers_override =
+        parser.get_value< int_fast32_t >("rhd-number-of-buffers");
+    if (number_of_buffers_override <= 0) {
+      cmac_error("--rhd-number-of-buffers must be greater than zero.");
+    }
+    params->add_value(number_of_buffers_key,
+                      std::to_string(number_of_buffers_override));
+    if (log) {
+      log->write_status("Overriding task-based RHD photon buffer count to ",
+                        number_of_buffers_override, ".");
+    }
+  }
+  const size_t number_of_buffers =
+      params->get_value< size_t >(number_of_buffers_key, 50000);
   const size_t queue_size_per_thread = params->get_value< size_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:queue size per thread", 10000);
   const size_t shared_queue_size = params->get_value< size_t >(
