@@ -58,6 +58,7 @@
 #include "ThreadStats.hpp"
 #include "TrackerManager.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -175,6 +176,11 @@ inline void output_queues(const unsigned int iloop,
  *    algorithm to perform (default: 10)
  *  - number of photons: Number of photon packets to use for each iteration of
  *    the photoionization algorithm (default: 1e6)
+ *  - number of photons first loop: Number of photon packets to use in the
+ *    first iteration (default: number of photons)
+ *  - number of photons last loop: Number of photon packets to use in the final
+ *    iteration (default: number of photons). Intermediate iterations are
+ *    logarithmically spaced between the first and final values.
  *  - output folder: Folder where all output files will be placed (default: .)
  *  - diffuse field: Should the diffuse field be tracked? (default: false)
  *  - source copy level: Copy level for subgrids that contain a source (default:
@@ -200,6 +206,14 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
           "TaskBasedIonizationSimulation:number of iterations", 10)),
       _number_of_photons(_parameter_file.get_value< uint_fast64_t >(
           "TaskBasedIonizationSimulation:number of photons", 1e6)),
+      _number_of_photons_first_loop(
+          _parameter_file.get_value< uint_fast64_t >(
+              "TaskBasedIonizationSimulation:number of photons first loop",
+              _number_of_photons)),
+      _number_of_photons_last_loop(
+          _parameter_file.get_value< uint_fast64_t >(
+              "TaskBasedIonizationSimulation:number of photons last loop",
+              _number_of_photons)),
       _source_copy_level(_parameter_file.get_value< uint_fast32_t >(
           "TaskBasedIonizationSimulation:source copy level", 4)),
       _simulation_box(_parameter_file),
@@ -212,6 +226,11 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
           "TaskBasedIonizationSimulation:time dependent timestep", "0.5 Myr")),
           _initial_neutral_fraction(_parameter_file.get_value< double >(
             "TaskBasedIonizationSimulation:initial neutral fraction", 1.e-3)){
+
+  if (_number_of_photons_first_loop == 0 ||
+      _number_of_photons_last_loop == 0) {
+    cmac_error("The first- and last-loop photon counts must be positive.");
+  }
 
   set_number_of_threads(num_thread);
 
@@ -593,18 +612,11 @@ void TaskBasedIonizationSimulation::run(
     _memory_log.print(mfile, false);
   }
 
-  DistributedPhotonSource< DensitySubGrid > *photon_source = nullptr;
-  uint_fast64_t number_of_discrete_photons = 0;
-  if (_photon_source_distribution != nullptr) {
-    number_of_discrete_photons = _number_of_photons;
-  }
-
   // per thread execution statistics
   std::vector< ThreadStats > thread_stats(_queues.size());
 
   const uint_fast32_t number_of_continuous_blocks = _queues.size();
   std::vector< ThreadLock > continuous_source_lock(number_of_continuous_blocks);
-  uint_fast64_t number_of_continuous_photons = 0;
   std::vector< std::vector< PhotonBuffer > > continuous_buffers(
       number_of_continuous_blocks);
   if (_continuous_photon_source != nullptr) {
@@ -612,30 +624,6 @@ void TaskBasedIonizationSimulation::run(
       continuous_buffers[i].resize(
           _grid_creator->number_of_original_subgrids());
     }
-    number_of_continuous_photons = _number_of_photons;
-  }
-
-  double discrete_photon_weight = 1.;
-  double continuous_photon_weight = 1.;
-  if (number_of_discrete_photons > 0 && number_of_continuous_photons > 0) {
-    number_of_discrete_photons >>= 1;
-    number_of_continuous_photons =
-        _number_of_photons - number_of_discrete_photons;
-    const double luminosity_ratio =
-        _total_luminosity /
-            _photon_source_distribution->get_total_luminosity() -
-        1.;
-    discrete_photon_weight = 2. / (luminosity_ratio + 1.);
-    continuous_photon_weight = 2. * luminosity_ratio / (luminosity_ratio + 1.);
-  }
-
-  const uint_fast64_t fixed_number_of_continuous_photons =
-      number_of_continuous_photons;
-
-  if (_photon_source_distribution != nullptr) {
-    photon_source = new DistributedPhotonSource< DensitySubGrid >(
-        number_of_discrete_photons, *_photon_source_distribution,
-        *_grid_creator);
   }
 
   _time_log.start("subgrid initialisation");
@@ -674,32 +662,27 @@ void TaskBasedIonizationSimulation::run(
   _time_log.start("photoionization loop");
   for (uint_fast32_t iloop = 0; iloop < _number_of_iterations; ++iloop) {
 
+    // Increase the sampling geometrically, so expensive high-photon iterations
+    // are concentrated near the converged solution.
+    if (_number_of_iterations < 2 || iloop == 0) {
+      _number_of_photons = _number_of_photons_first_loop;
+    } else if (iloop == _number_of_iterations - 1) {
+      _number_of_photons = _number_of_photons_last_loop;
+    } else {
+      const double loop_fraction =
+          static_cast< double >(iloop) / (_number_of_iterations - 1);
+      _number_of_photons = static_cast< uint_fast64_t >(std::llround(
+          _number_of_photons_first_loop *
+          std::pow(static_cast< double >(_number_of_photons_last_loop) /
+                       _number_of_photons_first_loop,
+                   loop_fraction)));
+    }
+
     std::stringstream iloopstr;
     iloopstr << "loop " << iloop;
     _time_log.start(iloopstr.str());
     _memory_log.add_entry(iloopstr.str());
 
-    if (_log) {
-      _log->write_status("Starting loop ", iloop, ".");
-    }
-
-    uint_fast64_t iteration_start, iteration_end;
-    cpucycle_tick(iteration_start);
-    _photon_propagation_timer.start();
-
-    // reset the photon source information
-    if (photon_source) {
-      photon_source->reset();
-    }
-
-    // define photon scattering stats
-
-    PhotonPacketStatistics statistics(_parameter_file);
-    if (iloop == 0) {
-      std::cout << "Tracked source xpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[0]/3.086e16 << std::endl;
-      std::cout << "Tracked source xpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[1]/3.086e16 << std::endl;
-      std::cout << "Tracked source zpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[2]/3.086e16 << std::endl;
-    }
     if (_trackers != nullptr && iloop == _number_of_iterations - 1) {
       if (_log) {
         _log->write_status("Adding trackers...");
@@ -710,6 +693,56 @@ void TaskBasedIonizationSimulation::run(
       if (_log) {
         _log->write_status("Done adding trackers.");
       }
+    }
+
+    if (_log) {
+      _log->write_status("Starting loop ", iloop, " with ",
+                         _number_of_photons, " photon packets.");
+    }
+
+    uint_fast64_t number_of_discrete_photons = 0;
+    if (_photon_source_distribution != nullptr) {
+      number_of_discrete_photons = _number_of_photons;
+    }
+    uint_fast64_t number_of_continuous_photons = 0;
+    if (_continuous_photon_source != nullptr) {
+      number_of_continuous_photons = _number_of_photons;
+    }
+
+    double discrete_photon_weight = 1.;
+    double continuous_photon_weight = 1.;
+    if (number_of_discrete_photons > 0 && number_of_continuous_photons > 0) {
+      number_of_discrete_photons >>= 1;
+      number_of_continuous_photons =
+          _number_of_photons - number_of_discrete_photons;
+      const double luminosity_ratio =
+          _total_luminosity /
+              _photon_source_distribution->get_total_luminosity() -
+          1.;
+      discrete_photon_weight = 2. / (luminosity_ratio + 1.);
+      continuous_photon_weight =
+          2. * luminosity_ratio / (luminosity_ratio + 1.);
+    }
+    const uint_fast64_t fixed_number_of_continuous_photons =
+        number_of_continuous_photons;
+
+    DistributedPhotonSource< DensitySubGrid > *photon_source = nullptr;
+    if (_photon_source_distribution != nullptr) {
+      photon_source = new DistributedPhotonSource< DensitySubGrid >(
+          number_of_discrete_photons, *_photon_source_distribution,
+          *_grid_creator);
+    }
+
+    uint_fast64_t iteration_start, iteration_end;
+    cpucycle_tick(iteration_start);
+    _photon_propagation_timer.start();
+
+    // define photon scattering stats
+    PhotonPacketStatistics statistics(_parameter_file);
+    if (iloop == 0) {
+      std::cout << "Tracked source xpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[0]/3.086e16 << std::endl;
+      std::cout << "Tracked source xpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[1]/3.086e16 << std::endl;
+      std::cout << "Tracked source zpos = " << _photon_source_distribution->get_position(statistics.get_tracked_source())[2]/3.086e16 << std::endl;
     }
 
     // reset mean intensity counters
@@ -1181,6 +1214,7 @@ void TaskBasedIonizationSimulation::run(
     for (int_fast32_t itask = 0; itask < TASKTYPE_NUMBER; ++itask) {
       delete task_contexts[itask];
     }
+    delete photon_source;
 
 
     std::cout << "Number of photons escaped = " << statistics.get_num_escaped() << std::endl;
@@ -1194,10 +1228,6 @@ void TaskBasedIonizationSimulation::run(
 
   } // photoionization loop
   _time_log.end("photoionization loop");
-
-  if (photon_source) {
-    delete photon_source;
-  }
 
   if (_trackers != nullptr) {
     if (_log) {

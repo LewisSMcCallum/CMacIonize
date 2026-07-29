@@ -84,9 +84,14 @@ private:
   /*! @brief Number of iterations of the ray tracing loop. */
   const uint_fast32_t _number_of_iterations;
 
-  /*! @brief Number of photons used in every iteration of the ray tracing
-   *  loop. */
+  /*! @brief Number of photons used in the current ray tracing iteration. */
   uint_fast64_t _number_of_photons;
+
+  /*! @brief Number of photons used in the first ray tracing iteration. */
+  const uint_fast64_t _number_of_photons_first_loop;
+
+  /*! @brief Number of photons used in the final ray tracing iteration. */
+  const uint_fast64_t _number_of_photons_last_loop;
 
   /*! @brief Copy level for subgrids that contain a source. */
   const uint_fast8_t _source_copy_level;
