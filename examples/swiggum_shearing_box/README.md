@@ -10,15 +10,20 @@ The supplied July 9 export contains only reconstructed ccSN progenitors. Its
 own README states that direct-collapse outcomes are absent, so this run cannot
 inject or record those missing events.
 
-## Important rotation limitation
+## Galactic rotation boundaries
 
 `GalacticShearingBox` initializes the solar-circle linear shear and advances
-the local Coriolis and radial tidal source terms. The horizontal boundaries in
-this development setup are ordinary periodic boundaries. They do **not** yet
-perform the time-dependent azimuthal remap required by a complete radial
-shearing-periodic boundary. This is suitable for developing and checking the
-source history, feedback and local rotation terms, but not yet for a final
-production shearing-box result over the full 120 Myr interval.
+the local Coriolis and radial tidal source terms. With
+`shearing periodic boundaries: true`, the hydrodynamic radial faces use a
+time-dependent, linearly interpolated y remap. Boundary fluxes are deposited
+conservatively, with y momentum and total energy transformed between the two
+background-shear frames. This removes the artificial edge-to-edge velocity
+jump produced by an ordinary x-periodic boundary.
+
+The photon transport still uses the ordinary geometric periodic neighbour
+links. The new remap therefore fixes the hydrodynamic boundary discontinuity;
+it does not yet remap a packet's y position when that packet crosses a radial
+boundary.
 
 ## Build and run
 

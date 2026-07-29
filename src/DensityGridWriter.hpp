@@ -122,6 +122,18 @@ public:
   virtual void write(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
                      const uint_fast32_t counter, ParameterFile &params,
                      double time = 0.) = 0;
+
+  /**
+   * @brief Get the filename used for a snapshot counter, if the writer creates
+   * a single file.
+   *
+   * This lets optional simulation metadata be appended after the grid writer
+   * has safely closed the file.
+   */
+  virtual std::string
+  get_snapshot_filename(const uint_fast32_t counter) const {
+    return std::string();
+  }
 };
 
 #endif // DENSITYGRIDWRITER_HPP

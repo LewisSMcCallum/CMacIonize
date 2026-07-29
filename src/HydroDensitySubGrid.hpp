@@ -753,6 +753,39 @@ public:
   }
 
   /**
+   * @brief Add the x-gradient contribution from an explicitly remapped ghost
+   * cell.
+   *
+   * This small hook is used by the Galactic shearing-periodic boundary.  The
+   * remapped cell does not belong to a single neighbouring subgrid, so the
+   * ordinary pairwise boundary sweep cannot be used.
+   *
+   * @param index Index of the real boundary cell.
+   * @param hydro Hydro instance to use.
+   * @param ghost Remapped ghost-cell state in the real cell's velocity frame.
+   * @param ghost_on_right True at x high, false at x low.
+   */
+  inline void add_x_remapped_ghost_gradient(const uint_fast32_t index,
+                                            const Hydro &hydro,
+                                            HydroVariables ghost,
+                                            const bool ghost_on_right) {
+    double ghost_limiters[10];
+    for (uint_fast8_t i = 0; i < 5; ++i) {
+      ghost_limiters[2 * i] = DBL_MAX;
+      ghost_limiters[2 * i + 1] = -DBL_MAX;
+    }
+    if (ghost_on_right) {
+      hydro.do_gradient_calculation(
+          0, _hydro_variables[index], ghost, _inv_cell_size[0],
+          &_primitive_variable_limiters[10 * index], ghost_limiters);
+    } else {
+      hydro.do_gradient_calculation(
+          0, ghost, _hydro_variables[index], _inv_cell_size[0],
+          ghost_limiters, &_primitive_variable_limiters[10 * index]);
+    }
+  }
+
+  /**
    * @brief Compute the hydrodynamical gradients for all interfaces at the
    * boundary between this subgrid and the given box boundary with boundary
    * condition.

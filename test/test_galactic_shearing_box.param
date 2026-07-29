@@ -1,0 +1,8 @@
+GalacticShearingBox:
+  enabled: true
+  initialize background shear: true
+  shearing periodic boundaries: true
+  circular velocity: 1. m s^-1
+  solar radius: 1. m
+  shear parameter: 1.
+  radial centre: 0. m

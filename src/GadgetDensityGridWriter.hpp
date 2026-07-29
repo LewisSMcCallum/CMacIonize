@@ -67,6 +67,9 @@ public:
   virtual void write(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
                      const uint_fast32_t counter, ParameterFile &params,
                      double time = 0.);
+
+  virtual std::string
+  get_snapshot_filename(const uint_fast32_t counter) const;
 };
 
 #endif // GADGETDENSITYGRIDWRITER_HPP

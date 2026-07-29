@@ -188,6 +188,15 @@ public:
   virtual void done_stellar_feedback() {}
 
   /**
+   * @brief Append distribution-specific metadata to a completed snapshot.
+   *
+   * Most distributions have no extra snapshot data. Implementations that do
+   * write metadata should open and close the file entirely within this call.
+   */
+  virtual void write_snapshot_metadata(const std::string &filename,
+                                       const double simulation_time) {}
+
+  /**
    * @brief Write the distribution to the given restart file.
    *
    * @param restart_writer RestartWriter to use.

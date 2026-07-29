@@ -39,6 +39,7 @@ GalacticShearingBox:
   shear parameter: 1.0
   radial centre: 0. pc
   initialize background shear: true
+  shearing periodic boundaries: true
 
 PhotonSourceDistribution:
   type: SwiggumFile

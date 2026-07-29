@@ -286,6 +286,18 @@ add_unit_test(NAME testMixedDrivingSourcePosition
               SOURCES ${TESTMIXEDDRIVINGSOURCEPOSITION_SOURCES}
               LIBS SharedEngine)
 
+## Regression test for the conservative Galactic shearing-periodic boundary
+set(TESTGALACTICSHEARINGBOX_SOURCES
+    testGalacticShearingBox.cpp
+)
+add_unit_test(NAME testGalacticShearingBox
+              SOURCES ${TESTGALACTICSHEARINGBOX_SOURCES}
+              LIBS SharedEngine)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_galactic_shearing_box.param
+    ${PROJECT_BINARY_DIR}/rundir/test/test_galactic_shearing_box.param
+    COPYONLY)
+
 ## Unit test for SwiggumFilePhotonSourceDistribution restart ordering
 set(TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES
     testSwiggumFilePhotonSourceDistribution.cpp

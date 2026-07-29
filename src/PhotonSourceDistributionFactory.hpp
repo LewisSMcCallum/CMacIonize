@@ -172,7 +172,10 @@ public:
   write_restart_file(RestartWriter &restart_writer,
                      PhotonSourceDistribution &distribution) {
 
-    const std::string tag = typeid(distribution).name();
+    const std::string tag =
+        typeid(distribution) == typeid(MixedDrivingPhotonSourceDistribution)
+            ? "MixedDrivingPhotonSourceDistributionV2"
+            : typeid(distribution).name();
     restart_writer.write(tag);
     distribution.write_restart_file(restart_writer);
   }
@@ -199,6 +202,8 @@ public:
       return new IMFDiscPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(PeakDrivingPhotonSourceDistribution).name()) {
       return new PeakDrivingPhotonSourceDistribution(restart_reader);
+    } else if (tag == "MixedDrivingPhotonSourceDistributionV2") {
+      return new MixedDrivingPhotonSourceDistribution(restart_reader, true);
     } else if (tag == typeid(MixedDrivingPhotonSourceDistribution).name()) {
       return new MixedDrivingPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(SingleStarPhotonSourceDistribution).name()) {

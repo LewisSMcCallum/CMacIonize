@@ -654,6 +654,7 @@ execute_task(const size_t itask,
              DensitySubGridCreator< HydroDensitySubGrid > &grid_creator,
              ThreadSafeVector< Task > &tasks, const double timestep,
              const Hydro &hydro, const HydroBoundaryManager &boundary_manager,
+             const GalacticShearingBox &galactic_shearing_box,
              const bool advect_ionization = false) {
 
   const Task &task = tasks[itask];
@@ -663,8 +664,12 @@ execute_task(const size_t itask,
     subgrid.inner_gradient_sweep(hydro);
     break;
   case TASKTYPE_GRADIENTSWEEP_EXTERNAL_NEIGHBOUR:
-    subgrid.outer_gradient_sweep(task.get_interaction_direction(), hydro,
-                                 *grid_creator.get_subgrid(task.get_buffer()));
+    if (!galactic_shearing_box.replaces_task(
+            task.get_subgrid(), task.get_interaction_direction(),
+            grid_creator)) {
+      subgrid.outer_gradient_sweep(task.get_interaction_direction(), hydro,
+                                   *grid_creator.get_subgrid(task.get_buffer()));
+    }
     break;
   case TASKTYPE_GRADIENTSWEEP_EXTERNAL_BOUNDARY:
     subgrid.outer_ghost_gradient_sweep(task.get_interaction_direction(), hydro,
@@ -681,9 +686,13 @@ execute_task(const size_t itask,
     subgrid.inner_flux_sweep(hydro, timestep, advect_ionization);
     break;
   case TASKTYPE_FLUXSWEEP_EXTERNAL_NEIGHBOUR:
-    subgrid.outer_flux_sweep(task.get_interaction_direction(), hydro,
-                             *grid_creator.get_subgrid(task.get_buffer()),
-                             timestep, advect_ionization);
+    if (!galactic_shearing_box.replaces_task(
+            task.get_subgrid(), task.get_interaction_direction(),
+            grid_creator)) {
+      subgrid.outer_flux_sweep(task.get_interaction_direction(), hydro,
+                               *grid_creator.get_subgrid(task.get_buffer()),
+                               timestep, advect_ionization);
+    }
     break;
   case TASKTYPE_FLUXSWEEP_EXTERNAL_BOUNDARY:
     subgrid.outer_ghost_flux_sweep(task.get_interaction_direction(), hydro,
@@ -700,6 +709,12 @@ execute_task(const size_t itask,
   default:
     cmac_error("Unknown hydro task: %" PRIiFAST32, task.get_type());
   }
+}
+
+inline bool is_hydro_flux_task(const int_fast8_t type) {
+  return type == TASKTYPE_FLUXSWEEP_INTERNAL ||
+         type == TASKTYPE_FLUXSWEEP_EXTERNAL_NEIGHBOUR ||
+         type == TASKTYPE_FLUXSWEEP_EXTERNAL_BOUNDARY;
 }
 
 /**
@@ -1771,6 +1786,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     time_logger.end("grid initialization");
   }
 
+  galactic_shearing_box.validate_boundaries(
+      simulation_box.get_periodicity(), *grid_creator);
+
   memory_logger.add_entry("pretasks");
 
   time_logger.start("task initialization");
@@ -1996,6 +2014,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   if (write_output && restart_reader == nullptr && hydro_firstsnap == 0) {
     time_logger.start("snapshot");
     writer->write(*grid_creator, 0, *params, 0.);
+    if (sourcedistribution != nullptr) {
+      sourcedistribution->write_snapshot_metadata(
+          writer->get_snapshot_filename(0), 0.);
+    }
     time_logger.end("snapshot");
   }
 
@@ -2787,6 +2809,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       time_logger.end("turbulence");
     }
 
+    // The radial remap contributes the missing x-neighbour to the gradients.
+    // Its ordinary same-y periodic task is left in the graph as a no-op so the
+    // existing task dependencies remain unchanged.
+    galactic_shearing_box.add_boundary_gradients(
+        *grid_creator, hydro, current_time - actual_timestep);
+
     // reset the hydro tasks and add them to the queue
     AtomicValue< uint_fast32_t > number_of_tasks;
     for (auto cellit = grid_creator->begin();
@@ -2803,46 +2831,76 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     }
 
     start_parallel_timing_block();
+    bool defer_flux_tasks =
+        galactic_shearing_box.shearing_periodic_boundaries();
+    bool hydro_tasks_finished = false;
+    while (!hydro_tasks_finished) {
 #ifdef HAVE_OPENMP
 #pragma omp parallel default(shared)
 #endif
-    {
-      const int_fast32_t thread_id = get_thread_index();
-      while (number_of_tasks.value() > 0) {
-        size_t current_task = queues[thread_id]->get_task(*tasks);
-        if (current_task == NO_TASK) {
-          current_task =
-              steal_task(thread_id, num_thread, queues, *tasks, *grid_creator);
-        }
-        if (current_task != NO_TASK) {
-          (*tasks)[current_task].start(thread_id);
-
-          uint_fast64_t task_start, task_stop;
-          cpucycle_tick(task_start);
-
-          execute_task(current_task, *grid_creator, *tasks, actual_timestep,
-                       hydro, hydro_boundary_manager, _advect_ionization);
-          (*tasks)[current_task].stop();
-
-          cpucycle_tick(task_stop);
-          active_time[thread_id] += task_stop - task_start;
-
-          (*tasks)[current_task].unlock_dependency();
-          const unsigned char numchild =
-              (*tasks)[current_task].get_number_of_children();
-          for (uint_fast8_t i = 0; i < numchild; ++i) {
-            const size_t ichild = (*tasks)[current_task].get_child(i);
-            if ((*tasks)[ichild].decrement_number_of_unfinished_parents() ==
-                0) {
-              queues[(*grid_creator->get_subgrid(
-                          (*tasks)[ichild].get_subgrid()))
-                         .get_owning_thread()]
-                  ->add_task(ichild);
-              number_of_tasks.pre_increment();
-            }
+      {
+        const int_fast32_t thread_id = get_thread_index();
+        while (number_of_tasks.value() > 0) {
+          size_t current_task = queues[thread_id]->get_task(*tasks);
+          if (current_task == NO_TASK) {
+            current_task = steal_task(thread_id, num_thread, queues, *tasks,
+                                      *grid_creator);
           }
-          number_of_tasks.pre_decrement();
+          if (current_task != NO_TASK) {
+            (*tasks)[current_task].start(thread_id);
+
+            uint_fast64_t task_start, task_stop;
+            cpucycle_tick(task_start);
+
+            execute_task(current_task, *grid_creator, *tasks, actual_timestep,
+                         hydro, hydro_boundary_manager, galactic_shearing_box,
+                         _advect_ionization);
+            (*tasks)[current_task].stop();
+
+            cpucycle_tick(task_stop);
+            active_time[thread_id] += task_stop - task_start;
+
+            (*tasks)[current_task].unlock_dependency();
+            const unsigned char numchild =
+                (*tasks)[current_task].get_number_of_children();
+            for (uint_fast8_t i = 0; i < numchild; ++i) {
+              const size_t ichild = (*tasks)[current_task].get_child(i);
+              if ((*tasks)[ichild].decrement_number_of_unfinished_parents() ==
+                      0 &&
+                  !(defer_flux_tasks &&
+                    is_hydro_flux_task((*tasks)[ichild].get_type()))) {
+                queues[(*grid_creator->get_subgrid(
+                            (*tasks)[ichild].get_subgrid()))
+                           .get_owning_thread()]
+                    ->add_task(ichild);
+                number_of_tasks.pre_increment();
+              }
+            }
+            number_of_tasks.pre_decrement();
+          }
         }
+      }
+
+      if (defer_flux_tasks) {
+        // All states have now been slope-limited and predicted to half time.
+        // Compute the conservative remapped face flux before releasing the
+        // normal flux/update half of the task graph.
+        galactic_shearing_box.add_boundary_fluxes(
+            *grid_creator, hydro, current_time - 0.5 * actual_timestep,
+            actual_timestep, _advect_ionization);
+        defer_flux_tasks = false;
+        for (size_t itask = 0; itask < radiation_task_offset; ++itask) {
+          if (is_hydro_flux_task((*tasks)[itask].get_type()) &&
+              (*tasks)[itask].get_number_of_unfinished_parents() == 0) {
+            queues[(*grid_creator->get_subgrid(
+                        (*tasks)[itask].get_subgrid()))
+                       .get_owning_thread()]
+                ->add_task(itask);
+            number_of_tasks.pre_increment();
+          }
+        }
+      } else {
+        hydro_tasks_finished = true;
       }
     }
     stop_parallel_timing_block();
@@ -3002,6 +3060,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       if (hydro_firstsnap <= hydro_lastsnap) {
         time_logger.start("snapshot");
         writer->write(*grid_creator, hydro_lastsnap, *params, current_time);
+        if (sourcedistribution != nullptr) {
+          sourcedistribution->write_snapshot_metadata(
+              writer->get_snapshot_filename(hydro_lastsnap), current_time);
+        }
         time_logger.end("snapshot");
       }
       ++hydro_lastsnap;
@@ -3282,6 +3344,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     if (write_output) {
       time_logger.start("snapshot");
       writer->write(*grid_creator, hydro_lastsnap, *params, current_time);
+      if (sourcedistribution != nullptr) {
+        sourcedistribution->write_snapshot_metadata(
+            writer->get_snapshot_filename(hydro_lastsnap), current_time);
+      }
       time_logger.end("snapshot");
     }
   }

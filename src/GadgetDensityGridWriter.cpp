@@ -1104,3 +1104,8 @@ void GadgetDensityGridWriter::write(
   // close file
   HDF5Tools::close_file(file);
 }
+std::string GadgetDensityGridWriter::get_snapshot_filename(
+    const uint_fast32_t counter) const {
+  return Utilities::compose_filename(_output_folder, _prefix, "hdf5", counter,
+                                     _padding);
+}
