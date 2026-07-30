@@ -48,11 +48,11 @@ PhotonSourceSpectrum:
   temperature: 40000. K
 
 TaskBasedIonizationSimulation:
-  # fallback number of photons to use when no ramp is configured
-  number of photons: 1e5
-  # exercise the logarithmic packet-count ramp
+  # number of photons to use for intermediate loops
+  number of photons: 2e4
+  # exercise the cheaper first and more expensive final loops
   number of photons first loop: 1e4
-  number of photons last loop: 1e5
+  number of photons last loop: 3e4
 
   # maximum number of iterations
   number of iterations: 10

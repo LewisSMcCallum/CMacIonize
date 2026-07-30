@@ -174,13 +174,12 @@ inline void output_queues(const unsigned int iloop,
  *    42)
  *  - number of iterations: Number of iterations of the photoionization
  *    algorithm to perform (default: 10)
- *  - number of photons: Number of photon packets to use for each iteration of
- *    the photoionization algorithm (default: 1e6)
+ *  - number of photons: Number of photon packets to use for intermediate
+ *    iterations of the photoionization algorithm (default: 1e6)
  *  - number of photons first loop: Number of photon packets to use in the
  *    first iteration (default: number of photons)
  *  - number of photons last loop: Number of photon packets to use in the final
- *    iteration (default: number of photons). Intermediate iterations are
- *    logarithmically spaced between the first and final values.
+ *    iteration (default: number of photons)
  *  - output folder: Folder where all output files will be placed (default: .)
  *  - diffuse field: Should the diffuse field be tracked? (default: false)
  *  - source copy level: Copy level for subgrids that contain a source (default:
@@ -206,14 +205,15 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
           "TaskBasedIonizationSimulation:number of iterations", 10)),
       _number_of_photons(_parameter_file.get_value< uint_fast64_t >(
           "TaskBasedIonizationSimulation:number of photons", 1e6)),
+      _number_of_photons_middle_loops(_number_of_photons),
       _number_of_photons_first_loop(
           _parameter_file.get_value< uint_fast64_t >(
               "TaskBasedIonizationSimulation:number of photons first loop",
-              _number_of_photons)),
+              _number_of_photons_middle_loops)),
       _number_of_photons_last_loop(
           _parameter_file.get_value< uint_fast64_t >(
               "TaskBasedIonizationSimulation:number of photons last loop",
-              _number_of_photons)),
+              _number_of_photons_middle_loops)),
       _source_copy_level(_parameter_file.get_value< uint_fast32_t >(
           "TaskBasedIonizationSimulation:source copy level", 4)),
       _simulation_box(_parameter_file),
@@ -227,9 +227,11 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
           _initial_neutral_fraction(_parameter_file.get_value< double >(
             "TaskBasedIonizationSimulation:initial neutral fraction", 1.e-3)){
 
-  if (_number_of_photons_first_loop == 0 ||
+  if (_number_of_photons_middle_loops == 0 ||
+      _number_of_photons_first_loop == 0 ||
       _number_of_photons_last_loop == 0) {
-    cmac_error("The first- and last-loop photon counts must be positive.");
+    cmac_error("The first-, intermediate-, and last-loop photon counts must "
+               "be positive.");
   }
 
   set_number_of_threads(num_thread);
@@ -662,20 +664,14 @@ void TaskBasedIonizationSimulation::run(
   _time_log.start("photoionization loop");
   for (uint_fast32_t iloop = 0; iloop < _number_of_iterations; ++iloop) {
 
-    // Increase the sampling geometrically, so expensive high-photon iterations
-    // are concentrated near the converged solution.
-    if (_number_of_iterations < 2 || iloop == 0) {
+    // Use cheap sampling for the initial state, the normal packet count while
+    // converging, and the expensive sampling only for the final estimate.
+    if (iloop == 0) {
       _number_of_photons = _number_of_photons_first_loop;
     } else if (iloop == _number_of_iterations - 1) {
       _number_of_photons = _number_of_photons_last_loop;
     } else {
-      const double loop_fraction =
-          static_cast< double >(iloop) / (_number_of_iterations - 1);
-      _number_of_photons = static_cast< uint_fast64_t >(std::llround(
-          _number_of_photons_first_loop *
-          std::pow(static_cast< double >(_number_of_photons_last_loop) /
-                       _number_of_photons_first_loop,
-                   loop_fraction)));
+      _number_of_photons = _number_of_photons_middle_loops;
     }
 
     std::stringstream iloopstr;

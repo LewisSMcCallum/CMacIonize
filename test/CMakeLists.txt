@@ -1003,6 +1003,13 @@ set(TESTDENSITYSUBGRIDCREATOR_SOURCES
 add_unit_test(NAME testDensitySubGridCreator
               SOURCES ${TESTDENSITYSUBGRIDCREATOR_SOURCES})
 
+## Regression test for near-tangent cubed-sphere subgrid entry
+set(TESTSPHERICALDENSITYSUBGRIDENTRY_SOURCES
+    testSphericalDensitySubGridEntry.cpp
+)
+add_unit_test(NAME testSphericalDensitySubGridEntry
+              SOURCES ${TESTSPHERICALDENSITYSUBGRIDENTRY_SOURCES})
+
 ## Unit test for TaskBasedIonizationSimulation
 set(TESTTASKBASEDIONIZATIONSIMULATION_SOURCES
     testTaskBasedIonizationSimulation.cpp

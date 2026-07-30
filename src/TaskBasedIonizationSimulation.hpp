@@ -87,6 +87,9 @@ private:
   /*! @brief Number of photons used in the current ray tracing iteration. */
   uint_fast64_t _number_of_photons;
 
+  /*! @brief Number of photons used in intermediate ray tracing iterations. */
+  const uint_fast64_t _number_of_photons_middle_loops;
+
   /*! @brief Number of photons used in the first ray tracing iteration. */
   const uint_fast64_t _number_of_photons_first_loop;
 

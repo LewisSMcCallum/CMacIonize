@@ -213,17 +213,26 @@ public:
     double start_u, start_v, start_r;
     local_coordinates(p, start_u, start_v, start_r);
     int_fast32_t initial_output = TRAVELDIRECTION_INSIDE;
-    if (start_u < _u0) {
+    // A photon that has just entered through a face can still lie a few
+    // floating-point spacings outside it. Keep it in the receiving subgrid;
+    // otherwise near-tangent rays can bounce forever between two neighbours.
+    if (start_u < _u0 &&
+        input_direction != TRAVELDIRECTION_FACE_X_N) {
       initial_output = TRAVELDIRECTION_FACE_X_N;
-    } else if (start_u > _u1) {
+    } else if (start_u > _u1 &&
+               input_direction != TRAVELDIRECTION_FACE_X_P) {
       initial_output = TRAVELDIRECTION_FACE_X_P;
-    } else if (start_v < _v0) {
+    } else if (start_v < _v0 &&
+               input_direction != TRAVELDIRECTION_FACE_Y_N) {
       initial_output = TRAVELDIRECTION_FACE_Y_N;
-    } else if (start_v > _v1) {
+    } else if (start_v > _v1 &&
+               input_direction != TRAVELDIRECTION_FACE_Y_P) {
       initial_output = TRAVELDIRECTION_FACE_Y_P;
-    } else if (start_r < _radial_edges.front()) {
+    } else if (start_r < _radial_edges.front() &&
+               input_direction != TRAVELDIRECTION_FACE_Z_N) {
       initial_output = TRAVELDIRECTION_FACE_Z_N;
-    } else if (start_r > _radial_edges.back()) {
+    } else if (start_r > _radial_edges.back() &&
+               input_direction != TRAVELDIRECTION_FACE_Z_P) {
       initial_output = TRAVELDIRECTION_FACE_Z_P;
     }
     if (initial_output != TRAVELDIRECTION_INSIDE) {
