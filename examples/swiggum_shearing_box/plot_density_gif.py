@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+from functools import lru_cache
 import glob
 import gzip
 import hashlib
@@ -155,6 +156,13 @@ def main():
     parser.add_argument("--grid-size", nargs=3, type=int, required=True)
     parser.add_argument("--subgrids", nargs=3, type=int, required=True)
     parser.add_argument("--fps", type=int, default=8)
+    parser.add_argument(
+        "--frames-between", type=int, default=3,
+        help=(
+            "number of linearly interpolated frames inserted between snapshots; "
+            "0 restores the original behaviour"
+        ),
+    )
     parser.add_argument("--vmin", type=float, default=None)
     parser.add_argument("--vmax", type=float, default=None)
     parser.add_argument(
@@ -181,6 +189,8 @@ def main():
     subgrids = tuple(args.subgrids)
     if any(grid_size[i] % subgrids[i] for i in range(3)):
         raise SystemExit("Grid dimensions must be divisible by subgrid dimensions")
+    if args.frames_between < 0:
+        raise SystemExit("--frames-between must be non-negative")
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     stars = load_stellar_history(args.star_history) if args.track_stars else []
 
@@ -263,10 +273,32 @@ def main():
                     axis.add_patch(remnant)
                     remnant_artists.append(remnant)
 
-    def update(frame):
-        surface_density, simulation_time, _ = read_surface_density(
+    @lru_cache(maxsize=2)
+    def load_frame(frame):
+        """Keep the adjacent cached projections in memory while interpolating."""
+        return read_surface_density(
             filenames[frame], subgrids, grid_size, args.cache_dir
         )
+
+    animation_frames = []
+    for frame in range(len(filenames) - 1):
+        animation_frames.append((frame, 0.0))
+        for intermediate in range(1, args.frames_between + 1):
+            fraction = intermediate / (args.frames_between + 1)
+            animation_frames.append((frame, fraction))
+    animation_frames.append((len(filenames) - 1, 0.0))
+
+    def update(frame):
+        left_frame, fraction = frame
+        surface_density, simulation_time, _ = load_frame(left_frame)
+        if fraction > 0.0:
+            next_density, next_time, _ = load_frame(left_frame + 1)
+            surface_density = (
+                (1.0 - fraction) * surface_density + fraction * next_density
+            )
+            simulation_time = (
+                (1.0 - fraction) * simulation_time + fraction * next_time
+            )
         image.set_data(
             np.log10(np.maximum(surface_density.T, np.finfo(float).tiny))
         )
@@ -275,11 +307,14 @@ def main():
             update_stars(simulation_time - 100.0)
         return image, title, star_artist, *remnant_artists
 
+    # Raising the output frame rate by the same factor keeps the original
+    # physical playback speed while making the transitions smoother.
+    output_fps = args.fps * (args.frames_between + 1)
     animation = FuncAnimation(
-        figure, update, frames=len(filenames), interval=1000.0 / args.fps,
+        figure, update, frames=animation_frames, interval=1000.0 / output_fps,
         blit=False
     )
-    animation.save(args.output, writer=PillowWriter(fps=args.fps), dpi=120)
+    animation.save(args.output, writer=PillowWriter(fps=output_fps), dpi=120)
 
 
 if __name__ == "__main__":
