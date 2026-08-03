@@ -75,8 +75,14 @@ python ../../examples/swiggum_shearing_box/plot_snapshot_diagnostics.py \
   --nside 64
 ```
 
-This writes `_cartesian.png`, `_sky.png`, and `_xray.png` figures beside the
-snapshot. The Halpha panels use the requested relative tracer
+This writes `_cartesian.png` (face-on, edge-on, and midplane panels with
+five-decade-clipped logarithmic colours), `_cartesian_linear.png` (the same
+panels with linear colours), `_sky.png`, and `_xray.png` figures beside the
+snapshot. The sky maps are line-of-sight integrations from the box centre onto
+HEALPix pixels, with bilinear sub-cell sampling. Increase `--nside` for a
+finer angular map, or use `--sky-radial-oversampling 1` if the projection is
+too slow. Orion–Eridanus and Gum are approximate contextual guide overlays;
+their editable definitions are at the top of the plotting script. The Halpha panels use the requested relative tracer
 `n_e^2 T^-0.9`. The three X-ray panels are intrinsic hydrogen free-free
 estimates for 0.2–0.6, 0.6–2.3, and 2.3–5.0 keV; they omit metal lines and
 foreground absorption and should not be interpreted as calibrated eROSITA
