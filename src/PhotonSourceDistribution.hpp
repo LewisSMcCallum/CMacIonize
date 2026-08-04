@@ -152,6 +152,20 @@ public:
   virtual void add_stellar_feedback(DensityGrid &grid,
                                     const double current_time) {}
 
+  /**
+   * @brief Select the supernova injection prescription, where supported.
+   *
+   * The default implementation is a no-op for source distributions without
+   * supernova feedback. This hook also lets restart-created distributions be
+   * configured from the current parameter file without changing the binary
+   * restart-file layout.
+   *
+   * @param use_tigress_like_injection True for TIGRESS-like injection, false
+   * for the legacy SILCC-like prescription.
+   */
+  virtual void set_tigress_like_supernova_injection(
+      const bool use_tigress_like_injection) {}
+
   virtual void get_sne_radii(HydroDensitySubGrid &subgrid) {}
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {}

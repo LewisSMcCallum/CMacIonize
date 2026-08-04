@@ -85,6 +85,8 @@ private:
 
 
 public:
+  virtual void set_tigress_like_supernova_injection(const bool value);
+
   HDF5PhotonSourceDistribution(
       std::string filename, const Box<> box, const double update_interval, const bool has_lifetimes,
       Log *log = nullptr);

@@ -78,6 +78,8 @@ private:
   size_t spectrum_index_from_mass(const double mass) const;
 
 public:
+  virtual void set_tigress_like_supernova_injection(const bool value);
+
   SwiggumFilePhotonSourceDistribution(ParameterFile &params, Log *log = nullptr);
   SwiggumFilePhotonSourceDistribution(RestartReader &restart_reader,
                                       Log *log = nullptr);

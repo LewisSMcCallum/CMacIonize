@@ -634,7 +634,10 @@ public:
             params.get_value<bool>("PhotonSourceDistribution:read file",false),
             params.get_value<std::string>("PhotonSourceDistribution:filename","SourceFile.txt"),
             params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:time","0.0 Myr"),
-            log) {}
+            log) {
+    novahandler->set_tigress_like_injection(params.get_value< bool >(
+        "SupernovaHandler:TIGRESS like injection", true));
+  }
 
   /**
    * @brief Virtual destructor.
@@ -666,6 +669,10 @@ public:
   }
 
 
+
+  virtual void set_tigress_like_supernova_injection(const bool value) {
+    novahandler->set_tigress_like_injection(value);
+  }
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 

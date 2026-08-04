@@ -127,7 +127,10 @@ public:
                 "PhotonSourceDistribution:luminosity", "1.e49 s^-1"),
             params.get_physical_value< QUANTITY_ENERGY >(
                 "PhotonSourceDistribution:energy", "1.e51 erg"),
-            log) {}
+            log) {
+    novahandler->set_tigress_like_injection(params.get_value< bool >(
+        "SupernovaHandler:TIGRESS like injection", true));
+  }
 
   /**
    * @brief Virtual destructor.
@@ -219,6 +222,10 @@ public:
 
 
 
+
+  virtual void set_tigress_like_supernova_injection(const bool value) {
+    novahandler->set_tigress_like_injection(value);
+  }
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 

@@ -80,6 +80,11 @@ Box<> read_box(RestartReader &restart_reader) {
 
 } // namespace
 
+void SwiggumFilePhotonSourceDistribution::
+    set_tigress_like_supernova_injection(const bool value) {
+  _supernova_handler->set_tigress_like_injection(value);
+}
+
 SwiggumFilePhotonSourceDistribution::SwiggumFilePhotonSourceDistribution(
     ParameterFile &params, Log *log)
     : _filename(params.get_value< std::string >(
@@ -98,6 +103,8 @@ SwiggumFilePhotonSourceDistribution::SwiggumFilePhotonSourceDistribution(
       _log(log), _supernova_handler(nullptr) {
   initialize_spectra();
   _supernova_handler = new SupernovaHandler(_supernova_energy);
+  _supernova_handler->set_tigress_like_injection(params.get_value< bool >(
+      "SupernovaHandler:TIGRESS like injection", true));
   load_file();
   rebuild_sources();
 }

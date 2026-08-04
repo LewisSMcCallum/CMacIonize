@@ -311,7 +311,10 @@ public:
             params.get_value< bool >("PhotonSourceDistribution:output sources",
                                      false),
             params.get_physical_value< QUANTITY_ENERGY > (
-                "PhotonSourceDistribution:supernova energy", "1.e51 erg")) {}
+                "PhotonSourceDistribution:supernova energy", "1.e51 erg")) {
+    novahandler->set_tigress_like_injection(params.get_value< bool >(
+        "SupernovaHandler:TIGRESS like injection", true));
+  }
 
   /**
    * @brief Virtual destructor.
@@ -343,6 +346,10 @@ public:
   }
 
 
+
+  virtual void set_tigress_like_supernova_injection(const bool value) {
+    novahandler->set_tigress_like_injection(value);
+  }
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 

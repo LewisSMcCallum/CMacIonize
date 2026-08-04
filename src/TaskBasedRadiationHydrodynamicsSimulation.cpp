@@ -1653,8 +1653,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     sourcedistribution =
         PhotonSourceDistributionFactory::generate(*params, log);
   } else {
-    sourcedistribution =
-        PhotonSourceDistributionFactory::restart(*restart_reader, log);
+    sourcedistribution = PhotonSourceDistributionFactory::restart(
+        *restart_reader, log,
+        params->get_value< bool >(
+            "SupernovaHandler:TIGRESS like injection", true));
   }
   PhotonSourceSpectrum *spectrum = PhotonSourceSpectrumFactory::generate(
       "PhotonSourceSpectrum", *params, log);

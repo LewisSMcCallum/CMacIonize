@@ -391,8 +391,10 @@ int RadiationHydrodynamicsSimulation::do_simulation(CommandLineParser &parser,
     sourcedistribution =
         PhotonSourceDistributionFactory::generate(*params, log);
   } else {
-    sourcedistribution =
-        PhotonSourceDistributionFactory::restart(*restart_reader, log);
+    sourcedistribution = PhotonSourceDistributionFactory::restart(
+        *restart_reader, log,
+        params->get_value< bool >(
+            "SupernovaHandler:TIGRESS like injection", true));
   }
   int_fast32_t random_seed = params->get_value< int_fast32_t >(
       "RadiationHydrodynamicsSimulation:random seed", 42);

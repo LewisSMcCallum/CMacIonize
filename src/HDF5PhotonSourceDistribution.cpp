@@ -36,6 +36,11 @@
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
 
+void HDF5PhotonSourceDistribution::set_tigress_like_supernova_injection(
+    const bool value) {
+  novahandler->set_tigress_like_injection(value);
+}
+
 /**
  * @brief Constructor.
  *
@@ -202,7 +207,9 @@ HDF5PhotonSourceDistribution::HDF5PhotonSourceDistribution(
           params.get_physical_value<QUANTITY_TIME>("PhotonSourceDistribution:update interval", "0.05 Myr"),
           params.get_value<bool>("PhotonSourceDistribution:has lifetimes", false),
           log) {
-          }
+  novahandler->set_tigress_like_injection(params.get_value< bool >(
+      "SupernovaHandler:TIGRESS like injection", true));
+}
 
 /**
  * @brief Get the number of sources in the snapshot file.
@@ -401,4 +408,3 @@ double HDF5PhotonSourceDistribution::get_photon_frequency(RandomGenerator &rando
 
     return changed;
   }
-

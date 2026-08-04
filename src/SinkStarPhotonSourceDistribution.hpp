@@ -511,7 +511,10 @@ public:
             params.get_value< double >("PhotonSourceDistribution:luminosity adjust",1.0),
             params.get_physical_value<QUANTITY_LENGTH>(
               "PhotonSourceDistribution:accretion radius", "0.1 pc"),
-            params.get_physical_value<QUANTITY_DENSITY>("PhotonSourceDistribution:critical density","1.e6 cm^-3")) {}
+            params.get_physical_value<QUANTITY_DENSITY>("PhotonSourceDistribution:critical density","1.e6 cm^-3")) {
+    novahandler->set_tigress_like_injection(params.get_value< bool >(
+        "SupernovaHandler:TIGRESS like injection", true));
+  }
 
   /**
    * @brief Virtual destructor.
@@ -543,6 +546,10 @@ public:
   }
 
 
+
+  virtual void set_tigress_like_supernova_injection(const bool value) {
+    novahandler->set_tigress_like_injection(value);
+  }
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 

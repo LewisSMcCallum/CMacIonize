@@ -513,9 +513,9 @@ public:
             params.get_physical_value< QUANTITY_SURFACE_DENSITY > (
                 "PhotonSourceDistribution:initial stellar density", "30 Msol pc^-2"),
             params.get_value< double >("PhotonSourceDistribution:luminosity adjust",1.0)) {
-
-              novahandler = new SupernovaHandler(_sne_energy);
-            }
+    novahandler->set_tigress_like_injection(params.get_value< bool >(
+        "SupernovaHandler:TIGRESS like injection", true));
+  }
 
   /**
    * @brief Virtual destructor.
@@ -547,6 +547,10 @@ public:
   }
 
 
+
+  virtual void set_tigress_like_supernova_injection(const bool value) {
+    novahandler->set_tigress_like_injection(value);
+  }
 
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator) {
 

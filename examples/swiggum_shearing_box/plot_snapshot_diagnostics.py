@@ -378,7 +378,7 @@ def plot_sky(prefix, halpha_map, hi_map, nside, time_myr):
         hp.mollview(
             displayed, fig=figure.number, sub=(2, 1, panel), title=title,
             unit=unit, norm="log", min=low, max=high, cmap="inferno",
-            coord=None, notext=False,
+            coord=None, notext=False, rot=180
         )
         add_sky_regions()
         hp.graticule(verbose=False)
