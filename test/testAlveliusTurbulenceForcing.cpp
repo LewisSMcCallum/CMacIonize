@@ -26,6 +26,58 @@
 
 #include "AlveliusTurbulenceForcing.hpp"
 #include "Assert.hpp"
+#include "HomogeneousDensityFunction.hpp"
+#include "InitialTurbulence.hpp"
+
+typedef DensitySubGridCreator< HydroDensitySubGrid > HydroGridCreator;
+
+/** @brief Create initialized hydro variables with an optional linear shear. */
+static void initialize_rectangular_grid(HydroGridCreator &grid_creator,
+                                        const Hydro &hydro,
+                                        const double shear_gradient) {
+  HomogeneousDensityFunction density_function;
+  grid_creator.initialize(density_function);
+  for (auto grid = grid_creator.begin(); grid != grid_creator.original_end();
+       ++grid) {
+    for (auto cell = (*grid).hydro_begin(); cell != (*grid).hydro_end();
+         ++cell) {
+      HydroVariables &variables = cell.get_hydro_variables();
+      const double x = cell.get_cell_midpoint().x();
+      variables.set_primitives_density(2. + 0.25 * x);
+      variables.set_primitives_velocity(
+          CoordinateVector<>(0., shear_gradient * x, 0.));
+      variables.set_primitives_pressure(3.);
+      hydro.set_conserved_variables(variables, cell.get_volume());
+    }
+  }
+}
+
+/** @brief Collect original-grid primitive velocities in iteration order. */
+static std::vector< CoordinateVector<> >
+get_velocities(HydroGridCreator &grid_creator) {
+  std::vector< CoordinateVector<> > velocities;
+  for (auto grid = grid_creator.begin(); grid != grid_creator.original_end();
+       ++grid) {
+    for (auto cell = (*grid).hydro_begin(); cell != (*grid).hydro_end();
+         ++cell) {
+      velocities.push_back(
+          cell.get_hydro_variables().get_primitives_velocity());
+    }
+  }
+  return velocities;
+}
+
+/** @brief Require two velocity fields to be bitwise identical. */
+static void assert_identical(
+    const std::vector< CoordinateVector<> > &first,
+    const std::vector< CoordinateVector<> > &second) {
+  assert_condition(first.size() == second.size());
+  for (size_t i = 0; i < first.size(); ++i) {
+    assert_condition(first[i].x() == second[i].x());
+    assert_condition(first[i].y() == second[i].y());
+    assert_condition(first[i].z() == second[i].z());
+  }
+}
 
 /**
  * @brief Unit test for the AlveliusTurbulenceForcing class.
@@ -106,6 +158,134 @@ int main(int argc, char **argv) {
       ++cellit2;
     }
   }
+
+  // One-time turbulence: use a genuinely rectangular 2:2:1 box, with the
+  // modes defined on the virtual 2:2:2 cube and sampled at the real cells.
+  const Box<> rectangular_box(CoordinateVector<>(-1., -1., -0.5),
+                              CoordinateVector<>(2., 2., 1.));
+  const CoordinateVector< int_fast32_t > total_cells(8, 8, 4);
+  const CoordinateVector< int_fast32_t > subgrids(2, 2, 1);
+  const CoordinateVector< bool > periodicity(true, true, false);
+  const Abundances abundances;
+  const Hydro hydro(5. / 3., 100., 1.e4, 1.e99, false, abundances);
+  const double shear_gradient = 3.;
+  const double target_rms = 8.5e3;
+
+  HydroGridCreator same_seed_a(rectangular_box, total_cells, subgrids,
+                               periodicity);
+  HydroGridCreator same_seed_b(rectangular_box, total_cells, subgrids,
+                               periodicity);
+  HydroGridCreator different_seed(rectangular_box, total_cells, subgrids,
+                                  periodicity);
+  HydroGridCreator no_shear(rectangular_box, total_cells, subgrids,
+                            periodicity);
+  HydroGridCreator disabled(rectangular_box, total_cells, subgrids,
+                            periodicity);
+  initialize_rectangular_grid(same_seed_a, hydro, shear_gradient);
+  initialize_rectangular_grid(same_seed_b, hydro, shear_gradient);
+  initialize_rectangular_grid(different_seed, hydro, shear_gradient);
+  initialize_rectangular_grid(no_shear, hydro, 0.);
+  initialize_rectangular_grid(disabled, hydro, shear_gradient);
+
+  const std::vector< CoordinateVector<> > baseline =
+      get_velocities(same_seed_a);
+  const std::vector< CoordinateVector<> > disabled_before =
+      get_velocities(disabled);
+  const InitialTurbulenceStatistics stats_a =
+      InitialTurbulence::initialize(
+          true, same_seed_a, hydro, target_rms, 42);
+  const InitialTurbulenceStatistics stats_b =
+      InitialTurbulence::initialize(
+          true, same_seed_b, hydro, target_rms, 42);
+  InitialTurbulence::initialize(
+      true, different_seed, hydro, target_rms, 43);
+  InitialTurbulence::initialize(
+      true, no_shear, hydro, target_rms, 42);
+  InitialTurbulence::initialize(
+      false, disabled, hydro, target_rms, 42);
+
+  // Disabling the feature is a no-op, and equal seeds are exactly
+  // deterministic.
+  assert_identical(disabled_before, get_velocities(disabled));
+  assert_identical(get_velocities(same_seed_a),
+                   get_velocities(same_seed_b));
+  assert_values_equal_tol(stats_a.final_mean_velocity.x(), 0., 1.e-8);
+  assert_values_equal_tol(stats_a.final_mean_velocity.y(), 0., 1.e-8);
+  assert_values_equal_tol(stats_a.final_mean_velocity.z(), 0., 1.e-8);
+  assert_values_equal_tol(stats_a.final_rms_velocity, target_rms, 1.e-8);
+  assert_condition(stats_a.raw_rms_velocity > 0.);
+  assert_condition(stats_a.normalization_factor > 0.);
+  assert_values_equal_tol(stats_a.final_rms_velocity,
+                          stats_b.final_rms_velocity, 1.e-12);
+
+  // A different seed must change at least one cell.
+  const std::vector< CoordinateVector<> > velocity_a =
+      get_velocities(same_seed_a);
+  const std::vector< CoordinateVector<> > velocity_different =
+      get_velocities(different_seed);
+  bool found_difference = false;
+  for (size_t i = 0; i < velocity_a.size(); ++i) {
+    found_difference =
+        found_difference || velocity_a[i].x() != velocity_different[i].x() ||
+        velocity_a[i].y() != velocity_different[i].y() ||
+        velocity_a[i].z() != velocity_different[i].z();
+  }
+  assert_condition(found_difference);
+
+  // Subtracting the same-seed no-shear realization must recover the original
+  // background shear, proving that turbulence was added on top of it.
+  const std::vector< CoordinateVector<> > velocity_no_shear =
+      get_velocities(no_shear);
+  for (size_t i = 0; i < velocity_a.size(); ++i) {
+    assert_values_equal_tol(velocity_a[i].x() - velocity_no_shear[i].x(),
+                            baseline[i].x(), 1.e-8);
+    assert_values_equal_tol(velocity_a[i].y() - velocity_no_shear[i].y(),
+                            baseline[i].y(), 1.e-8);
+    assert_values_equal_tol(velocity_a[i].z() - velocity_no_shear[i].z(),
+                            baseline[i].z(), 1.e-8);
+  }
+
+  // Independently recover the mass-weighted statistics from the velocity
+  // increment and verify that momentum and total energy were reconstructed.
+  double total_mass = 0.;
+  double turbulent_second_moment = 0.;
+  CoordinateVector<> turbulent_weighted_sum;
+  size_t velocity_index = 0;
+  for (auto grid = same_seed_a.begin(); grid != same_seed_a.original_end();
+       ++grid) {
+    for (auto cell = (*grid).hydro_begin(); cell != (*grid).hydro_end();
+         ++cell, ++velocity_index) {
+      const HydroVariables &variables = cell.get_hydro_variables();
+      const double mass = variables.get_conserved_mass();
+      const CoordinateVector<> velocity = variables.get_primitives_velocity();
+      const CoordinateVector<> turbulent_velocity =
+          velocity - baseline[velocity_index];
+      total_mass += mass;
+      turbulent_weighted_sum += mass * turbulent_velocity;
+      turbulent_second_moment += mass * turbulent_velocity.norm2();
+      const CoordinateVector<> expected_momentum = mass * velocity;
+      assert_values_equal_tol(variables.get_conserved_momentum().x(),
+                              expected_momentum.x(), 1.e-10);
+      assert_values_equal_tol(variables.get_conserved_momentum().y(),
+                              expected_momentum.y(), 1.e-10);
+      assert_values_equal_tol(variables.get_conserved_momentum().z(),
+                              expected_momentum.z(), 1.e-10);
+      const double expected_energy =
+          variables.get_primitives_pressure() * cell.get_volume() /
+              (5. / 3. - 1.) +
+          0.5 * mass * velocity.norm2();
+      assert_values_equal_tol(variables.get_conserved_total_energy(),
+                              expected_energy, 1.e-10);
+    }
+  }
+  const CoordinateVector<> measured_mean =
+      turbulent_weighted_sum / total_mass;
+  const double measured_rms = std::sqrt(std::max(
+      0., turbulent_second_moment / total_mass - measured_mean.norm2()));
+  assert_values_equal_tol(measured_mean.x(), 0., 1.e-8);
+  assert_values_equal_tol(measured_mean.y(), 0., 1.e-8);
+  assert_values_equal_tol(measured_mean.z(), 0., 1.e-8);
+  assert_values_equal_tol(measured_rms, target_rms, 1.e-8);
 
   return 0;
 }

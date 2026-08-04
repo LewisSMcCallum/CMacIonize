@@ -43,6 +43,7 @@
 #include "GalacticShearingBox.hpp"
 #include "HydroDensitySubGrid.hpp"
 #include "HydroMaskFactory.hpp"
+#include "InitialTurbulence.hpp"
 #include "LineCoolingData.hpp"
 #include "LiveOutputManager.hpp"
 #include "MemoryLogger.hpp"
@@ -1376,6 +1377,8 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
  *  - use mask: Use a mask to disable hydrodynamics and radiation in part of
  *    the box? (default: no)
  *  - turbulent forcing: Enable turbulent forcing? (default: no)
+ *  - initial turbulence: Add one initial Alvelius turbulent velocity field?
+ *    (default: no)
  *  - first snapshot: Index of the first snapshot to write out (default: 0)
  *  - do radiation: Enable radiation? (default: yes)
  *  - do radiative cooling: Enable radiative cooling? (default: no)
@@ -1585,6 +1588,17 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       "TaskBasedRadiationHydrodynamicsSimulation:random seed", 42);
   if (restart_reader != nullptr) {
     random_seed = restart_reader->read< int_fast32_t >();
+  }
+  const bool initial_turbulence = params->get_value< bool >(
+      "TaskBasedRadiationHydrodynamicsSimulation:initial turbulence", false);
+  double initial_turbulence_rms = 0.;
+  int_fast32_t initial_turbulence_seed = 42;
+  if (initial_turbulence) {
+    initial_turbulence_rms =
+        params->get_physical_value< QUANTITY_VELOCITY >(
+            "InitialTurbulence:target 3D rms velocity", "8.5 km s^-1");
+    initial_turbulence_seed = params->get_value< int_fast32_t >(
+        "InitialTurbulence:random seed", 42);
   }
   time_logger.start("density grid creation");
   DensitySubGridCreator< HydroDensitySubGrid > *grid_creator = nullptr;
@@ -1875,6 +1889,15 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       requested_timestep =
           std::min(requested_timestep,
                    (*cellit).initialize_hydrodynamic_variables(hydro, true));
+    }
+    if (initial_turbulence) {
+      time_logger.start("initial turbulence");
+    }
+    InitialTurbulence::initialize(
+        initial_turbulence, *grid_creator, hydro, initial_turbulence_rms,
+        initial_turbulence_seed, log);
+    if (initial_turbulence) {
+      time_logger.end("initial turbulence");
     }
   }
   time_logger.end("initial time step");

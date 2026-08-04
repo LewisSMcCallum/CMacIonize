@@ -1048,7 +1048,8 @@ set(TESTALVELIUSTURBULENCEFORCING_SOURCES
     testAlveliusTurbulenceForcing.cpp
 )
 add_unit_test(NAME testAlveliusTurbulenceForcing
-              SOURCES ${TESTALVELIUSTURBULENCEFORCING_SOURCES})
+              SOURCES ${TESTALVELIUSTURBULENCEFORCING_SOURCES}
+              LIBS ${OpenMP_CXX_LIBRARIES})
 
 # Unit test for MemoryLogger
 set(TESTMEMORYLOGGER_SOURCES

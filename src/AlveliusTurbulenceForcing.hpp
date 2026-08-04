@@ -36,6 +36,10 @@
 #include "RestartReader.hpp"
 #include "RestartWriter.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
 /**
  * @brief Turbulence forcing using the method of Alvelius (1999).
  */
@@ -116,6 +120,49 @@ private:
     ImRand[1] = std::sin(theta2) * gb;
   }
 
+  /** @brief Convert a subgrid index into its Cartesian layout offsets. */
+  inline void get_subgrid_offsets(const uint_fast32_t index,
+                                  int_fast32_t &offset_x,
+                                  int_fast32_t &offset_y,
+                                  int_fast32_t &offset_z) const {
+    offset_x = index / (_number_of_subgrids.y() * _number_of_subgrids.z());
+    offset_y =
+        (index - offset_x * _number_of_subgrids.y() *
+                     _number_of_subgrids.z()) /
+        _number_of_subgrids.z();
+    offset_z = index -
+               offset_x * _number_of_subgrids.y() *
+                   _number_of_subgrids.z() -
+               offset_y * _number_of_subgrids.z();
+  }
+
+  /** @brief Evaluate the current solenoidal Alvelius field in one cell. */
+  inline CoordinateVector<>
+  evaluate_turbulent_field(const uint_fast32_t oix,
+                           const uint_fast32_t oiy,
+                           const uint_fast32_t oiz) const {
+    CoordinateVector<> field;
+    const uint_fast32_t number_of_modes = _kforce.size();
+    for (uint_fast32_t ik = 0; ik < number_of_modes; ++ik) {
+      const CoordinateVector<> fr = _amplitudes_real[ik];
+      const CoordinateVector<> fi = _amplitudes_imaginary[ik];
+
+      const double cosx = _cos_x[oix + ik];
+      const double cosy = _cos_y[oiy + ik];
+      const double cosz = _cos_z[oiz + ik];
+      const double sinx = _sin_x[oix + ik];
+      const double siny = _sin_y[oiy + ik];
+      const double sinz = _sin_z[oiz + ik];
+
+      const double cosyz = cosy * cosz - siny * sinz;
+      const double sinyz = siny * cosz + cosy * sinz;
+      const double cosxyz = cosx * cosyz - sinx * sinyz;
+      const double sinxyz = sinx * cosyz + cosx * sinyz;
+      field += fr * cosxyz - fi * sinxyz;
+    }
+    return field;
+  }
+
 public:
   /**
    * @brief Constructor.
@@ -152,7 +199,13 @@ public:
     double spectra_sum = 0.;
     const double cinv = 1. / (concentration_factor * concentration_factor);
 
-    const double Linv = 1. / box.get_sides().x();
+    // Define the modes on a virtual cube, but sample them at the actual cell
+    // centres below.  A short box dimension therefore selects a central slab
+    // of the same isotropic periodic field rather than stretching that axis.
+    const double mode_length =
+        std::max(box.get_sides().x(),
+                 std::max(box.get_sides().y(), box.get_sides().z()));
+    const double Linv = 1. / mode_length;
     std::vector< CoordinateVector<> > ktable;
 
     /*
@@ -285,7 +338,7 @@ public:
       log->write_status("Number of turbulent modes: ", number_of_modes);
       log->write_status("Modes:");
       for (uint_fast32_t i = 0; i < number_of_modes; ++i) {
-        const CoordinateVector<> k = ktable[i] * box.get_sides().x();
+        const CoordinateVector<> k = ktable[i] * mode_length;
         log->write_status("mode ", i, ": ", k.x(), " ", k.y(), " ", k.z(),
                           " (norm: ", k.norm(), ")");
       }
@@ -342,11 +395,7 @@ public:
                 "TurbulenceForcing:time step", "1.519e6 s"),
             params.get_physical_value< QUANTITY_TIME >(
                 "TurbulenceForcing:starting time", "0. s"),
-            log) {
-
-    cmac_assert(box.get_sides().x() == box.get_sides().y());
-    cmac_assert(box.get_sides().x() == box.get_sides().z());
-  }
+            log) {}
 
   /**
    * @brief Update the turbulent amplitudes for the next time step.
@@ -382,6 +431,40 @@ public:
   }
 
   /**
+   * @brief Evaluate the current Alvelius field for all cells in one subgrid.
+   *
+   * The returned vectors have the same cell order as hydro_begin()/hydro_end().
+   * No acceleration or velocity update is applied.
+   *
+   * @param index Original subgrid index.
+   * @param field Output field.
+   */
+  inline void
+  get_turbulent_field(const uint_fast32_t index,
+                      std::vector< CoordinateVector<> > &field) const {
+    int_fast32_t offset_x, offset_y, offset_z;
+    get_subgrid_offsets(index, offset_x, offset_y, offset_z);
+    const uint_fast32_t number_of_modes = _kforce.size();
+    field.resize(static_cast< size_t >(_number_of_cells.x()) *
+                 _number_of_cells.y() * _number_of_cells.z());
+    size_t cell_index = 0;
+    for (int_fast32_t ix = 0; ix < _number_of_cells.x(); ++ix) {
+      const uint_fast32_t oix =
+          (offset_x * _number_of_cells.x() + ix) * number_of_modes;
+      for (int_fast32_t iy = 0; iy < _number_of_cells.y(); ++iy) {
+        const uint_fast32_t oiy =
+            (offset_y * _number_of_cells.y() + iy) * number_of_modes;
+        for (int_fast32_t iz = 0; iz < _number_of_cells.z(); ++iz) {
+          const uint_fast32_t oiz =
+              (offset_z * _number_of_cells.z() + iz) * number_of_modes;
+          field[cell_index] = evaluate_turbulent_field(oix, oiy, oiz);
+          ++cell_index;
+        }
+      }
+    }
+  }
+
+  /**
    * @brief Add the turbulent forcing for the given subgrid.
    *
    * @param index Subgrid index.
@@ -390,14 +473,8 @@ public:
   inline void add_turbulent_forcing(const uint_fast32_t index,
                                     HydroDensitySubGrid &subgrid) const {
 
-    const int_fast32_t offset_x =
-        index / (_number_of_subgrids.y() * _number_of_subgrids.z());
-    const int_fast32_t offset_y =
-        (index - offset_x * _number_of_subgrids.y() * _number_of_subgrids.z()) /
-        _number_of_subgrids.z();
-    const int_fast32_t offset_z =
-        index - offset_x * _number_of_subgrids.y() * _number_of_subgrids.z() -
-        offset_y * _number_of_subgrids.z();
+    int_fast32_t offset_x, offset_y, offset_z;
+    get_subgrid_offsets(index, offset_x, offset_y, offset_z);
 
     const uint_fast32_t nk = _kforce.size();
 
@@ -408,26 +485,8 @@ public:
         const uint_fast32_t oiy = (offset_y * _number_of_cells.y() + iy) * nk;
         for (int_fast32_t iz = 0; iz < _number_of_cells.z(); ++iz) {
           const uint_fast32_t oiz = (offset_z * _number_of_cells.z() + iz) * nk;
-          CoordinateVector<> force;
-          for (uint_fast32_t ik = 0; ik < nk; ++ik) {
-            const CoordinateVector<> fr = _amplitudes_real[ik];
-            const CoordinateVector<> fi = _amplitudes_imaginary[ik];
-
-            const double cosx = _cos_x[oix + ik];
-            const double cosy = _cos_y[oiy + ik];
-            const double cosz = _cos_z[oiz + ik];
-            const double sinx = _sin_x[oix + ik];
-            const double siny = _sin_y[oiy + ik];
-            const double sinz = _sin_z[oiz + ik];
-
-            const double cosyz = cosy * cosz - siny * sinz;
-            const double sinyz = siny * cosz + cosy * sinz;
-
-            const double cosxyz = cosx * cosyz - sinx * sinyz;
-            const double sinxyz = sinx * cosyz + cosx * sinyz;
-
-            force += fr * cosxyz - fi * sinxyz;
-          }
+          const CoordinateVector<> force =
+              evaluate_turbulent_field(oix, oiy, oiz);
 
           const double mdt =
               cellit.get_hydro_variables().get_conserved_mass() * _time_step;
