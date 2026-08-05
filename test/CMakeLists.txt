@@ -314,7 +314,7 @@ set(TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES
 )
 add_unit_test(NAME testSwiggumFilePhotonSourceDistribution
               SOURCES ${TESTSWIGGUMFILEPHOTONSOURCEDISTRIBUTION_SOURCES}
-              LIBS SharedEngine)
+              LIBS SharedEngine ${OpenMP_CXX_LIBRARIES})
 configure_file(
     ${PROJECT_SOURCE_DIR}/test/test_swiggum_file_photon_source_distribution.csv
     ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_file_photon_source_distribution.csv
@@ -322,6 +322,18 @@ configure_file(
 configure_file(
     ${PROJECT_SOURCE_DIR}/test/test_swiggum_file_photon_source_distribution.yml
     ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_file_photon_source_distribution.yml
+    COPYONLY)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_swiggum_snap_stars.csv
+    ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_snap_stars.csv
+    COPYONLY)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_swiggum_snap_clusters.csv
+    ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_snap_clusters.csv
+    COPYONLY)
+configure_file(
+    ${PROJECT_SOURCE_DIR}/test/test_swiggum_snap.yml
+    ${PROJECT_BINARY_DIR}/rundir/test/test_swiggum_snap.yml
     COPYONLY)
 
 ## Unit test for AMRDensityGrid

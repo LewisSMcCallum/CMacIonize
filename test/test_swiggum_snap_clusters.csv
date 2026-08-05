@@ -1,0 +1,8 @@
+snap_cluster_id,cluster_name,birth_time_myr,birth_x_pc,birth_y_pc,birth_z_pc,cluster_radius_pc,number_of_sampled_stars
+0,cluster_snap,1,12.5,12.5,12.5,5,2
+1,cluster_already,2,32.5,12.5,12.5,5,1
+2,cluster_outside,3,-5,12.5,12.5,5,1
+3,cluster_none,4,42.5,12.5,12.5,5,1
+4,cluster_too_far,5,52.5,12.5,12.5,5,1
+5,cluster_early_state,6,12.5,52.5,12.5,5,1
+6,cluster_late_state,7,12.5,52.5,12.5,5,1

@@ -1,0 +1,20 @@
+SimulationBox:
+  anchor: [0. pc, 0. pc, 0. pc]
+  sides: [80. pc, 80. pc, 40. pc]
+
+PhotonSourceDistribution:
+  filename: test_swiggum_snap_stars.csv
+  history start time: 0. Myr
+  luminosity adjust: 1.0
+  supernova energy: 1.e51 erg
+  snap clusters to gas: true
+  cluster birth filename: test_swiggum_snap_clusters.csv
+  snap search radius: 16. pc
+  snap maximum displacement: 12. pc
+  snap minimum number density: 1.0 cm^-3
+  snap minimum density contrast: 2.0
+  snap minimum neutral fraction: 0.8
+  snap maximum temperature: 5000. K
+  snap distance scale: 50. pc
+  snap centroid radius: 1. pc
+  snap log filename: test_cluster_snap_events.csv

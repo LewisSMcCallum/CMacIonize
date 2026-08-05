@@ -28,6 +28,7 @@ class ParameterFile;
 class PhotonSourceSpectrum;
 class RestartReader;
 class SupernovaHandler;
+class SwiggumFilePhotonSourceDistributionTestAccess;
 
 /**
  * @brief Stellar photon sources and supernovae following tabulated tracks.
@@ -41,10 +42,23 @@ private:
 
   struct Star {
     uint_fast64_t id;
+    uint_fast32_t snap_cluster_id;
     double birth_time;
     double death_time;
     double mass;
     std::vector< TrackPoint > track;
+  };
+
+  struct SnapCluster {
+    uint_fast32_t id;
+    std::string name;
+    double birth_time;
+    CoordinateVector<> nominal_birth_position;
+    double radius;
+    bool placement_attempted;
+    bool placement_successful;
+    CoordinateVector<> offset;
+    std::string status;
   };
 
   std::string _filename;
@@ -54,6 +68,20 @@ private:
   double _luminosity_adjustment;
   double _supernova_energy;
   Log *_log;
+
+  bool _snap_clusters_to_gas;
+  std::string _cluster_birth_filename;
+  double _snap_search_radius;
+  double _snap_maximum_displacement;
+  double _snap_minimum_number_density;
+  double _snap_minimum_density_contrast;
+  double _snap_minimum_neutral_fraction;
+  double _snap_maximum_temperature;
+  double _snap_distance_scale;
+  double _snap_centroid_radius;
+  std::string _snap_log_filename;
+  std::vector< SnapCluster > _snap_clusters;
+  size_t _last_snap_subgrids_inspected;
 
   std::vector< Star > _stars;
   std::vector< CoordinateVector<> > _source_positions;
@@ -70,12 +98,30 @@ private:
   SupernovaHandler *_supernova_handler;
 
   void load_file();
+  void load_cluster_birth_file();
+  void validate_snap_configuration() const;
+  void validate_snap_clusters() const;
+  void open_snap_log();
+  void log_snap_event(const SnapCluster &cluster,
+                      const CoordinateVector<> &target,
+                      const double nominal_number_density,
+                      const double target_number_density,
+                      const double target_temperature,
+                      const double target_neutral_fraction) const;
+  void place_cluster_in_current_gas(
+      SnapCluster &cluster,
+      DensitySubGridCreator< HydroDensitySubGrid > &grid_creator);
   void initialize_spectra();
   void rebuild_sources();
   CoordinateVector<> interpolate_position(const Star &star,
                                            const double time) const;
+  CoordinateVector<> get_shifted_position(const Star &star,
+                                           const double time) const;
+  const SnapCluster *get_snap_cluster(const uint_fast32_t id) const;
   double luminosity_from_mass(const double mass) const;
   size_t spectrum_index_from_mass(const double mass) const;
+
+  friend class SwiggumFilePhotonSourceDistributionTestAccess;
 
 public:
   virtual void set_tigress_like_supernova_injection(const bool value);
