@@ -7,10 +7,20 @@ SimulationBox:
   periodicity: [true, true, false]
 
 DensityFunction:
-  type: Homogeneous
-  density: 1. cm^-3
-  temperature: 8000. K
-  neutral fraction H: 0.999
+  type: DiscPatch
+  observationaldisc: false
+  disc z: 0. pc
+  surface density: 68.3 Msol pc^-2
+  scale height: 352. pc
+  gas fraction: 0.1444
+  temperature: 5000. K
+  neutral fraction: 0.999
+
+ExternalPotential:
+  type: DiscPatch
+  disc z: 0. pc
+  surface density: 68.3 Msol pc^-2
+  scale height: 352. pc
 
 DensityGrid:
   type: Cartesian
@@ -79,7 +89,11 @@ TaskBasedRadiationHydrodynamicsSimulation:
   do explicit temperature calculation: true
   do radiative cooling: true
   use cooling tables: true
-  cooling temperature floor: 10. K
+  cooling temperature floor: 100. K
+  neutral gas heating: true
+  neutral gas heating rate: 2.e-26 erg s^-1
+  initial turbulence: false
+  external gravity: true
   output folder: .
   random seed: 42
 

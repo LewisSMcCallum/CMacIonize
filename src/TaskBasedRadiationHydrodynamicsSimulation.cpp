@@ -791,7 +791,10 @@ inline static void get_thermal_gain_loss(double &gain, double &loss,
                               const double inverse_volume,
                               LineCoolingData &line_cooling_data,
                               double abund[LINECOOLINGDATA_NUMELEMENTS], double AHe,
-                              DeRijckeRadiativeCooling* radiative_cooling, bool use_cooling_tables){
+                              DeRijckeRadiativeCooling* radiative_cooling,
+                              bool use_cooling_tables,
+                              const bool neutral_gas_heating,
+                              const double neutral_gas_heating_rate){
 
 
 double temp = ionization_variables.get_temperature();
@@ -807,6 +810,9 @@ double sqrtT = std::pow(temp,0.5);
 
 const double n = ionization_variables.get_number_density();
 const double h0 = ionization_variables.get_ionic_fraction(ION_H_n);
+if (neutral_gas_heating) {
+  gain += neutral_gas_heating_rate * n * h0 / inverse_volume;
+}
 #ifdef HAS_HELIUM
    //calculate heating due to helium photoionization
     const double T4 = 1.e-4*temp;
@@ -899,7 +905,9 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
                               Hydro &hydro, double _cooling_temp_floor,
                               double gamma_minus_one,
                               LineCoolingData &line_cooling_data,
-                              Abundances &abundances, bool use_cooling_tables) {
+                              Abundances &abundances, bool use_cooling_tables,
+                              const bool neutral_gas_heating,
+                              const double neutral_gas_heating_rate) {
 
 
   double rho = hydro_variables.get_primitives_density();
@@ -1019,7 +1027,9 @@ while (clock < total_dt) {
   time_left = total_dt - clock;
 
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
-                              line_cooling_data, abund, AHe, radiative_cooling, use_cooling_tables);
+                              line_cooling_data, abund, AHe, radiative_cooling,
+                              use_cooling_tables, neutral_gas_heating,
+                              neutral_gas_heating_rate);
 
   
   if (!std::isfinite(gain) || !std::isfinite(loss)){
@@ -1382,6 +1392,10 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
  *  - first snapshot: Index of the first snapshot to write out (default: 0)
  *  - do radiation: Enable radiation? (default: yes)
  *  - do radiative cooling: Enable radiative cooling? (default: no)
+ *  - neutral gas heating: Enable uniform heating per neutral hydrogen atom?
+ *    (default: no)
+ *  - neutral gas heating rate: Heating rate per neutral hydrogen atom
+ *    (default: 2.e-26 erg s^-1)
  *  - do stellar feedback: Enable stellar feedback? (default: no)
  *
  * @param parser CommandLineParser that contains the parsed command line
@@ -1642,6 +1656,24 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool do_explicit_temp_calc = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do explicit temperature calculation",
           false);
+
+  const bool neutral_gas_heating = params->get_value< bool >(
+      "TaskBasedRadiationHydrodynamicsSimulation:neutral gas heating", false);
+  const double neutral_gas_heating_rate =
+      params->get_physical_value< QUANTITY_ENERGY_RATE >(
+          "TaskBasedRadiationHydrodynamicsSimulation:neutral gas heating rate",
+          "2.e-26 erg s^-1");
+  if (neutral_gas_heating && !do_explicit_temp_calc) {
+    cmac_error("Neutral gas heating requires "
+               "TaskBasedRadiationHydrodynamicsSimulation:do explicit "
+               "temperature calculation to be true.");
+  }
+  if (log) {
+    log->write_status("Neutral gas heating is ",
+                      neutral_gas_heating ? "enabled" : "disabled",
+                      "; rate = ", neutral_gas_heating_rate,
+                      " J s^-1 per neutral hydrogen atom.");
+  }
 
   if (do_rad_cool || do_explicit_temp_calc) {
     _cooling_temp_floor = params->get_physical_value< QUANTITY_TEMPERATURE >(
@@ -3081,7 +3113,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
                           _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances,
-                          use_cool_tables);
+                          use_cool_tables, neutral_gas_heating,
+                          neutral_gas_heating_rate);
             }
             cellit.get_ionization_variables().set_temperature(
                 ionization_variables.get_temperature());
