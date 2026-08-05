@@ -56,7 +56,7 @@ std::vector< std::string > split_csv_line(const std::string &line) {
     } else if (character == ',' && !quoted) {
       fields.push_back(field);
       field.clear();
-    } else if (character != '\r') {
+    } else if (character != '\r' && character != '\n') {
       field.push_back(character);
     }
   }

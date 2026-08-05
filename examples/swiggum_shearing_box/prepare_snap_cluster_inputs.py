@@ -213,7 +213,9 @@ def prepare(stellar_path, cluster_path, output_dir, history_start_time_myr,
     star_output_path = output_dir / stellar_output
     with _open_text(star_output_path, "wt") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=star_header + ["snap_cluster_id"]
+            handle,
+            fieldnames=star_header + ["snap_cluster_id"],
+            lineterminator="\n",
         )
         writer.writeheader()
         for row in star_rows:
@@ -227,7 +229,9 @@ def prepare(stellar_path, cluster_path, output_dir, history_start_time_myr,
         "number_of_sampled_stars",
     ]
     with _open_text(cluster_output_path, "wt") as handle:
-        writer = csv.DictWriter(handle, fieldnames=birth_header)
+        writer = csv.DictWriter(
+            handle, fieldnames=birth_header, lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(birth_rows)
 
