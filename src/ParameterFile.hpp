@@ -43,13 +43,25 @@ private:
   /*! @brief Underlying YAML dictionary that contains the actual parameters. */
   YAMLDictionary _yaml_dictionary;
 
+  /*! @brief Most recently constructed parameter file. */
+  static ParameterFile *_active_parameter_file;
+
 public:
   /**
    * @brief Empty constructor.
    */
-  ParameterFile() {}
+  ParameterFile() { _active_parameter_file = this; }
 
   ParameterFile(std::string filename);
+
+  /**
+   * @brief Get the parameter file currently used to configure a simulation.
+   *
+   * @return Active ParameterFile, or nullptr if none has been constructed.
+   */
+  static inline ParameterFile *get_active_parameter_file() {
+    return _active_parameter_file;
+  }
 
   /**
    * @brief Check if the parameter with the given name exists.
@@ -218,7 +230,7 @@ public:
    * filename is parsed with an MD5 checksum algorithm, and an additional field
    * "<key> checksum" is added to the parameters. If this field already exists,
    * the existing value is checked against the MD5 checksum, and a warning is
-   * thrown if they do not match.
+   * thrown if it does not match.
    *
    * @param key Key in the dictionary that relates to a filename.
    * @param default_value Default value for the filename.
@@ -325,7 +337,9 @@ public:
    * @param restart_reader Restart file to read from.
    */
   inline ParameterFile(RestartReader &restart_reader)
-      : _yaml_dictionary(restart_reader) {}
+      : _yaml_dictionary(restart_reader) {
+    _active_parameter_file = this;
+  }
 };
 
 #endif // PARAMETERFILE_HPP
