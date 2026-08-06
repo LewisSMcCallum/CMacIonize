@@ -27,6 +27,8 @@
 #include "Error.hpp"
 #include <fstream>
 
+ParameterFile *ParameterFile::_active_parameter_file = nullptr;
+
 /**
  * @brief Constructor.
  *
@@ -35,6 +37,7 @@
  * @param filename Name of the parameter file.
  */
 ParameterFile::ParameterFile(std::string filename) {
+  _active_parameter_file = this;
   std::ifstream file(filename);
 
   if (!file) {
