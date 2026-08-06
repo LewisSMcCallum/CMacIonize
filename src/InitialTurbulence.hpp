@@ -18,6 +18,8 @@
 
 #include "AlveliusTurbulenceForcing.hpp"
 #include "DensitySubGridCreator.hpp"
+#include "ParameterFile.hpp"
+#include "SampledInitialTurbulence.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -38,7 +40,7 @@ struct InitialTurbulenceStatistics {
         final_rms_velocity(0.), final_component_dispersions(0.) {}
 };
 
-/** @brief Add a mass-centred, RMS-normalized Alvelius velocity field once. */
+/** @brief Add a mass-centred, RMS-normalized turbulent velocity field once. */
 class InitialTurbulence {
 public:
   static InitialTurbulenceStatistics initialize(
@@ -55,12 +57,51 @@ public:
                  "non-negative.");
     }
 
-    // The raw normalization is arbitrary; the requested RMS sets its scale.
-    AlveliusTurbulenceForcing forcing(
-        grid_creator.get_subgrid_layout(),
-        grid_creator.get_subgrid_cell_layout(), grid_creator.get_box(), 1., 3.,
-        2.5, 0.2, 1., seed, 1., 0., nullptr);
-    forcing.update_turbulence(1.);
+    double minimum_wave_number = 1.;
+    double maximum_wave_number = 3.;
+    double peak_wave_number = 2.5;
+    double concentration_factor = 0.2;
+    uint_fast32_t number_of_modes = 0;
+    ParameterFile *params = ParameterFile::get_active_parameter_file();
+    if (params != nullptr) {
+      minimum_wave_number = params->get_value< double >(
+          "InitialTurbulence:minimum wave number", minimum_wave_number);
+      maximum_wave_number = params->get_value< double >(
+          "InitialTurbulence:maximum wave number", maximum_wave_number);
+      peak_wave_number = params->get_value< double >(
+          "InitialTurbulence:peak wave number", peak_wave_number);
+      concentration_factor = params->get_value< double >(
+          "InitialTurbulence:concentration factor", concentration_factor);
+      number_of_modes = params->get_value< uint_fast32_t >(
+          "InitialTurbulence:number of modes", number_of_modes);
+    }
+
+    if (log) {
+      log->write_status("Initial turbulence spectrum: |k| = ",
+                        minimum_wave_number, "--", maximum_wave_number,
+                        ", peak = ", peak_wave_number,
+                        ", concentration = ", concentration_factor,
+                        ", sampled modes = ", number_of_modes,
+                        number_of_modes > 0 ? "." : " (legacy full shell).");
+    }
+
+    AlveliusTurbulenceForcing *forcing = nullptr;
+    SampledInitialTurbulence *sampled_forcing = nullptr;
+    if (number_of_modes > 0) {
+      sampled_forcing = new SampledInitialTurbulence(
+          grid_creator.get_subgrid_layout(),
+          grid_creator.get_subgrid_cell_layout(), grid_creator.get_box(),
+          minimum_wave_number, maximum_wave_number, peak_wave_number,
+          concentration_factor, number_of_modes, seed, log);
+    } else {
+      // A zero mode count preserves the previous full-shell implementation.
+      forcing = new AlveliusTurbulenceForcing(
+          grid_creator.get_subgrid_layout(),
+          grid_creator.get_subgrid_cell_layout(), grid_creator.get_box(),
+          minimum_wave_number, maximum_wave_number, peak_wave_number,
+          concentration_factor, 1., seed, 1., 0., nullptr);
+      forcing->update_turbulence(1.);
+    }
 
     double total_mass = 0.;
     double raw_second_moment = 0.;
@@ -68,7 +109,11 @@ public:
     std::vector< CoordinateVector<> > field;
     for (size_t igrid = 0;
          igrid < grid_creator.number_of_original_subgrids(); ++igrid) {
-      forcing.get_turbulent_field(igrid, field);
+      if (sampled_forcing != nullptr) {
+        sampled_forcing->get_turbulent_field(igrid, field);
+      } else {
+        forcing->get_turbulent_field(igrid, field);
+      }
       HydroDensitySubGrid &subgrid = *grid_creator.get_subgrid(igrid);
       size_t icell = 0;
       for (auto cell = subgrid.hydro_begin(); cell != subgrid.hydro_end();
@@ -99,7 +144,11 @@ public:
     CoordinateVector<> final_second_moments;
     for (size_t igrid = 0;
          igrid < grid_creator.number_of_original_subgrids(); ++igrid) {
-      forcing.get_turbulent_field(igrid, field);
+      if (sampled_forcing != nullptr) {
+        sampled_forcing->get_turbulent_field(igrid, field);
+      } else {
+        forcing->get_turbulent_field(igrid, field);
+      }
       HydroDensitySubGrid &subgrid = *grid_creator.get_subgrid(igrid);
       size_t icell = 0;
       for (auto cell = subgrid.hydro_begin(); cell != subgrid.hydro_end();
@@ -137,6 +186,9 @@ public:
                         statistics.final_mean_velocity.z())));
     statistics.final_rms_velocity =
         statistics.final_component_dispersions.norm();
+
+    delete forcing;
+    delete sampled_forcing;
 
     if (log) {
       log->write_status(
