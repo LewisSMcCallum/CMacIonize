@@ -22,6 +22,7 @@
 #include "Log.hpp"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <random>
@@ -107,7 +108,7 @@ public:
     const double inverse_mode_length = 1. / mode_length;
     const int_fast32_t ikmax = static_cast< int_fast32_t >(std::ceil(kmax));
 
-    std::mt19937 generator(static_cast< uint_fast32_t >(seed));
+    std::mt19937 generator(static_cast< std::mt19937::result_type >(seed));
     std::uniform_int_distribution< int_fast32_t > integer_mode(-ikmax, ikmax);
     std::uniform_real_distribution< double > uniform(0., 2. * M_PI);
     std::set< std::tuple< int_fast32_t, int_fast32_t, int_fast32_t > > used;
@@ -185,7 +186,8 @@ public:
     if (wavevectors.size() != number_of_modes) {
       cmac_error("Could only sample %zu of %u requested initial turbulence "
                  "modes in [%g, %g].",
-                 wavevectors.size(), number_of_modes, kmin, kmax);
+                 wavevectors.size(),
+                 static_cast< unsigned int >(number_of_modes), kmin, kmax);
     }
 
     const CoordinateVector< int_fast32_t > ntot(
