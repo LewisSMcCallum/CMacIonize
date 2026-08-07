@@ -31,6 +31,8 @@
 #include "RandomGenerator.hpp"
 #include "ThreadLock.hpp"
 
+#include <cmath>
+
 /**
  * @brief PhotonSource to be used by a distributed grid consisting of subgrids.
  */
@@ -45,8 +47,7 @@ private:
   /*! @brief Position of each source (in m). */
   std::vector< CoordinateVector<> > _positions;
 
-  std::vector<int > _original_indexes;
-
+  std::vector< int > _original_indexes;
 
   /*! @brief Subgrid corresponding to each source. */
   std::vector< size_t > _subgrids;
@@ -72,11 +73,26 @@ public:
     const photonsourcenumber_t number_of_sources =
         distribution.get_number_of_sources();
     double active_weight = 0.;
+    size_t number_of_active_sources = 0;
     for (photonsourcenumber_t isource = 0; isource < number_of_sources;
          ++isource) {
       if (grid_creator.contains(distribution.get_position(isource))) {
-        active_weight += distribution.get_weight(isource);
+        const double weight = distribution.get_weight(isource);
+        if (!std::isfinite(weight) || weight < 0.) {
+          cmac_error("Invalid photon-source weight for source %zu: %g.",
+                     static_cast< size_t >(isource), weight);
+        }
+        active_weight += weight;
+        ++number_of_active_sources;
       }
+    }
+    if (number_of_photons > 0 &&
+        (number_of_active_sources == 0 || !(active_weight > 0.) ||
+         !std::isfinite(active_weight))) {
+      cmac_error("Cannot distribute %zu photon packets: %zu active sources "
+                 "have total weight %g. Aborting instead of entering a "
+                 "no-progress photon scheduling loop.",
+                 number_of_photons, number_of_active_sources, active_weight);
     }
 
     for (photonsourcenumber_t isource = 0; isource < number_of_sources;
@@ -117,13 +133,19 @@ public:
       number_done += number_this_source;
     }
     if (overhead.empty()) {
+      if (number_of_photons > 0) {
+        cmac_error("No distributed photon sources were created for %zu "
+                   "requested photon packets. Aborting instead of spinning "
+                   "forever.",
+                   number_of_photons);
+      }
       _locks = new std::vector< ThreadLock >();
       return;
     }
     const size_t num_overhead = number_of_photons - number_done;
     RandomGenerator random_generator;
     for (size_t i = 0; i < num_overhead; ++i) {
-      size_t index =
+      const size_t index =
           random_generator.get_uniform_random_double() * overhead.size();
       ++_total_number_of_photons[overhead[index]];
     }
@@ -132,7 +154,11 @@ public:
     for (size_t i = 0; i < _subgrids.size(); ++i) {
       number_done += _total_number_of_photons[i];
     }
-    cmac_assert(number_done == number_of_photons);
+    if (number_done != number_of_photons) {
+      cmac_error("Distributed photon-source allocation produced %zu packets, "
+                 "but %zu were requested.",
+                 number_done, number_of_photons);
+    }
 
     _locks = new std::vector< ThreadLock >(_subgrids.size());
   }
@@ -202,8 +228,7 @@ public:
    * @brief Get the position of the source with the given index.
    *
    * @param source_index Index of a source.
-   * @return Position of the corresponding source (in m).
-   */
+   * @return Position of the corresponding source (in m). */
   inline CoordinateVector<> get_position(const size_t source_index) const {
     return _positions[source_index];
   }
