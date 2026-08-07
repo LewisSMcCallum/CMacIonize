@@ -30,6 +30,8 @@
  *  that was read by the reader. */
 //#define RESTARTREADER_INFO
 
+#include "Error.hpp"
+
 #include <fstream>
 #include <map>
 #include <string>
@@ -42,11 +44,49 @@ private:
   /*! @brief Underlying input file. */
   std::ifstream _file;
 
+  /*! @brief Restart filename, used in diagnostics. */
+  const std::string _filename;
+
 #ifdef RESTARTREADER_INFO
   /*! @brief Detailed info file describing everything that was read by the
    *  reader. */
   std::ofstream _info_file;
 #endif
+
+  /** @brief Current byte offset, or -1 if unavailable. */
+  inline std::streamoff get_offset() {
+    const std::streampos position = _file.tellg();
+    return position == std::streampos(-1) ? -1 :
+                                           static_cast< std::streamoff >(position);
+  }
+
+  /** @brief Number of unread bytes, or -1 if unavailable. */
+  inline std::streamoff get_remaining_bytes() {
+    const std::streampos current = _file.tellg();
+    if (current == std::streampos(-1)) {
+      return -1;
+    }
+    _file.seekg(0, std::ios::end);
+    const std::streampos end = _file.tellg();
+    _file.seekg(current);
+    if (end == std::streampos(-1)) {
+      return -1;
+    }
+    return static_cast< std::streamoff >(end - current);
+  }
+
+  /** @brief Read exactly size bytes or fail with a useful diagnostic. */
+  inline void read_bytes(char *buffer, const std::streamsize size,
+                         const char *description) {
+    const std::streamoff offset = get_offset();
+    _file.read(buffer, size);
+    if (!_file) {
+      cmac_error("Unexpected end/corruption while reading %s (%lld bytes) "
+                 "from restart file \"%s\" at byte offset %lld.",
+                 description, static_cast< long long >(size),
+                 _filename.c_str(), static_cast< long long >(offset));
+    }
+  }
 
 public:
   /**
@@ -54,7 +94,12 @@ public:
    *
    * @param filename Name of the restart file.
    */
-  inline RestartReader(const std::string filename) : _file(filename) {
+  inline RestartReader(const std::string filename)
+      : _file(filename, std::ios::binary), _filename(filename) {
+    if (!_file.is_open()) {
+      cmac_error("Failed to open restart file \"%s\" for reading.",
+                 _filename.c_str());
+    }
 
 #ifdef RESTARTREADER_INFO
     _info_file.open("restart_reader_info.txt");
@@ -80,8 +125,9 @@ public:
    * @return Value read from the restart file.
    */
   template < typename _datatype_ > _datatype_ read() {
-    _datatype_ value;
-    _file.read(reinterpret_cast< char * >(&value), sizeof(_datatype_));
+    _datatype_ value{};
+    read_bytes(reinterpret_cast< char * >(&value), sizeof(_datatype_),
+               "restart value");
 #ifdef RESTARTREADER_INFO
     _info_file << sizeof(_datatype_) << "\n";
 #endif
@@ -109,11 +155,20 @@ template <> inline bool RestartReader::read() {
  */
 template <> inline std::string RestartReader::read() {
   const auto size = read< std::string::size_type >();
-  char *c_string = new char[size + 1];
-  _file.read(c_string, size);
-  c_string[size] = '\0';
-  std::string string(c_string);
-  delete[] c_string;
+  const std::streamoff remaining = get_remaining_bytes();
+  if (remaining < 0 || size > static_cast< std::string::size_type >(remaining)) {
+    cmac_error("Invalid string length %zu in restart file \"%s\" at byte "
+               "offset %lld; only %lld bytes remain. The restart is truncated "
+               "or incompatible with this build.",
+               static_cast< size_t >(size), _filename.c_str(),
+               static_cast< long long >(get_offset()),
+               static_cast< long long >(remaining));
+  }
+  std::string string(size, '\0');
+  if (size > 0) {
+    read_bytes(&string[0], static_cast< std::streamsize >(size),
+               "restart string");
+  }
 #ifdef RESTARTREADER_INFO
   _info_file << "string\n";
 #endif
@@ -127,6 +182,19 @@ template <> inline std::string RestartReader::read() {
  */
 template <> inline std::map< std::string, std::string > RestartReader::read() {
   const auto size = read< std::map< std::string, std::string >::size_type >();
+  const std::streamoff remaining = get_remaining_bytes();
+  const size_t minimum_bytes_per_entry =
+      2 * sizeof(std::string::size_type);
+  if (remaining < 0 ||
+      size > static_cast< std::map< std::string, std::string >::size_type >(
+                 remaining / static_cast< std::streamoff >(
+                                 minimum_bytes_per_entry))) {
+    cmac_error("Invalid map length %zu in restart file \"%s\" at byte offset "
+               "%lld. The restart is truncated or incompatible with this "
+               "build.",
+               static_cast< size_t >(size), _filename.c_str(),
+               static_cast< long long >(get_offset()));
+  }
   std::map< std::string, std::string > map;
   for (std::map< std::string, std::string >::size_type i = 0; i < size; ++i) {
     const std::string key = read< std::string >();
