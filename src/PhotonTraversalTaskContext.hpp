@@ -1,6 +1,6 @@
 /*******************************************************************************
  * This file is part of CMacIonize
- * Copyright (C) 2020 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
+ * Copyright (C) 2020 Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  *
  * CMacIonize is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -40,6 +40,10 @@
 #include "TaskContext.hpp"
 #include "TaskQueue.hpp"
 
+#include <cinttypes>
+#include <cmath>
+#include <cstdlib>
+
 /**
  * @brief Task context responsible for propagating photon packets.
  */
@@ -66,6 +70,60 @@ private:
 
   const double _max_photon_distance;
 
+  /**
+   * @brief Allow a restart-safe runtime override of the photon distance cap.
+   *
+   * Restart files contain their original parameter dictionary, so changing the
+   * .param file does not alter an existing restart.  The environment variable
+   * CMAC_RHD_MAX_PHOTON_DISTANCE_KPC provides a deliberately narrow escape
+   * hatch for salvaging such runs without changing the restart format.
+   */
+  inline static double
+  resolve_max_photon_distance(const double configured_distance) {
+    const char *value = std::getenv("CMAC_RHD_MAX_PHOTON_DISTANCE_KPC");
+    if (value == nullptr || value[0] == '\0') {
+      return configured_distance;
+    }
+
+    char *end = nullptr;
+    const double distance_kpc = std::strtod(value, &end);
+    if (end == value || *end != '\0' || !std::isfinite(distance_kpc) ||
+        !(distance_kpc > 0.)) {
+      cmac_error("Invalid CMAC_RHD_MAX_PHOTON_DISTANCE_KPC=\"%s\". Expected "
+                 "a positive number in kpc.",
+                 value);
+    }
+    const double distance = distance_kpc * 3.0856775814913673e19;
+
+    static AtomicValue< bool > reported(false);
+    if (reported.lock()) {
+      cmac_warning("Overriding the task-based RHD maximum photon propagation "
+                   "distance from the restart/parameter value to %g kpc via "
+                   "CMAC_RHD_MAX_PHOTON_DISTANCE_KPC.",
+                   distance_kpc);
+    }
+    return distance;
+  }
+
+  /** @brief Report distance-limited packets without adding normal-path I/O. */
+  inline static void report_distance_limited_photon(const PhotonPacket &photon) {
+    static AtomicValue< uint_fast64_t > count(0);
+    const uint_fast64_t current_count = count.pre_increment();
+    // Report at powers of two: useful diagnostics with logarithmically bounded
+    // output even if a pathological run caps many packets.
+    if ((current_count & (current_count - 1)) == 0) {
+      const CoordinateVector<> &direction = photon.get_direction();
+      cmac_warning(
+          "Photon propagation distance cap reached (capped packet count now "
+          "%" PRIuFAST64 "). Last packet: distance=%g kpc, source=%g, "
+          "frequency=%g Hz, direction=(%g,%g,%g).",
+          current_count,
+          photon.get_distance_travelled() / 3.0856775814913673e19,
+          photon.get_source_index(), photon.get_energy(), direction.x(),
+          direction.y(), direction.z());
+    }
+  }
+
 public:
   /**
    * @brief Constructor.
@@ -87,7 +145,8 @@ public:
       const double max_photon_distance)
       : _buffers(buffers), _grid_creator(grid_creator), _tasks(tasks),
         _num_photon_done(num_photon_done), _statistics(statistics),
-        _do_reemission(do_reemission),_max_photon_distance(max_photon_distance) {}
+        _do_reemission(do_reemission),
+        _max_photon_distance(resolve_max_photon_distance(max_photon_distance)) {}
 
   /**
    * @brief Execute a photon traversal task.
@@ -139,20 +198,28 @@ public:
                           "size: %" PRIuFAST32, photon_buffer.size());
 
       // traverse the photon through the active subgrid
-      const int_fast32_t result =
-          this_grid.interact(photon, photon_buffer.get_direction(), _max_photon_distance);
+      const int_fast32_t result = this_grid.interact(
+          photon, photon_buffer.get_direction(), _max_photon_distance);
 
       // check that the photon ended up in a valid output buffer
       cmac_assert_message(result >= 0 && result < TRAVELDIRECTION_NUMBER,
                           "fail");
 
-      // add the photon to an output buffer, if it still exists
-      if (!traversal_thread_context.store_photon(result, photon, _max_photon_distance) &&
-          _statistics != nullptr) {
-        if (result == 0) {
+      const bool distance_limited =
+          _max_photon_distance > 0. &&
+          photon.get_distance_travelled() >= _max_photon_distance;
+      const bool stored = traversal_thread_context.store_photon(
+          result, photon, _max_photon_distance);
+      if (!stored) {
+        if (distance_limited) {
+          report_distance_limited_photon(photon);
+        }
+        if (_statistics != nullptr) {
+          if (result == 0) {
             _statistics->absorb_photon(photon);
-        } else {
-          _statistics->escape_photon(photon);
+          } else {
+            _statistics->escape_photon(photon);
+          }
         }
       }
     }
@@ -251,8 +318,8 @@ public:
 
       } // if (thread_context.has_outgoing_photons(i))
 
-      // we have to do this outside the other condition, as buffers to
-      // which nothing was added can still be non-empty...
+      // we have to do this outside the other condition, as buffers to which
+      // nothing was added can still be non-empty...
       if (this_grid.get_neighbour(i) != NEIGHBOUR_OUTSIDE) {
         uint_fast32_t new_index = this_grid.get_active_buffer(i);
         if (new_index != NEIGHBOUR_OUTSIDE &&
