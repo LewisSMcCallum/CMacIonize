@@ -32,6 +32,7 @@
 
 #include "Error.hpp"
 
+#include <cstdlib>
 #include <fstream>
 #include <map>
 #include <string>
@@ -52,6 +53,30 @@ private:
    *  reader. */
   std::ofstream _info_file;
 #endif
+
+  /**
+   * @brief Resolve the requested restart filename.
+   *
+   * Setting CMAC_RESTART_USE_BACKUP to a non-zero value changes a canonical
+   * restart.dump request to restart.0.back. This is intentionally an
+   * environment-only recovery mechanism so it does not alter serialized
+   * parameters or the restart format.
+   */
+  inline static std::string resolve_filename(const std::string &filename) {
+    const char *use_backup = std::getenv("CMAC_RESTART_USE_BACKUP");
+    if (use_backup == nullptr || use_backup[0] == '\0' ||
+        std::string(use_backup) == "0") {
+      return filename;
+    }
+    const std::string suffix = "restart.dump";
+    if (filename.size() >= suffix.size() &&
+        filename.compare(filename.size() - suffix.size(), suffix.size(),
+                         suffix) == 0) {
+      return filename.substr(0, filename.size() - suffix.size()) +
+             "restart.0.back";
+    }
+    return filename;
+  }
 
   /** @brief Current byte offset, or -1 if unavailable. */
   inline std::streamoff get_offset() {
@@ -95,10 +120,16 @@ public:
    * @param filename Name of the restart file.
    */
   inline RestartReader(const std::string filename)
-      : _file(filename, std::ios::binary), _filename(filename) {
+      : _file(), _filename(resolve_filename(filename)) {
+    _file.open(_filename, std::ios::binary);
     if (!_file.is_open()) {
       cmac_error("Failed to open restart file \"%s\" for reading.",
                  _filename.c_str());
+    }
+    if (_filename != filename) {
+      cmac_warning("Restart recovery requested: reading backup file \"%s\" "
+                   "instead of \"%s\".",
+                   _filename.c_str(), filename.c_str());
     }
 
 #ifdef RESTARTREADER_INFO
