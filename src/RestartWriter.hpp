@@ -30,6 +30,9 @@
  *  that was written by the writer. */
 //#define RESTARTWRITER_INFO
 
+#include "Error.hpp"
+
+#include <cstdio>
 #include <fstream>
 #include <map>
 #include <string>
@@ -42,6 +45,12 @@ private:
   /*! @brief Underlying output file. */
   std::ofstream _file;
 
+  /*! @brief Final restart filename. */
+  const std::string _filename;
+
+  /*! @brief Temporary filename used until the complete restart is written. */
+  const std::string _temporary_filename;
+
 #ifdef RESTARTWRITER_INFO
   /*! @brief Detailed info file describing everything that was written by
    *  the writer. */
@@ -52,13 +61,40 @@ public:
   /**
    * @brief Constructor.
    *
+   * Restart data are first written to <filename>.tmp. The temporary file is
+   * renamed over the requested filename only when this writer is destroyed
+   * after a successful write, preventing interrupted writes from leaving a
+   * partially written restart at the canonical path.
+   *
    * @param filename Name of the restart file.
    */
-  inline RestartWriter(const std::string filename) : _file(filename) {
+  inline RestartWriter(const std::string filename)
+      : _file(filename + ".tmp", std::ios::binary | std::ios::trunc),
+        _filename(filename), _temporary_filename(filename + ".tmp") {
+    if (!_file.is_open()) {
+      cmac_error("Failed to open temporary restart file \"%s\" for writing.",
+                 _temporary_filename.c_str());
+    }
 
 #ifdef RESTARTWRITER_INFO
     _info_file.open("restart_writer_info.txt");
 #endif
+  }
+
+  /** @brief Flush, close and atomically publish the completed restart file. */
+  inline ~RestartWriter() {
+    _file.flush();
+    if (!_file) {
+      cmac_error("Failed while flushing temporary restart file \"%s\". The "
+                 "previous restart/backup has not been replaced.",
+                 _temporary_filename.c_str());
+    }
+    _file.close();
+    if (std::rename(_temporary_filename.c_str(), _filename.c_str()) != 0) {
+      cmac_error("Failed to publish completed restart file \"%s\" from "
+                 "temporary file \"%s\".",
+                 _filename.c_str(), _temporary_filename.c_str());
+    }
   }
 
   /**
@@ -68,6 +104,10 @@ public:
    */
   template < typename _datatype_ > void write(const _datatype_ &value) {
     _file.write(reinterpret_cast< const char * >(&value), sizeof(_datatype_));
+    if (!_file) {
+      cmac_error("Failed while writing restart file \"%s\".",
+                 _temporary_filename.c_str());
+    }
 #ifdef RESTARTWRITER_INFO
     _info_file << sizeof(_datatype_) << "\n";
 #endif
@@ -95,7 +135,13 @@ template <> inline void RestartWriter::write(const bool &boolean) {
 template <> inline void RestartWriter::write(const std::string &string) {
   const auto size = string.size();
   write(size);
-  _file.write(string.c_str(), size);
+  if (size > 0) {
+    _file.write(string.c_str(), size);
+    if (!_file) {
+      cmac_error("Failed while writing string to restart file \"%s\".",
+                 _temporary_filename.c_str());
+    }
+  }
 #ifdef RESTARTWRITER_INFO
   _info_file << "string\n";
 #endif
