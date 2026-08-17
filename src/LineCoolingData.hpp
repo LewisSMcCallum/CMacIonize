@@ -257,9 +257,67 @@ public:
   get_cooling(const double temperature, const double electron_density,
               const double abundances[LINECOOLINGDATA_NUMELEMENTS]) const;
 
+  /**
+   * @brief Get the cooling coefficient of each ion.
+   *
+   * The returned coefficients have the same units as get_cooling(), but do
+   * not include the ion abundance. This makes it possible to tabulate the
+   * temperature and electron-density dependent part of the line cooling
+   * without losing the local ionization-state dependence.
+   *
+   * @param temperature Temperature (in K).
+   * @param electron_density Electron density (in m^-3).
+   * @param coefficients Array to receive one coefficient per supported ion.
+   */
+  void get_cooling_coefficients(
+      const double temperature, const double electron_density,
+      double coefficients[LINECOOLINGDATA_NUMELEMENTS]) const;
+
   std::vector< std::vector< double > > get_line_strengths(
       const double temperature, const double electron_density,
       const double abundances[LINECOOLINGDATA_NUMELEMENTS]) const;
+};
+
+/**
+ * @brief Logarithmic lookup table for the per-ion line cooling coefficients.
+ *
+ * The table deliberately covers only the temperature range in which the RHD
+ * explicit heating/cooling routine uses LineCoolingData. Calls outside its
+ * finite tabulated domain fall back to LineCoolingData, retaining the exact
+ * solver as a safe path for unusual gas conditions.
+ */
+class LineCoolingTable {
+private:
+  const LineCoolingData &_line_cooling_data;
+  std::vector< double > _log_coefficients;
+  bool _is_valid;
+
+  size_t get_index(const size_t temperature_index,
+                   const size_t density_index,
+                   const size_t element) const;
+
+public:
+  /*! @brief Number of logarithmic temperature samples. */
+  static constexpr size_t NUMBER_OF_TEMPERATURES = 256;
+  /*! @brief Number of logarithmic electron-density samples. */
+  static constexpr size_t NUMBER_OF_ELECTRON_DENSITIES = 256;
+
+  LineCoolingTable(const LineCoolingData &line_cooling_data);
+
+  /*! @brief Check whether the table was safely initialized. */
+  inline bool is_valid() const { return _is_valid; }
+
+  /**
+   * @brief Get the total line cooling, using table interpolation where valid.
+   *
+   * @param temperature Temperature (in K).
+   * @param electron_density Electron density (in m^-3).
+   * @param abundances Ion abundances relative to hydrogen.
+   * @return Cooling per hydrogen atom (in kg m^2 s^-3).
+   */
+  double get_cooling(const double temperature, const double electron_density,
+                     const double abundances[LINECOOLINGDATA_NUMELEMENTS])
+      const;
 };
 
 #endif // LINECOOLINGDATA_HPP

@@ -28,6 +28,7 @@
 #include "UnitConverter.hpp"
 #include "Utilities.hpp"
 #include <cinttypes>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -122,6 +123,40 @@ int main(int argc, char **argv) {
       }
       assert_values_equal_tol(a, Bc[i], 1.e-11);
     }
+  }
+
+  // The RHD line-cooling lookup table must accurately reproduce the direct
+  // per-ion solver throughout its tabulated domain, and use that solver for
+  // conditions outside the domain.
+  {
+    LineCoolingTable table(data);
+    assert_condition(table.is_valid());
+
+    const double abundances[LINECOOLINGDATA_NUMELEMENTS] = {
+        3.e-5, 7.e-5, 3.e-4, 3.e-4, 3.e-4, 1.e-4, 2.e-5,
+        2.e-5, 1.e-4, 1.e-4, 7.e-5, 1.e-4, 2.e-5};
+    const double log_temperature_minimum = std::log(3000.);
+    const double log_temperature_range = std::log(50000.) -
+                                         log_temperature_minimum;
+    const double log_density_range = std::log(1.e16);
+    for (uint_fast8_t itemperature = 0; itemperature < 24; ++itemperature) {
+      const double temperature = std::exp(
+          log_temperature_minimum + log_temperature_range *
+                                        (itemperature + 0.37) / 24.);
+      for (uint_fast8_t idensity = 0; idensity < 24; ++idensity) {
+        const double electron_density = std::exp(
+            log_density_range * (idensity + 0.63) / 24.);
+        const double direct =
+            data.get_cooling(temperature, electron_density, abundances);
+        const double tabulated =
+            table.get_cooling(temperature, electron_density, abundances);
+        assert_values_equal_rel(direct, tabulated, 0.01);
+      }
+    }
+
+    const double direct = data.get_cooling(2000., 1.e8, abundances);
+    const double tabulated = table.get_cooling(2000., 1.e8, abundances);
+    assert_condition(direct == tabulated);
   }
 
   // linecool

@@ -66,6 +66,8 @@
 #include "TimeLine.hpp"
 #include "TimeLogger.hpp"
 
+#include <memory>
+
 /*! @brief Stop the serial time timer and start the parallel time timer. */
 #define start_parallel_timing_block()                                          \
   serial_timer.stop();                                                         \
@@ -790,6 +792,7 @@ inline static void get_thermal_gain_loss(double &gain, double &loss,
                               IonizationVariables &ionization_variables,
                               const double inverse_volume,
                               LineCoolingData &line_cooling_data,
+                              const LineCoolingTable *line_cooling_table,
                               double abund[LINECOOLINGDATA_NUMELEMENTS], double AHe,
                               DeRijckeRadiativeCooling* radiative_cooling,
                               bool use_cooling_tables,
@@ -849,7 +852,10 @@ const double nenhp = ne*n*(1-h0);
 
   if (!use_cooling_tables && temp < 50000 && temp > 3000) {
   //get line cooling
-  loss = line_cooling_data.get_cooling(temp, ne, abund) * n /inverse_volume;
+  const double line_cooling = line_cooling_table == nullptr
+                                  ? line_cooling_data.get_cooling(temp, ne, abund)
+                                  : line_cooling_table->get_cooling(temp, ne, abund);
+  loss = line_cooling * n /inverse_volume;
 
   cmac_assert_message(loss==loss, "loss=%g,T=%g,h0=%g,ne=%g",loss,temp,h0,ne);
     //get brehm cooling
@@ -905,6 +911,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
                               Hydro &hydro, double _cooling_temp_floor,
                               double gamma_minus_one,
                               LineCoolingData &line_cooling_data,
+                              const LineCoolingTable *line_cooling_table,
                               Abundances &abundances, bool use_cooling_tables,
                               const bool neutral_gas_heating,
                               const double neutral_gas_heating_rate) {
@@ -942,7 +949,7 @@ inline static void do_explicit_heat_cool(IonizationVariables &ionization_variabl
 
 //get cooling 
 
-double abund[LINECOOLINGDATA_NUMELEMENTS];
+double abund[LINECOOLINGDATA_NUMELEMENTS] = {};
   
 
 #ifdef HAS_CARBON
@@ -1027,7 +1034,8 @@ while (clock < total_dt) {
   time_left = total_dt - clock;
 
   get_thermal_gain_loss(gain, loss, ionization_variables, inverse_volume,
-                              line_cooling_data, abund, AHe, radiative_cooling,
+                              line_cooling_data, line_cooling_table, abund, AHe,
+                              radiative_cooling,
                               use_cooling_tables, neutral_gas_heating,
                               neutral_gas_heating_rate);
 
@@ -1102,7 +1110,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
 //get loss from full metals by doing this
 //loss = _line_cooling_data.get_cooling(T, ne, abund) * n * V;
 
-  double abund[LINECOOLINGDATA_NUMELEMENTS];
+  double abund[LINECOOLINGDATA_NUMELEMENTS] = {};
   if (radiative_cooling == nullptr) {
 
 #ifdef HAS_CARBON
@@ -1651,6 +1659,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool use_cool_tables = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:use cooling tables",
           false);
+  const bool use_line_cooling_table = params->get_value< bool >(
+      "TaskBasedRadiationHydrodynamicsSimulation:line cooling lookup table",
+      true);
   
 
   const bool do_explicit_temp_calc = params->get_value< bool >(
@@ -1683,6 +1694,32 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     _cooling_file = new std::ofstream("CoolingProgression.txt");
     *_cooling_file << "#time (s)\tTotal lost Energy\n";
     _cooling_file->flush();
+  }
+
+  std::unique_ptr< LineCoolingTable > line_cooling_table;
+  if (do_explicit_temp_calc && !use_cool_tables && use_line_cooling_table) {
+#ifdef HAS_CARBON
+    time_logger.start("line cooling table");
+    line_cooling_table = std::make_unique< LineCoolingTable >(line_cooling_data);
+    time_logger.end("line cooling table");
+    if (!line_cooling_table->is_valid()) {
+      line_cooling_table.reset();
+      if (log) {
+        log->write_warning("Line cooling lookup table could not be initialized; "
+                           "using the direct line solver.");
+      }
+    } else if (log) {
+      log->write_status("Using a 256 x 256 logarithmic line cooling lookup "
+                        "table (direct fallback outside its domain).");
+    }
+#else
+    if (log) {
+      log->write_status("Line cooling lookup table not needed in a hydrogen-only "
+                        "build.");
+    }
+#endif
+  } else if (log && do_explicit_temp_calc && !use_cool_tables) {
+    log->write_status("Using the direct line cooling solver.");
   }
 
   double total_thermal_lost=0.0;
@@ -3112,7 +3149,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               do_explicit_heat_cool(ionization_variables, hydro_variables,
                         1. / cellit.get_volume(), nH2 * cellit.get_volume(),
                         actual_timestep, radiative_cooling, hydro,
-                          _cooling_temp_floor,_gamma-1.,line_cooling_data, abundances,
+                          _cooling_temp_floor,_gamma-1.,line_cooling_data,
+                          line_cooling_table.get(), abundances,
                           use_cool_tables, neutral_gas_heating,
                           neutral_gas_heating_rate);
             }

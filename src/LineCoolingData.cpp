@@ -27,6 +27,7 @@
 #include "LineCoolingData.hpp"
 #include "Error.hpp"
 #include "PhysicalConstants.hpp"
+#include <algorithm>
 #include <cinttypes>
 #include <cmath>
 #include <cstdlib>
@@ -1764,17 +1765,18 @@ double LineCoolingData::compute_level_population(
  * @param abundances Abdunances of coolants.
  * @return Radiative cooling per hydrogen atom (in kg m^2s^-3).
  */
-double LineCoolingData::get_cooling(
+void LineCoolingData::get_cooling_coefficients(
     const double temperature, const double electron_density,
-    const double abundances[LINECOOLINGDATA_NUMELEMENTS]) const {
+    double coefficients[LINECOOLINGDATA_NUMELEMENTS]) const {
 
-  if (electron_density == 0.) {
-    // we cannot return a 0 cooling rate, because that crashes our iterative
-    // temperature finding scheme
-    return 1.e-99;
+  for (int_fast32_t element = 0; element < LINECOOLINGDATA_NUMELEMENTS;
+       ++element) {
+    coefficients[element] = 0.;
   }
-
-  /// initialize some variables
+  if (!(temperature > 0.) || !(electron_density > 0.) ||
+      !std::isfinite(temperature) || !std::isfinite(electron_density)) {
+    return;
+  }
 
   // Boltzmann constant (in J s^-1)
   const double kb =
@@ -1788,8 +1790,6 @@ double LineCoolingData::get_cooling(
   const double logT = std::log(temperature);
 
   /// five level elements
-
-  double cooling = 0.;
   for (int_fast32_t element = 0; element < LINECOOLINGDATA_NUMFIVELEVELELEMENTS;
        ++element) {
 
@@ -1828,22 +1828,166 @@ double LineCoolingData::get_cooling(
          _five_level_transition_probability[element][TRANSITION_3_to_4] *
              _five_level_energy_difference[element][TRANSITION_3_to_4]);
 
-    cooling += abundances[element] * kb * (cl2 + cl3 + cl4 + cl5);
+    coefficients[element] = kb * (cl2 + cl3 + cl4 + cl5);
   }
 
   /// 2 level atoms
-
-  // offset of two level elements in the abundances array
   const int_fast32_t offset = LINECOOLINGDATA_NUMFIVELEVELELEMENTS;
   for (int_fast32_t i = 0; i < LINECOOLINGDATA_NUMTWOLEVELELEMENTS; ++i) {
-
     const int_fast32_t element = i + offset;
     const double level_population = compute_level_population(
         element, collision_strength_prefactor, temperature, Tinv, logT);
-    cooling += abundances[element] * kb * _two_level_energy_difference[i] *
-               _two_level_transition_probability[i] * level_population;
+    coefficients[element] =
+        kb * _two_level_energy_difference[i] *
+        _two_level_transition_probability[i] * level_population;
+  }
+}
+
+double LineCoolingData::get_cooling(
+    const double temperature, const double electron_density,
+    const double abundances[LINECOOLINGDATA_NUMELEMENTS]) const {
+
+  if (electron_density == 0.) {
+    // we cannot return a 0 cooling rate, because that crashes our iterative
+    // temperature finding scheme
+    return 1.e-99;
   }
 
+  double coefficients[LINECOOLINGDATA_NUMELEMENTS];
+  get_cooling_coefficients(temperature, electron_density, coefficients);
+
+  double cooling = 0.;
+  for (int_fast32_t element = 0; element < LINECOOLINGDATA_NUMELEMENTS;
+       ++element) {
+    cooling += abundances[element] * coefficients[element];
+  }
+  return cooling;
+}
+
+namespace {
+
+// The explicit RHD line-cooling branch is used only between these two
+// temperatures. The density limits span 10^-6 to 10^10 cm^-3; unusual values
+// are evaluated by the direct solver instead of being extrapolated.
+constexpr double LINE_COOLING_TABLE_MINIMUM_TEMPERATURE = 3000.;
+constexpr double LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE = 50000.;
+constexpr double LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY = 1.;
+constexpr double LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY = 1.e16;
+
+} // namespace
+
+size_t LineCoolingTable::get_index(const size_t temperature_index,
+                                   const size_t density_index,
+                                   const size_t element) const {
+  return ((temperature_index * NUMBER_OF_ELECTRON_DENSITIES + density_index) *
+          LINECOOLINGDATA_NUMELEMENTS + element);
+}
+
+LineCoolingTable::LineCoolingTable(const LineCoolingData &line_cooling_data)
+    : _line_cooling_data(line_cooling_data),
+      _log_coefficients(NUMBER_OF_TEMPERATURES *
+                            NUMBER_OF_ELECTRON_DENSITIES *
+                            LINECOOLINGDATA_NUMELEMENTS,
+                        0.),
+      _is_valid(true) {
+
+  const double minimum_log_temperature =
+      std::log(LINE_COOLING_TABLE_MINIMUM_TEMPERATURE);
+  const double log_temperature_interval =
+      (std::log(LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) -
+       minimum_log_temperature) /
+      (NUMBER_OF_TEMPERATURES - 1);
+  const double minimum_log_density =
+      std::log(LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY);
+  const double log_density_interval =
+      (std::log(LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY) -
+       minimum_log_density) /
+      (NUMBER_OF_ELECTRON_DENSITIES - 1);
+
+  for (size_t temperature_index = 0;
+       temperature_index < NUMBER_OF_TEMPERATURES; ++temperature_index) {
+    const double temperature = std::exp(
+        minimum_log_temperature + temperature_index * log_temperature_interval);
+    for (size_t density_index = 0;
+         density_index < NUMBER_OF_ELECTRON_DENSITIES; ++density_index) {
+      const double electron_density = std::exp(
+          minimum_log_density + density_index * log_density_interval);
+      double coefficients[LINECOOLINGDATA_NUMELEMENTS];
+      _line_cooling_data.get_cooling_coefficients(
+          temperature, electron_density, coefficients);
+      for (size_t element = 0; element < LINECOOLINGDATA_NUMELEMENTS;
+           ++element) {
+        // Do not make a table if the direct microphysics ever returns a value
+        // that cannot safely be logarithmically interpolated.
+        if (!(coefficients[element] > 0.) ||
+            !std::isfinite(coefficients[element])) {
+          _log_coefficients.clear();
+          _is_valid = false;
+          return;
+        }
+        _log_coefficients[get_index(temperature_index, density_index,
+                                    element)] = std::log(coefficients[element]);
+      }
+    }
+  }
+}
+
+double LineCoolingTable::get_cooling(
+    const double temperature, const double electron_density,
+    const double abundances[LINECOOLINGDATA_NUMELEMENTS]) const {
+
+  if (!_is_valid || !(temperature >= LINE_COOLING_TABLE_MINIMUM_TEMPERATURE) ||
+      !(temperature <= LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) ||
+      !(electron_density >= LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY) ||
+      !(electron_density <= LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY)) {
+    return _line_cooling_data.get_cooling(temperature, electron_density,
+                                          abundances);
+  }
+
+  const double minimum_log_temperature =
+      std::log(LINE_COOLING_TABLE_MINIMUM_TEMPERATURE);
+  const double temperature_coordinate =
+      (std::log(temperature) - minimum_log_temperature) /
+      (std::log(LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) -
+       minimum_log_temperature) *
+      (NUMBER_OF_TEMPERATURES - 1);
+  const size_t temperature_index = std::min(
+      static_cast< size_t >(temperature_coordinate), NUMBER_OF_TEMPERATURES - 2);
+  const double temperature_fraction =
+      temperature_coordinate - temperature_index;
+
+  const double minimum_log_density =
+      std::log(LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY);
+  const double density_coordinate =
+      (std::log(electron_density) - minimum_log_density) /
+      (std::log(LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY) -
+       minimum_log_density) *
+      (NUMBER_OF_ELECTRON_DENSITIES - 1);
+  const size_t density_index = std::min(
+      static_cast< size_t >(density_coordinate), NUMBER_OF_ELECTRON_DENSITIES - 2);
+  const double density_fraction = density_coordinate - density_index;
+
+  double cooling = 0.;
+  for (size_t element = 0; element < LINECOOLINGDATA_NUMELEMENTS; ++element) {
+    const double lower_temperature =
+        (1. - density_fraction) *
+            _log_coefficients[get_index(temperature_index, density_index,
+                                        element)] +
+        density_fraction *
+            _log_coefficients[get_index(temperature_index, density_index + 1,
+                                        element)];
+    const double upper_temperature =
+        (1. - density_fraction) *
+            _log_coefficients[get_index(temperature_index + 1, density_index,
+                                        element)] +
+        density_fraction * _log_coefficients[get_index(
+                               temperature_index + 1, density_index + 1,
+                               element)];
+    const double coefficient = std::exp(
+        (1. - temperature_fraction) * lower_temperature +
+        temperature_fraction * upper_temperature);
+    cooling += abundances[element] * coefficient;
+  }
   return cooling;
 }
 
