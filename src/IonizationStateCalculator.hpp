@@ -28,6 +28,7 @@
 #define IONIZATIONSTATECALCULATOR_HPP
 
 #include "DensityGrid.hpp"
+#include "SafeGslOde.hpp"
 
 class Abundances;
 class ChargeTransferRates;
