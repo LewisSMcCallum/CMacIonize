@@ -25,9 +25,10 @@
  * The chemistry variables are fractions, so an absolute error of 1.e-4 can be
  * physically important even when the neutral fraction is close to unity.  The
  * wrapper therefore enforces 1.e-8 absolute and relative tolerances, caps the
- * number of internal driver steps, and falls back to the input state rather
- * than aborting an RHD calculation when an exceptionally stiff or malformed
- * cell cannot be advanced safely.
+ * number of internal driver steps, preflights the reaction RHS for finite
+ * values, and falls back to the input state rather than aborting an RHD
+ * calculation when an exceptionally stiff or malformed cell cannot be
+ * advanced safely.
  */
 #ifndef SAFEGSLODE_HPP
 #define SAFEGSLODE_HPP
@@ -50,9 +51,10 @@ static const std::size_t MAXIMUM_TRACKED_DIMENSION = 32;
 
 struct DriverState {
   gsl_odeiv2_driver *driver;
+  const gsl_odeiv2_system *system;
   std::size_t dimension;
 
-  DriverState() : driver(nullptr), dimension(0) {}
+  DriverState() : driver(nullptr), system(nullptr), dimension(0) {}
 };
 
 /**
@@ -60,7 +62,8 @@ struct DriverState {
  *
  * CMacIonize allocates, applies and frees one GSL driver at a time in each
  * thread.  Keeping only the current driver avoids a mutex or map in this hot
- * path while still letting the apply wrapper know the system dimension.
+ * path while still letting the apply wrapper know the system dimension and
+ * evaluate the RHS once before entering the adaptive integrator.
  */
 inline DriverState &driver_state() {
   static thread_local DriverState state;
@@ -94,11 +97,13 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
 
   DriverState &state = driver_state();
   state.driver = nullptr;
+  state.system = system;
   state.dimension = system == nullptr ? 0 : system->dimension;
 
-  if (system == nullptr || state.dimension == 0 ||
-      state.dimension > MAXIMUM_TRACKED_DIMENSION) {
+  if (system == nullptr || system->function == nullptr ||
+      state.dimension == 0 || state.dimension > MAXIMUM_TRACKED_DIMENSION) {
     warn_failure("invalid ODE system or unsupported dimension");
+    state.system = nullptr;
     return nullptr;
   }
 
@@ -113,6 +118,7 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
       RELATIVE_TOLERANCE);
   if (driver == nullptr) {
     warn_failure("GSL driver allocation failed");
+    state.system = nullptr;
     return nullptr;
   }
 
@@ -121,6 +127,7 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
   if (status != GSL_SUCCESS) {
     warn_failure("could not set the GSL driver step cap", status);
     ::gsl_odeiv2_driver_free(driver);
+    state.system = nullptr;
     return nullptr;
   }
 
@@ -131,11 +138,12 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
 /**
  * @brief Advance the ODE while preserving a safe fallback state.
  *
- * On any GSL failure, non-finite output, or grossly non-physical fraction, the
- * input state is restored and success is returned to the legacy caller.  The
- * fallback is deliberately a zero-order hold: for a pathological cell it is
- * safer to defer its chemistry by one radiation step than to inject a NaN or
- * an arbitrary ion fraction into the hydro calculation.
+ * On any GSL failure, non-finite reaction derivative/output, or grossly
+ * non-physical fraction, the input state is restored and success is returned
+ * to the legacy caller.  The fallback is deliberately a zero-order hold: for
+ * a pathological cell it is safer to defer its chemistry by one radiation
+ * step than to inject a NaN or an arbitrary ion fraction into the hydro
+ * calculation.
  */
 inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
                         const double target_time, double y[]) {
@@ -173,8 +181,28 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
     return GSL_SUCCESS;
   }
 
-  if (driver == nullptr || driver != state.driver) {
+  if (driver == nullptr || driver != state.driver || state.system == nullptr) {
     warn_failure("GSL driver was not available");
+    for (std::size_t i = 0; i < dimension; ++i) {
+      y[i] = initial[i];
+    }
+    return GSL_SUCCESS;
+  }
+
+  // Evaluate the exact user RHS once before entering GSL.  This cheaply catches
+  // overflowed reaction coefficients, invalid electron densities and similar
+  // pathologies before the adaptive integrator spends thousands of attempts on
+  // a state that can never produce a finite derivative.
+  double derivative[MAXIMUM_TRACKED_DIMENSION];
+  const int preflight_status = state.system->function(
+      *time, y, derivative, state.system->params);
+  bool finite_derivative = preflight_status == GSL_SUCCESS;
+  for (std::size_t i = 0; i < dimension && finite_derivative; ++i) {
+    finite_derivative = std::isfinite(derivative[i]);
+  }
+  if (!finite_derivative) {
+    warn_failure("non-finite reaction derivative before ODE integration",
+                 preflight_status);
     for (std::size_t i = 0; i < dimension; ++i) {
       y[i] = initial[i];
     }
@@ -216,6 +244,7 @@ inline void driver_free(gsl_odeiv2_driver *driver) {
   }
   if (state.driver == driver) {
     state.driver = nullptr;
+    state.system = nullptr;
     state.dimension = 0;
   }
 }
