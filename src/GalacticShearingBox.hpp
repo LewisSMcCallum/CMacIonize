@@ -18,6 +18,7 @@
 
 #include "DensitySubGridCreator.hpp"
 #include "Hydro.hpp"
+#include "IonizationAdvection.hpp"
 #include "Log.hpp"
 #include "ParameterFile.hpp"
 
@@ -340,9 +341,38 @@ public:
               ion, high_cell.get_ionization_variables().get_ionic_fraction(
                        ion));
         }
+
+        double high_face[NUMBER_OF_IONNAMES];
+        double low_face[NUMBER_OF_IONNAMES];
+        if (advect_ionization) {
+          const IonizationVariables *high_minus = nullptr;
+          const IonizationVariables *low_plus = nullptr;
+          IonizationVariables low_plus_state;
+          if (nx > 1) {
+            auto high_inside = get_cell(grid_creator, nx - 2, iy, iz);
+            high_minus = &high_inside.get_ionization_variables();
+            auto low_plus0 = get_cell(grid_creator, 1, low0, iz);
+            auto low_plus1 = get_cell(grid_creator, 1, low1, iz);
+            low_plus_state = interpolate_ionization(
+                low_plus0.get_ionization_variables(),
+                low_plus1.get_ionization_variables(), weight1);
+            low_plus = &low_plus_state;
+          }
+          const double high_courant =
+              high_state.get_primitives_velocity().x() * timestep / dx;
+          const double low_courant =
+              low_state.get_primitives_velocity().x() * timestep / dx;
+          IonizationAdvection::reconstruct_interface(
+              high_minus, high_ionization, low_ionization, low_plus,
+              high_courant, low_courant, high_face, low_face);
+        }
+
+        // Do not let Hydro perform its legacy donor-cell ion advection here.
+        // We use the final, limited hydro mass flux below with the same
+        // second-order reconstructed ionic face state used everywhere else.
         hydro.do_flux_calculation(
             0, high_state, high_ionization, low_state, low_ionization, dx,
-            area, timestep, advect_ionization);
+            area, timestep, false);
 
         HydroVariables &high_variables = high_cell.get_hydro_variables();
         HydroVariables &low_variables0 = low_cell0.get_hydro_variables();
@@ -368,18 +398,18 @@ public:
         }
 
         if (advect_ionization) {
+          // high_state started with zero deltas, so its mass change is exactly
+          // -mflux after the hydro solver and all hydro flux limiters.
+          const double mflux = -high_state.delta_conserved(0);
+          const double *upwind_face = mflux > 0. ? high_face : low_face;
           for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+            const double ion_flux = mflux * upwind_face[ion];
             high_cell.get_ionization_variables()
-                .increase_delta_ionic_fraction(
-                    ion, high_ionization.get_delta_ionic_fraction(ion));
+                .increase_delta_ionic_fraction(ion, -ion_flux);
             low_cell0.get_ionization_variables()
-                .increase_delta_ionic_fraction(
-                    ion, weight0 *
-                             low_ionization.get_delta_ionic_fraction(ion));
+                .increase_delta_ionic_fraction(ion, weight0 * ion_flux);
             low_cell1.get_ionization_variables()
-                .increase_delta_ionic_fraction(
-                    ion, weight1 *
-                             low_ionization.get_delta_ionic_fraction(ion));
+                .increase_delta_ionic_fraction(ion, weight1 * ion_flux);
           }
         }
       }
