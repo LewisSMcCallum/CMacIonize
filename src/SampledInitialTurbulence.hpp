@@ -88,7 +88,7 @@ public:
       const Box<> box, const double kmin, const double kmax,
       const double kpeak, const double concentration_factor,
       const uint_fast32_t number_of_modes, const int_fast32_t seed,
-      Log *log = nullptr)
+      Log *log = nullptr, const bool vertical_only = false)
       : _number_of_subgrids(number_of_subgrids),
         _number_of_cells(number_of_cells) {
     if (!(kmin > 0.) || kmax < kmin) {
@@ -126,7 +126,7 @@ public:
       ++attempts;
       int_fast32_t kx = integer_mode(generator);
       int_fast32_t ky = integer_mode(generator);
-      int_fast32_t kz = integer_mode(generator);
+      int_fast32_t kz = vertical_only ? 0 : integer_mode(generator);
       if (kx < 0 || (kx == 0 && ky < 0) ||
           (kx == 0 && ky == 0 && kz < 0)) {
         kx = -kx;
@@ -147,36 +147,48 @@ public:
         continue;
       }
 
-      const CoordinateVector<> khat(kx / kmag, ky / kmag, kz / kmag);
-      const CoordinateVector<> reference =
-          std::abs(khat.z()) < 0.9 ? CoordinateVector<>(0., 0., 1.)
-                                  : CoordinateVector<>(0., 1., 0.);
-      CoordinateVector<> e1(
-          khat.y() * reference.z() - khat.z() * reference.y(),
-          khat.z() * reference.x() - khat.x() * reference.z(),
-          khat.x() * reference.y() - khat.y() * reference.x());
-      e1 /= std::sqrt(e1.norm2());
-      const CoordinateVector<> e2(
-          khat.y() * e1.z() - khat.z() * e1.y(),
-          khat.z() * e1.x() - khat.x() * e1.z(),
-          khat.x() * e1.y() - khat.y() * e1.x());
-
       const double kdiff = kmag - kpeak;
       const double weight =
           std::sqrt(std::exp(-kdiff * kdiff /
                              (concentration_factor * concentration_factor)) /
                     kk);
-      const double phi = uniform(generator);
-      const double theta1 = uniform(generator);
-      const double theta2 = uniform(generator);
-      const double ga = std::sin(phi);
-      const double gb = std::cos(phi);
-      _amplitudes_real.push_back(
-          weight * (std::cos(theta1) * ga * e1 +
-                    std::cos(theta2) * gb * e2));
-      _amplitudes_imaginary.push_back(
-          weight * (std::sin(theta1) * ga * e1 +
-                    std::sin(theta2) * gb * e2));
+
+      if (vertical_only) {
+        // Restrict all wavevectors to the x-y plane and polarize the velocity
+        // along z. Thus k dot v = 0 and v_z is independent of z: the initial
+        // field is exactly divergence-free and has no imposed x-y motion.
+        const double theta = uniform(generator);
+        _amplitudes_real.push_back(
+            CoordinateVector<>(0., 0., weight * std::cos(theta)));
+        _amplitudes_imaginary.push_back(
+            CoordinateVector<>(0., 0., weight * std::sin(theta)));
+      } else {
+        const CoordinateVector<> khat(kx / kmag, ky / kmag, kz / kmag);
+        const CoordinateVector<> reference =
+            std::abs(khat.z()) < 0.9 ? CoordinateVector<>(0., 0., 1.)
+                                    : CoordinateVector<>(0., 1., 0.);
+        CoordinateVector<> e1(
+            khat.y() * reference.z() - khat.z() * reference.y(),
+            khat.z() * reference.x() - khat.x() * reference.z(),
+            khat.x() * reference.y() - khat.y() * reference.x());
+        e1 /= std::sqrt(e1.norm2());
+        const CoordinateVector<> e2(
+            khat.y() * e1.z() - khat.z() * e1.y(),
+            khat.z() * e1.x() - khat.x() * e1.z(),
+            khat.x() * e1.y() - khat.y() * e1.x());
+
+        const double phi = uniform(generator);
+        const double theta1 = uniform(generator);
+        const double theta2 = uniform(generator);
+        const double ga = std::sin(phi);
+        const double gb = std::cos(phi);
+        _amplitudes_real.push_back(
+            weight * (std::cos(theta1) * ga * e1 +
+                      std::cos(theta2) * gb * e2));
+        _amplitudes_imaginary.push_back(
+            weight * (std::sin(theta1) * ga * e1 +
+                      std::sin(theta2) * gb * e2));
+      }
       wavevectors.push_back(CoordinateVector<>(
           kx * inverse_mode_length, ky * inverse_mode_length,
           kz * inverse_mode_length));
@@ -229,10 +241,13 @@ public:
     }
 
     if (log) {
-      log->write_status("Sampled initial turbulence: ", number_of_modes,
-                        " solenoidal modes; selected |k| range ",
-                        selected_kmin, "--", selected_kmax,
-                        "; requested peak ", kpeak, ".");
+      log->write_status(
+          "Sampled initial turbulence: ", number_of_modes,
+          vertical_only ? " vertical, k_z=0 solenoidal modes; selected |k| "
+                          "range "
+                        : " solenoidal modes; selected |k| range ",
+          selected_kmin, "--", selected_kmax, "; requested peak ", kpeak,
+          ".");
     }
   }
 
