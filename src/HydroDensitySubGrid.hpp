@@ -38,16 +38,109 @@
 class HydroDensitySubGrid : public DensitySubGrid {
 private:
   /**
-   * @brief Run the ordinary hydro Riemann solve and advect the ion mass with
-   * bounded MUSCL-Hancock face states using exactly the same limited mass flux.
+   * @brief Build limited ionic slopes and local bounds for one cell.
+   *
+   * The ordinary symmetric MC stencil is used whenever both neighbours are
+   * available. At a local subgrid edge a bounded one-sided three-cell slope is
+   * used instead. For the direction normal to a subgrid interface, the cell on
+   * the neighbouring subgrid can be supplied as an override, restoring the
+   * centred stencil across that interface without storing ion gradients.
+   */
+  inline void get_ionic_reconstruction_data(
+      const int_fast32_t index, const int_fast32_t normal_direction,
+      const IonizationVariables *normal_minus_override,
+      const IonizationVariables *normal_plus_override,
+      double slopes[3][NUMBER_OF_IONNAMES],
+      double lower[NUMBER_OF_IONNAMES],
+      double upper[NUMBER_OF_IONNAMES]) const {
+
+    const int_fast32_t ix = index / _number_of_cells[3];
+    const int_fast32_t remainder = index - ix * _number_of_cells[3];
+    const int_fast32_t iy = remainder / _number_of_cells[2];
+    const int_fast32_t iz = remainder - iy * _number_of_cells[2];
+    const int_fast32_t coordinate[3] = {ix, iy, iz};
+    const int_fast32_t stride[3] = {_number_of_cells[3],
+                                    _number_of_cells[2], 1};
+
+    const IonizationVariables &cell = _ionization_variables[index];
+    for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+      const double x0 = cell.get_ionic_fraction(ion);
+      lower[ion] = x0;
+      upper[ion] = x0;
+    }
+
+    for (int_fast32_t direction = 0; direction < 3; ++direction) {
+      const IonizationVariables *minus = nullptr;
+      const IonizationVariables *plus = nullptr;
+      const IonizationVariables *minus_two = nullptr;
+      const IonizationVariables *plus_two = nullptr;
+
+      if (coordinate[direction] > 0) {
+        minus = &_ionization_variables[index - stride[direction]];
+      } else if (direction == normal_direction) {
+        minus = normal_minus_override;
+      }
+      if (coordinate[direction] + 1 < _number_of_cells[direction]) {
+        plus = &_ionization_variables[index + stride[direction]];
+      } else if (direction == normal_direction) {
+        plus = normal_plus_override;
+      }
+      if (coordinate[direction] > 1) {
+        minus_two = &_ionization_variables[index - 2 * stride[direction]];
+      }
+      if (coordinate[direction] + 2 < _number_of_cells[direction]) {
+        plus_two = &_ionization_variables[index + 2 * stride[direction]];
+      }
+
+      for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+        slopes[direction][ion] = IonizationAdvection::limited_cell_slope(
+            cell, minus, plus, minus_two, plus_two, ion);
+        if (minus != nullptr) {
+          lower[ion] = std::min(lower[ion], minus->get_ionic_fraction(ion));
+          upper[ion] = std::max(upper[ion], minus->get_ionic_fraction(ion));
+        }
+        if (plus != nullptr) {
+          lower[ion] = std::min(lower[ion], plus->get_ionic_fraction(ion));
+          upper[ion] = std::max(upper[ion], plus->get_ionic_fraction(ion));
+        }
+        if (minus_two != nullptr) {
+          lower[ion] =
+              std::min(lower[ion], minus_two->get_ionic_fraction(ion));
+          upper[ion] =
+              std::max(upper[ion], minus_two->get_ionic_fraction(ion));
+        }
+        if (plus_two != nullptr) {
+          lower[ion] =
+              std::min(lower[ion], plus_two->get_ionic_fraction(ion));
+          upper[ion] =
+              std::max(upper[ion], plus_two->get_ionic_fraction(ion));
+        }
+      }
+    }
+  }
+
+  /**
+   * @brief Run the ordinary hydro Riemann solve and advect ion mass with the
+   * exact same final hydro mass flux.
+   *
+   * Only the upwind donor composition is reconstructed. Its face state uses a
+   * full three-dimensional MUSCL-Hancock predictor, and is then projected onto
+   * the positivity-preserving ionic flux budget before the equal/opposite
+   * conservative tracer flux is deposited.
    */
   inline static void do_reconstructed_flux(
       const Hydro &hydro, const uint_fast8_t direction,
-      HydroVariables &left_hydro, IonizationVariables &left_ionization,
-      HydroVariables &right_hydro, IonizationVariables &right_ionization,
-      const IonizationVariables *left_minus,
-      const IonizationVariables *right_plus, const double dx, const double area,
-      const double dt, const bool advect_ionization) {
+      HydroDensitySubGrid &left_grid, const int_fast32_t index_left,
+      HydroDensitySubGrid &right_grid, const int_fast32_t index_right,
+      const double dx, const double area, const double dt,
+      const bool advect_ionization) {
+
+    HydroVariables &left_hydro = left_grid._hydro_variables[index_left];
+    HydroVariables &right_hydro = right_grid._hydro_variables[index_right];
+    IonizationVariables &left_ionization =
+        left_grid._ionization_variables[index_left];
+    IonizationVariables &right_ionization =
+        right_grid._ionization_variables[index_right];
 
     if (!advect_ionization) {
       hydro.do_flux_calculation(direction, left_hydro, left_ionization,
@@ -56,60 +149,102 @@ private:
       return;
     }
 
-    double left_face[NUMBER_OF_IONNAMES];
-    double right_face[NUMBER_OF_IONNAMES];
-    const double courant_left =
-        left_hydro.get_primitives_velocity()[direction] * dt / dx;
-    const double courant_right =
-        right_hydro.get_primitives_velocity()[direction] * dt / dx;
-    IonizationAdvection::reconstruct_interface(
-        left_minus, left_ionization, right_ionization, right_plus,
-        courant_left, courant_right, left_face, right_face);
+    const double left_mass = left_hydro.get_conserved_mass();
+    const double right_mass = right_hydro.get_conserved_mass();
+    const double left_mass_delta_before = left_hydro.delta_conserved(0);
+    const double right_mass_delta_before = right_hydro.delta_conserved(0);
 
-    // Recover the mass flux after all hydro flux limiters have been applied.
-    // This avoids duplicating any part of the HLLC flux calculation and makes
-    // the ionic tracer exactly conservative with the mass update.
-    const double old_left_mass_delta = left_hydro.delta_conserved(0);
+    // Let hydro decide exactly how much gas crosses the face, including the
+    // HLLC solve, second-order hydro reconstruction and all flux limiting.
     hydro.do_flux_calculation(direction, left_hydro, left_ionization,
                               right_hydro, right_ionization, dx, area, dt,
                               false);
     const double mflux =
-        old_left_mass_delta - left_hydro.delta_conserved(0);
-    IonizationAdvection::add_interface_flux(
-        left_ionization, right_ionization, mflux, left_face, right_face);
-  }
-
-  /**
-   * @brief Hydro flux plus second-order one-sided ionic reconstruction at a
-   * physical domain boundary.
-   */
-  inline static void do_reconstructed_ghost_flux(
-      const Hydro &hydro, const uint_fast8_t direction,
-      const CoordinateVector<> ghost_position, HydroVariables &cell_hydro,
-      IonizationVariables &cell_ionization,
-      const IonizationVariables *inside_one,
-      const IonizationVariables *inside_two, const HydroBoundary &boundary,
-      const double dx, const double cell_size, const double area,
-      const double dt, const bool advect_ionization) {
-
-    if (!advect_ionization) {
-      hydro.do_ghost_flux_calculation(
-          direction, ghost_position, cell_hydro, cell_ionization, boundary, dx,
-          area, dt, false);
+        left_mass_delta_before - left_hydro.delta_conserved(0);
+    if (mflux == 0.) {
       return;
     }
 
-    double face[NUMBER_OF_IONNAMES];
-    const double courant =
-        cell_hydro.get_primitives_velocity()[direction] * dt / cell_size;
-    IonizationAdvection::reconstruct_boundary(
-        cell_ionization, inside_one, inside_two, dx > 0., courant, face);
+    HydroDensitySubGrid &donor_grid = mflux > 0. ? left_grid : right_grid;
+    const int_fast32_t donor_index = mflux > 0. ? index_left : index_right;
+    IonizationVariables &donor = mflux > 0. ? left_ionization : right_ionization;
+    HydroVariables &donor_hydro = mflux > 0. ? left_hydro : right_hydro;
+    const double donor_mass = mflux > 0. ? left_mass : right_mass;
+    const double donor_mass_delta_before =
+        mflux > 0. ? left_mass_delta_before : right_mass_delta_before;
 
+    double slopes[3][NUMBER_OF_IONNAMES];
+    double lower[NUMBER_OF_IONNAMES];
+    double upper[NUMBER_OF_IONNAMES];
+    donor_grid.get_ionic_reconstruction_data(
+        donor_index, direction,
+        mflux > 0. ? nullptr : &left_ionization,
+        mflux > 0. ? &right_ionization : nullptr, slopes, lower, upper);
+
+    const double cell_size[3] = {donor_grid._cell_size[0],
+                                 donor_grid._cell_size[1],
+                                 donor_grid._cell_size[2]};
+    double donor_face[NUMBER_OF_IONNAMES];
+    IonizationAdvection::reconstruct_face_3d(
+        donor, slopes, lower, upper, donor_hydro.get_primitives_velocity(),
+        cell_size, direction, mflux > 0., dt, donor_face);
+
+    IonizationAdvection::limit_outflow_face(
+        donor, donor_mass, donor_mass_delta_before, std::abs(mflux), dt,
+        donor_face);
+    IonizationAdvection::add_donor_interface_flux(
+        left_ionization, right_ionization, mflux, donor_face);
+  }
+
+  /**
+   * @brief Hydro flux plus multidimensional ionic reconstruction at a physical
+   * domain boundary.
+   */
+  inline static void do_reconstructed_ghost_flux(
+      const Hydro &hydro, const uint_fast8_t direction,
+      const CoordinateVector<> ghost_position, HydroDensitySubGrid &grid,
+      const int_fast32_t index, const HydroBoundary &boundary, const double dx,
+      const double area, const double dt, const bool advect_ionization) {
+
+    HydroVariables &cell_hydro = grid._hydro_variables[index];
+    IonizationVariables &cell_ionization = grid._ionization_variables[index];
+    if (!advect_ionization) {
+      hydro.do_ghost_flux_calculation(direction, ghost_position, cell_hydro,
+                                      cell_ionization, boundary, dx, area, dt,
+                                      false);
+      return;
+    }
+
+    const double old_mass = cell_hydro.get_conserved_mass();
     const double old_mass_delta = cell_hydro.delta_conserved(0);
-    hydro.do_ghost_flux_calculation(
-        direction, ghost_position, cell_hydro, cell_ionization, boundary, dx,
-        area, dt, false);
+    hydro.do_ghost_flux_calculation(direction, ghost_position, cell_hydro,
+                                    cell_ionization, boundary, dx, area, dt,
+                                    false);
     const double mflux = old_mass_delta - cell_hydro.delta_conserved(0);
+    if (mflux == 0.) {
+      return;
+    }
+
+    double slopes[3][NUMBER_OF_IONNAMES];
+    double lower[NUMBER_OF_IONNAMES];
+    double upper[NUMBER_OF_IONNAMES];
+    grid.get_ionic_reconstruction_data(index, direction, nullptr, nullptr,
+                                       slopes, lower, upper);
+    const double cell_size[3] = {grid._cell_size[0], grid._cell_size[1],
+                                 grid._cell_size[2]};
+    double face[NUMBER_OF_IONNAMES];
+    IonizationAdvection::reconstruct_face_3d(
+        cell_ionization, slopes, lower, upper,
+        cell_hydro.get_primitives_velocity(), cell_size, direction, dx > 0., dt,
+        face);
+
+    // Positive mflux is out of the real cell and therefore needs the donor
+    // positivity constraint. Negative mflux enters from the outflow ghost and
+    // retains the extrapolated interior composition used historically.
+    if (mflux > 0.) {
+      IonizationAdvection::limit_outflow_face(
+          cell_ionization, old_mass, old_mass_delta, mflux, dt, face);
+    }
     IonizationAdvection::add_boundary_flux(cell_ionization, mflux, face);
   }
 
@@ -149,7 +284,6 @@ public:
                     _cell_size[0] * _cell_size[2],
                     _cell_size[0] * _cell_size[1]} {
 
-    // allocate memory for data arrays
     const int_fast32_t tot_ncell = _number_of_cells[3] * ncell[0];
     _hydro_variables = new HydroVariables[tot_ncell];
     _primitive_variable_limiters = new double[tot_ncell * 10];
@@ -160,11 +294,7 @@ public:
     }
   }
 
-  /**
-   * @brief Copy constructor.
-   *
-   * @param original DensitySubGrid to copy.
-   */
+  /** @brief Copy constructor. */
   inline HydroDensitySubGrid(const HydroDensitySubGrid &original)
       : DensitySubGrid(original), _cell_volume(original._cell_volume),
         _inverse_cell_volume(original._inverse_cell_volume),
@@ -175,37 +305,23 @@ public:
     _hydro_variables = new HydroVariables[tot_ncell];
     _primitive_variable_limiters = new double[tot_ncell * 10];
 
-    // copy data arrays
     for (int_fast32_t i = 0; i < tot_ncell; ++i) {
       _hydro_variables[i].copy_all(original._hydro_variables[i]);
     }
-
     for (int_fast32_t i = 0; i < 10 * tot_ncell; ++i) {
       _primitive_variable_limiters[i] =
           original._primitive_variable_limiters[i];
     }
   }
 
-  /**
-   * @brief Destructor.
-   */
+  /** @brief Destructor. */
   virtual ~HydroDensitySubGrid() {
-    // deallocate data arrays
     delete[] _hydro_variables;
     delete[] _primitive_variable_limiters;
   }
 
-  /**
-   * @brief Initialize the conserved variables for the grid.
-   *
-   * @param hydro Hydro instance to use.
-   * @param do_primitives Initialize the primitive variables based on the
-   * ionization variables?
-   * @return Minimum initial time step for the cells in the grid.
-   */
   inline double initialize_hydrodynamic_variables(const Hydro &hydro,
                                                   const bool do_primitives) {
-
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     double timestep = DBL_MAX;
@@ -222,14 +338,8 @@ public:
     return timestep;
   }
 
-  /**
-   * @brief Update the conserved variables for all cells in the grid.
-   *
-   * @param timestep Integration time step size (in s).
-   */
   inline void update_conserved_variables(const double timestep,
                                          const bool advect_ionization = false) {
-
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     for (int_fast32_t i = 0; i < tot_num_cells; ++i) {
@@ -244,8 +354,6 @@ public:
       _hydro_variables[i].conserved(3) += mdt * a.z();
       _hydro_variables[i].conserved(4) +=
           timestep * CoordinateVector<>::dot_product(p, a);
-      // Time-centre the work done by a constant acceleration. Without this
-      // term the momentum kick is taken out of the cell's internal energy.
       _hydro_variables[i].conserved(4) +=
           0.5 * mdt * timestep * a.norm2();
       _hydro_variables[i].conserved(4) +=
@@ -254,8 +362,6 @@ public:
       for (int_fast8_t j = 0; j < 5; ++j) {
         _hydro_variables[i].conserved(j) +=
             _hydro_variables[i].delta_conserved(j) * timestep;
-
-        // reset hydro variables
         _hydro_variables[i].delta_conserved(j) = 0;
         _hydro_variables[i].primitive_gradients(j) = CoordinateVector<>(0.);
         _primitive_variable_limiters[10 * i + 2 * j] = DBL_MAX;
@@ -273,6 +379,8 @@ public:
             double new_fraction =
                 (old_mass * old_fraction + delta_fraction * timestep) /
                 new_mass;
+            // The face limiter should make these clamps roundoff-only. Keep
+            // them as a last-resort guard for specialised boundary paths.
             if (new_fraction < 0.) {
               new_fraction = 0.;
             } else if (new_fraction > 1.) {
@@ -280,10 +388,6 @@ public:
             }
             _ionization_variables[i].set_ionic_fraction(j, new_fraction);
           }
-          // Independent stage reconstruction can only violate an element's
-          // implicit final-stage constraint at roundoff/limiter level. Keep
-          // every post-advection state physical before it is used by the
-          // thermochemistry.
           IonizationAdvection::enforce_ionic_simplex(
               _ionization_variables[i]);
         }
@@ -322,13 +426,7 @@ public:
     }
   }
 
-  /**
-   * @brief Update the primitive variables for the grid.
-   *
-   * @param hydro Hydro instance to use.
-   */
   inline void update_primitive_variables(const Hydro &hydro) {
-
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     for (int_fast32_t i = 0; i < tot_num_cells; ++i) {
@@ -337,27 +435,13 @@ public:
     }
   }
 
-  /**
-   * @brief Update the ionization variables for all cells in the subgrid using
-   * their hydrodynamical variables.
-   *
-   * @param hydro Hydro instance to use.
-   * @param maximum_neutral_fraction Maximum neutral fraction for hydrogen.
-   */
   inline void
   update_ionization_variables(const Hydro &hydro,
                               const double maximum_neutral_fraction) {
-
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     for (int_fast32_t i = 0; i < tot_num_cells; ++i) {
       hydro.hydro_to_ionization(_hydro_variables[i], _ionization_variables[i]);
-
-      // Stateful ionization modes copy the physical ionic fractions into the
-      // previous-state array immediately before this call. In that case the
-      // previous state, not an artificial opacity cap, must seed the radiation
-      // step. Equilibrium mode explicitly marks the previous H fraction < 0
-      // and retains the historical maximum-neutral-fraction behaviour.
       const double previous_h0 =
           _ionization_variables[i].get_prev_ionic_fraction(ION_H_n);
       const bool has_physical_previous_state =
@@ -371,14 +455,7 @@ public:
     }
   }
 
-  /**
-   * @brief Add the energy because of photoionization to the hydro variables.
-   *
-   * @param hydro Hydro instance to use.
-   * @param timestep Integration time step (in s).
-   */
   inline void add_ionization_energy(const Hydro &hydro, const double timestep) {
-
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
     for (int_fast32_t i = 0; i < tot_num_cells; ++i) {
@@ -388,12 +465,6 @@ public:
     }
   }
 
-  /**
-   * @brief Half time step prediction for the primitive variables.
-   *
-   * @param hydro Hydro instance to use.
-   * @param timestep Half system time step (in s).
-   */
   inline void predict_primitive_variables(const Hydro &hydro,
                                           const double timestep) {
     const int_fast32_t tot_num_cells =
@@ -403,11 +474,6 @@ public:
     }
   }
 
-  /**
-   * @brief Apply the slope limiter to all primitive variable gradients.
-   *
-   * @param hydro Hydro instance to use.
-   */
   inline void apply_slope_limiter(const Hydro &hydro) {
     const int_fast32_t tot_num_cells =
         _number_of_cells[0] * _number_of_cells[3];
@@ -418,17 +484,8 @@ public:
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical fluxes for all interfaces inside the
-   * subgrid.
-   *
-   * @param hydro Hydro instance to use.
-   * @param dt Current system time step (in s).
-   */
   inline void inner_flux_sweep(const Hydro &hydro, const double dt,
                                const bool advect_ionization = false) {
-
-    // we do three separate sweeps: one for every coordinate direction
     for (int_fast32_t ix = 0; ix < _number_of_cells[0] - 1; ++ix) {
       for (int_fast32_t iy = 0; iy < _number_of_cells[1]; ++iy) {
         for (int_fast32_t iz = 0; iz < _number_of_cells[2]; ++iz) {
@@ -436,18 +493,9 @@ public:
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index100 =
               (ix + 1) * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
-          const IonizationVariables *left_minus =
-              ix > 0 ? &_ionization_variables[index000 - _number_of_cells[3]]
-                     : nullptr;
-          const IonizationVariables *right_plus =
-              ix + 2 < _number_of_cells[0]
-                  ? &_ionization_variables[index100 + _number_of_cells[3]]
-                  : nullptr;
-          do_reconstructed_flux(
-              hydro, 0, _hydro_variables[index000],
-              _ionization_variables[index000], _hydro_variables[index100],
-              _ionization_variables[index100], left_minus, right_plus,
-              _cell_size[0], _cell_areas[0], dt, advect_ionization);
+          do_reconstructed_flux(hydro, 0, *this, index000, *this, index100,
+                                _cell_size[0], _cell_areas[0], dt,
+                                advect_ionization);
         }
       }
     }
@@ -458,18 +506,9 @@ public:
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index010 =
               ix * _number_of_cells[3] + (iy + 1) * _number_of_cells[2] + iz;
-          const IonizationVariables *left_minus =
-              iy > 0 ? &_ionization_variables[index000 - _number_of_cells[2]]
-                     : nullptr;
-          const IonizationVariables *right_plus =
-              iy + 2 < _number_of_cells[1]
-                  ? &_ionization_variables[index010 + _number_of_cells[2]]
-                  : nullptr;
-          do_reconstructed_flux(
-              hydro, 1, _hydro_variables[index000],
-              _ionization_variables[index000], _hydro_variables[index010],
-              _ionization_variables[index010], left_minus, right_plus,
-              _cell_size[1], _cell_areas[1], dt, advect_ionization);
+          do_reconstructed_flux(hydro, 1, *this, index000, *this, index010,
+                                _cell_size[1], _cell_areas[1], dt,
+                                advect_ionization);
         }
       }
     }
@@ -479,36 +518,18 @@ public:
           const int_fast32_t index000 =
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index001 = index000 + 1;
-          const IonizationVariables *left_minus =
-              iz > 0 ? &_ionization_variables[index000 - 1] : nullptr;
-          const IonizationVariables *right_plus =
-              iz + 2 < _number_of_cells[2]
-                  ? &_ionization_variables[index001 + 1]
-                  : nullptr;
-          do_reconstructed_flux(
-              hydro, 2, _hydro_variables[index000],
-              _ionization_variables[index000], _hydro_variables[index001],
-              _ionization_variables[index001], left_minus, right_plus,
-              _cell_size[2], _cell_areas[2], dt, advect_ionization);
+          do_reconstructed_flux(hydro, 2, *this, index000, *this, index001,
+                                _cell_size[2], _cell_areas[2], dt,
+                                advect_ionization);
         }
       }
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical fluxes for all interfaces at the boundary
-   * between this subgrid and the given neighbouring subgrid.
-   *
-   * @param direction TravelDirection of the neighbour.
-   * @param hydro Hydro instance to use.
-   * @param neighbour Neighbouring DensitySubGrid.
-   * @param dt Current system time step (in s).
-   */
   inline void outer_flux_sweep(const int_fast32_t direction, const Hydro &hydro,
                                HydroDensitySubGrid &neighbour,
                                const double dt,
                                const bool advect_ionization = false) {
-
     int_fast32_t i, start_index_left, start_index_right, row_increment,
         row_length, column_increment, column_length;
     double dx, A;
@@ -597,51 +618,22 @@ public:
       break;
     }
 
-    const int_fast32_t normal_stride =
-        i == 0 ? left_grid->_number_of_cells[3]
-               : (i == 1 ? left_grid->_number_of_cells[2] : 1);
-
-    // using the index computation below is (much) faster than setting the
-    // increment correctly and summing the indices manually
     for (int_fast32_t ic = 0; ic < column_length; ++ic) {
       for (int_fast32_t ir = 0; ir < row_length; ++ir) {
         const int_fast32_t index_left =
             start_index_left + ic * column_increment + ir * row_increment;
         const int_fast32_t index_right =
             start_index_right + ic * column_increment + ir * row_increment;
-        const IonizationVariables *left_minus =
-            left_grid->_number_of_cells[i] > 1
-                ? &left_grid->_ionization_variables[index_left - normal_stride]
-                : nullptr;
-        const IonizationVariables *right_plus =
-            right_grid->_number_of_cells[i] > 1
-                ? &right_grid->_ionization_variables[index_right + normal_stride]
-                : nullptr;
-        do_reconstructed_flux(
-            hydro, i, left_grid->_hydro_variables[index_left],
-            left_grid->_ionization_variables[index_left],
-            right_grid->_hydro_variables[index_right],
-            right_grid->_ionization_variables[index_right], left_minus,
-            right_plus, dx, A, dt, advect_ionization);
+        do_reconstructed_flux(hydro, i, *left_grid, index_left, *right_grid,
+                              index_right, dx, A, dt, advect_ionization);
       }
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical fluxes for all interfaces at the boundary
-   * between this subgrid and the given box boundary.
-   *
-   * @param direction TravelDirection of the neighbour.
-   * @param hydro Hydro instance to use.
-   * @param boundary HydroBoundary that sets the right state primitive
-   * variables.
-   * @param dt Current system time step (in s).
-   */
   inline void outer_ghost_flux_sweep(
       const int_fast32_t direction, const Hydro &hydro,
       const HydroBoundary &boundary, const double dt,
       const bool advect_ionization = false) {
-
     int_fast32_t i, start_index_left, row_increment, row_length,
         column_increment, column_length;
     double dx, A;
@@ -718,44 +710,18 @@ public:
       break;
     }
 
-    const int_fast32_t normal_stride =
-        i == 0 ? _number_of_cells[3] : (i == 1 ? _number_of_cells[2] : 1);
-    const bool high_side = dx > 0.;
-
-    // using the index computation below is (much) faster than setting the
-    // increment correctly and summing the indices manually
     for (int_fast32_t ic = 0; ic < column_length; ++ic) {
       for (int_fast32_t ir = 0; ir < row_length; ++ir) {
         const int_fast32_t index_left =
             start_index_left + ic * column_increment + ir * row_increment;
-        const IonizationVariables *inside_one = nullptr;
-        const IonizationVariables *inside_two = nullptr;
-        if (_number_of_cells[i] > 1) {
-          const int_fast32_t sign = high_side ? -1 : 1;
-          inside_one = &_ionization_variables[index_left + sign * normal_stride];
-          if (_number_of_cells[i] > 2) {
-            inside_two =
-                &_ionization_variables[index_left + 2 * sign * normal_stride];
-          }
-        }
         do_reconstructed_ghost_flux(
-            hydro, i, get_cell_midpoint(index_left) + offset,
-            _hydro_variables[index_left], _ionization_variables[index_left],
-            inside_one, inside_two, boundary, dx, _cell_size[i], A, dt,
-            advect_ionization);
+            hydro, i, get_cell_midpoint(index_left) + offset, *this, index_left,
+            boundary, dx, A, dt, advect_ionization);
       }
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical gradients for all interfaces inside the
-   * subgrid.
-   *
-   * @param hydro Hydro instance to use.
-   */
   inline void inner_gradient_sweep(const Hydro &hydro) {
-
-    // we do three separate sweeps: one for every coordinate direction
     for (int_fast32_t ix = 0; ix < _number_of_cells[0] - 1; ++ix) {
       for (int_fast32_t iy = 0; iy < _number_of_cells[1]; ++iy) {
         for (int_fast32_t iz = 0; iz < _number_of_cells[2]; ++iz) {
@@ -763,7 +729,6 @@ public:
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index100 =
               (ix + 1) * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
-          // x direction
           hydro.do_gradient_calculation(
               0, _hydro_variables[index000], _hydro_variables[index100],
               _inv_cell_size[0], &_primitive_variable_limiters[10 * index000],
@@ -778,7 +743,6 @@ public:
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index010 =
               ix * _number_of_cells[3] + (iy + 1) * _number_of_cells[2] + iz;
-          // y direction
           hydro.do_gradient_calculation(
               1, _hydro_variables[index000], _hydro_variables[index010],
               _inv_cell_size[1], &_primitive_variable_limiters[10 * index000],
@@ -793,7 +757,6 @@ public:
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz;
           const int_fast32_t index001 =
               ix * _number_of_cells[3] + iy * _number_of_cells[2] + iz + 1;
-          // z direction
           hydro.do_gradient_calculation(
               2, _hydro_variables[index000], _hydro_variables[index001],
               _inv_cell_size[2], &_primitive_variable_limiters[10 * index000],
@@ -803,18 +766,9 @@ public:
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical gradients for all interfaces at the
-   * boundary between this subgrid and the given neighbouring subgrid.
-   *
-   * @param direction TravelDirection of the neighbour.
-   * @param hydro Hydro instance to use.
-   * @param neighbour Neighbouring DensitySubGrid.
-   */
   inline void outer_gradient_sweep(const int_fast32_t direction,
                                    const Hydro &hydro,
                                    HydroDensitySubGrid &neighbour) {
-
     int_fast32_t i, start_index_left, start_index_right, row_increment,
         row_length, column_increment, column_length;
     double dxinv;
@@ -897,8 +851,6 @@ public:
       break;
     }
 
-    // using the index computation below is (much) faster than setting the
-    // increment correctly and summing the indices manually
     for (int_fast32_t ic = 0; ic < column_length; ++ic) {
       for (int_fast32_t ir = 0; ir < row_length; ++ir) {
         const int_fast32_t index_left =
@@ -914,19 +866,6 @@ public:
     }
   }
 
-  /**
-   * @brief Add the x-gradient contribution from an explicitly remapped ghost
-   * cell.
-   *
-   * This small hook is used by the Galactic shearing-periodic boundary.  The
-   * remapped cell does not belong to a single neighbouring subgrid, so the
-   * ordinary pairwise boundary sweep cannot be used.
-   *
-   * @param index Index of the real boundary cell.
-   * @param hydro Hydro instance to use.
-   * @param ghost Remapped ghost-cell state in the real cell's velocity frame.
-   * @param ghost_on_right True at x high, false at x low.
-   */
   inline void add_x_remapped_ghost_gradient(const uint_fast32_t index,
                                             const Hydro &hydro,
                                             HydroVariables ghost,
@@ -947,20 +886,9 @@ public:
     }
   }
 
-  /**
-   * @brief Compute the hydrodynamical gradients for all interfaces at the
-   * boundary between this subgrid and the given box boundary with boundary
-   * condition.
-   *
-   * @param direction TravelDirection of the neighbour.
-   * @param hydro Hydro instance to use.
-   * @param boundary HydroBoundary that sets the right state primitive
-   * variables.
-   */
   inline void outer_ghost_gradient_sweep(const int_fast32_t direction,
                                          const Hydro &hydro,
                                          const HydroBoundary &boundary) {
-
     int_fast32_t i, start_index_left, row_increment, row_length,
         column_increment, column_length;
     double dxinv;
@@ -1038,8 +966,6 @@ public:
       break;
     }
 
-    // using the index computation below is (much) faster than setting the
-    // increment correctly and summing the indices manually
     for (int_fast32_t ic = 0; ic < column_length; ++ic) {
       for (int_fast32_t ir = 0; ir < row_length; ++ir) {
         const int_fast32_t index_left =
@@ -1052,217 +978,87 @@ public:
     }
   }
 
-  /**
-   * @brief Set the hydro task with the given index.
-   *
-   * @param i Index.
-   * @param task Task.
-   */
   inline void set_hydro_task(const int_fast32_t i, const size_t task) {
     _hydro_tasks[i] = task;
   }
 
-  /**
-   * @brief Get the hydro task with the given index.
-   *
-   * @param i Index.
-   * @return Task.
-   */
   inline size_t get_hydro_task(const int_fast32_t i) const {
     return _hydro_tasks[i];
   }
 
-  /**
-   * @brief Initialize the hydrodynamic variables for a cell in this subgrid.
-   *
-   * @param index Index of a cell in the subgrid.
-   * @param values DensityValues to use.
-   */
   virtual void initialize_hydro(const uint_fast32_t index,
                                 const DensityValues &values) {
     _hydro_variables[index].set_primitives_velocity(values.get_velocity());
   }
 
-  /**
-   * @brief Iterator to loop over the cells in the subgrid.
-   */
   class hydroiterator : public Cell {
   private:
-    /*! @brief Index of the cell the iterator is currently pointing to. */
     uint_fast32_t _index;
-
-    /*! @brief Pointer to the underlying subgrid (we cannot use a reference,
-     *  since then things like it = it would not work). */
     HydroDensitySubGrid *_subgrid;
 
   public:
-    /**
-     * @brief Constructor.
-     *
-     * @param index Index of the cell the iterator is currently pointing to.
-     * @param subgrid HydroDensitySubGrid over which we iterate.
-     */
     inline hydroiterator(const uint_fast32_t index,
                          HydroDensitySubGrid &subgrid)
         : _index(index), _subgrid(&subgrid) {}
 
-    // Cell interface
-
-    /**
-     * @brief Get the midpoint of the cell the iterator is pointing to.
-     *
-     * @return Cell midpoint (in m).
-     */
     virtual CoordinateVector<> get_cell_midpoint() const {
       return _subgrid->get_cell_midpoint(_index);
     }
 
-    /**
-     * @brief Get the volume of the cell the iterator is pointing to.
-     *
-     * @return Cell volume (in m^3).
-     */
     virtual double get_volume() const { return _subgrid->_cell_volume; }
 
-    /**
-     * @brief Get the faces of the cell.
-     *
-     * @return Faces of the cell.
-     */
     virtual std::vector< Face > get_faces() const {
       return std::vector< Face >();
     }
 
-    // HydroDensitySubGrid access functionality
-
-    /**
-     * @brief Get read only access to the hydro variables stored in this
-     * cell.
-     *
-     * @return Read only access to the hydro variables.
-     */
     inline const HydroVariables &get_hydro_variables() const {
       return _subgrid->_hydro_variables[_index];
     }
 
-    /**
-     * @brief Get read/write access to the hydro variables stored in this
-     * cell.
-     *
-     * @return Read/write access to the hydro variables.
-     */
     inline HydroVariables &get_hydro_variables() {
       return _subgrid->_hydro_variables[_index];
     }
 
-    /**
-     * @brief Get read only access to the ionization variables stored in this
-     * cell.
-     *
-     * @return Read only access to the ionization variables.
-     */
     inline const IonizationVariables &get_ionization_variables() const {
       return _subgrid->_ionization_variables[_index];
     }
 
-    /**
-     * @brief Get read/write access to the ionization variables stored in this
-     * cell.
-     *
-     * @return Read/write access to the ionization variables.
-     */
     inline IonizationVariables &get_ionization_variables() {
       return _subgrid->_ionization_variables[_index];
     }
 
-    // Iterator functionality
-
-    /**
-     * @brief Increment operator.
-     *
-     * We only implemented the pre-increment version, since the post-increment
-     * version creates a new object and is computationally more expensive.
-     *
-     * @return Reference to the incremented iterator.
-     */
     inline hydroiterator &operator++() {
       ++_index;
       return *this;
     }
 
-    /**
-     * @brief Increment operator.
-     *
-     * @param increment Increment to add.
-     * @return Reference to the incremented iterator.
-     */
     inline hydroiterator &operator+=(const uint_fast32_t increment) {
       _index += increment;
       return *this;
     }
 
-    /**
-     * @brief Free addition operator.
-     *
-     * @param increment Increment to add to the iterator.
-     * @return Incremented iterator.
-     */
     inline hydroiterator operator+(const uint_fast32_t increment) const {
       hydroiterator it(*this);
       it += increment;
       return it;
     }
 
-    /**
-     * @brief Get the index of the cell the iterator is currently pointing to.
-     *
-     * @return Index of the current cell.
-     */
     inline uint_fast32_t get_index() const { return _index; }
 
-    /**
-     * @brief Compare iterators.
-     *
-     * @param it Iterator to compare with.
-     * @return True if the iterators point to the same cell of the same grid.
-     */
     inline bool operator==(hydroiterator it) const {
       return (_subgrid == it._subgrid && _index == it._index);
     }
 
-    /**
-     * @brief Compare iterators.
-     *
-     * @param it Iterator to compare with.
-     * @return True if the iterators do not point to the same cell of the same
-     * grid.
-     */
     inline bool operator!=(hydroiterator it) const { return !(*this == it); }
   };
 
-  /**
-   * @brief Get an iterator to the first cell in the subgrid.
-   *
-   * @return Iterator to the first cell in the subgrid.
-   */
   inline hydroiterator hydro_begin() { return hydroiterator(0, *this); }
 
-  /**
-   * @brief Get an iterator to the beyond last cell in the subgrid.
-   *
-   * @return Iterator to the beyond last cell in the subgrid.
-   */
   inline hydroiterator hydro_end() {
     return hydroiterator(
         _number_of_cells[0] * _number_of_cells[1] * _number_of_cells[2], *this);
   }
 
-  /**
-   * @brief Get an iterator to the cell that contains the given position.
-   *
-   * @param position Position (in m).
-   * @return Iterator to the corresponding cell.
-   */
   inline hydroiterator get_hydro_cell(const CoordinateVector<> position) {
     CoordinateVector< int_fast32_t > three_index;
     return hydroiterator(get_start_index(position - _anchor,
@@ -1270,15 +1066,8 @@ public:
                          *this);
   }
 
-  /**
-   * @brief Dump the subgrid to the given restart file.
-   *
-   * @param restart_writer RestartWriter to write to.
-   */
   virtual void write_restart_file(RestartWriter &restart_writer) const {
-
     DensitySubGrid::write_restart_file(restart_writer);
-
     restart_writer.write(_cell_volume);
     restart_writer.write(_cell_areas[0]);
     restart_writer.write(_cell_areas[1]);
@@ -1291,14 +1080,8 @@ public:
     }
   }
 
-  /**
-   * @brief Restart constructor.
-   *
-   * @param restart_reader Restart file to read from.
-   */
   inline HydroDensitySubGrid(RestartReader &restart_reader)
       : DensitySubGrid(restart_reader) {
-
     _cell_volume = restart_reader.read< double >();
     _inverse_cell_volume = 1. / _cell_volume;
     _cell_areas[0] = restart_reader.read< double >();
