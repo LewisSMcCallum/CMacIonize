@@ -19,12 +19,13 @@
 /**
  * @file IonizationAdvection.hpp
  *
- * @brief Bounded second-order reconstruction helpers for advected ionic
- * fractions.
+ * @brief Bounded multidimensional second-order reconstruction and conservative
+ * positivity-preserving flux helpers for advected ionic fractions.
  */
 #ifndef IONIZATIONADVECTION_HPP
 #define IONIZATIONADVECTION_HPP
 
+#include "CoordinateVector.hpp"
 #include "IonizationVariables.hpp"
 
 #include <algorithm>
@@ -47,21 +48,44 @@ inline double mc_slope(const double xm, const double x0, const double xp) {
   return minmod(0.5 * (xp - xm), minmod(2. * dl, 2. * dr));
 }
 
-/**
- * @brief Limited one-sided slope, used only where a four-cell stencil is not
- * available inside a subgrid.
- */
+/** @brief Limited one-sided slope on three consecutive cell centres. */
 inline double one_sided_slope(const double x0, const double x1,
                               const double x2) {
   return minmod(x1 - x0, x2 - x1);
 }
 
-/** @brief Clamp a reconstructed fraction to the local interface bounds. */
-inline double bound_face_fraction(const double value, const double left,
-                                  const double right) {
-  const double lower = std::max(0., std::min(left, right));
-  const double upper = std::min(1., std::max(left, right));
-  return std::max(lower, std::min(upper, value));
+/**
+ * @brief Limited slope for one cell and one coordinate direction.
+ *
+ * Prefer the symmetric MC stencil. At a local subgrid/domain edge, retain a
+ * bounded one-sided second-order slope when two cells are available on the
+ * interior side. Falling back to zero is deliberately first order but safe.
+ */
+inline double limited_cell_slope(
+    const IonizationVariables &cell, const IonizationVariables *minus,
+    const IonizationVariables *plus, const IonizationVariables *minus_two,
+    const IonizationVariables *plus_two, const int_fast32_t ion) {
+  const double x0 = cell.get_ionic_fraction(ion);
+  if (minus != nullptr && plus != nullptr) {
+    return mc_slope(minus->get_ionic_fraction(ion), x0,
+                    plus->get_ionic_fraction(ion));
+  }
+  if (minus == nullptr && plus != nullptr && plus_two != nullptr) {
+    return one_sided_slope(x0, plus->get_ionic_fraction(ion),
+                           plus_two->get_ionic_fraction(ion));
+  }
+  if (plus == nullptr && minus != nullptr && minus_two != nullptr) {
+    return one_sided_slope(minus_two->get_ionic_fraction(ion),
+                           minus->get_ionic_fraction(ion), x0);
+  }
+  return 0.;
+}
+
+/** @brief Clamp a fraction to supplied monotonic/physical bounds. */
+inline double bound_face_fraction(const double value, const double lower,
+                                  const double upper) {
+  return std::max(std::max(0., lower),
+                  std::min(std::min(1., upper), value));
 }
 
 /** @brief Renormalize one element's explicitly stored ion stages if needed. */
@@ -129,23 +153,53 @@ inline void enforce_ionic_simplex(IonizationVariables &variables) {
 }
 
 /**
- * @brief Reconstruct the two ionic states at an interface.
+ * @brief Reconstruct one donor-cell ionic state at a face using a genuinely
+ * multidimensional MUSCL-Hancock predictor.
  *
- * This is a directionally time-centred MUSCL-Hancock reconstruction for the
- * passive mass fractions. A monotonized-central slope is used when the full
- * four-cell stencil is available. At a subgrid edge a limited one-sided slope
- * retains second-order accuracy in smooth flow without storing three gradients
- * for every ion in every cell. Reconstructed states are kept inside the local
- * interface extrema and the physical ionic simplex.
+ * Slopes are dimensionless cell-to-cell changes. The cell state is first
+ * predicted to half time with -0.5 dt v.grad(x), including all three
+ * directions, then extrapolated by half a slope to the requested face. The
+ * result is bounded by the local multidimensional stencil and physical simplex.
+ */
+inline void reconstruct_face_3d(
+    const IonizationVariables &cell,
+    const double slopes[3][NUMBER_OF_IONNAMES],
+    const double lower[NUMBER_OF_IONNAMES],
+    const double upper[NUMBER_OF_IONNAMES], const CoordinateVector<> &velocity,
+    const double cell_size[3], const uint_fast8_t direction,
+    const bool high_side, const double dt,
+    double face[NUMBER_OF_IONNAMES]) {
+
+  double courant[3];
+  for (uint_fast8_t d = 0; d < 3; ++d) {
+    courant[d] = cell_size[d] > 0. ? velocity[d] * dt / cell_size[d] : 0.;
+    if (!std::isfinite(courant[d])) {
+      courant[d] = 0.;
+    }
+    // A healthy hydro step is already inside its CFL limit. This is only a
+    // guard against a damaged velocity feeding an unbounded scalar predictor.
+    courant[d] = std::max(-1., std::min(1., courant[d]));
+  }
+
+  for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+    double advective_prediction = 0.;
+    for (uint_fast8_t d = 0; d < 3; ++d) {
+      advective_prediction += courant[d] * slopes[d][ion];
+    }
+    const double half_time =
+        cell.get_ionic_fraction(ion) - 0.5 * advective_prediction;
+    const double reconstructed =
+        half_time + (high_side ? 0.5 : -0.5) * slopes[direction][ion];
+    face[ion] = bound_face_fraction(reconstructed, lower[ion], upper[ion]);
+  }
+  enforce_ionic_simplex(face);
+}
+
+/**
+ * @brief Legacy directional interface reconstruction.
  *
- * @param left_minus Cell immediately before left, or nullptr at a local edge.
- * @param left Left cell.
- * @param right Right cell.
- * @param right_plus Cell immediately after right, or nullptr at a local edge.
- * @param courant_left v_n dt/dx for the left cell.
- * @param courant_right v_n dt/dx for the right cell.
- * @param left_face Output state reconstructed from the left.
- * @param right_face Output state reconstructed from the right.
+ * Retained for the specialised shearing-periodic remap. Ordinary Cartesian
+ * hydro faces use reconstruct_face_3d().
  */
 inline void reconstruct_interface(
     const IonizationVariables *left_minus, const IonizationVariables &left,
@@ -154,8 +208,6 @@ inline void reconstruct_interface(
     double left_face[NUMBER_OF_IONNAMES],
     double right_face[NUMBER_OF_IONNAMES]) {
 
-  // A healthy hydro step already satisfies this through its CFL condition.
-  // The clamp prevents a damaged velocity from amplifying a scalar slope.
   if (!std::isfinite(courant_left)) {
     courant_left = 0.;
   }
@@ -190,8 +242,10 @@ inline void reconstruct_interface(
     const double reconstructed_right =
         xr - 0.5 * (1. + courant_right) * slope_right;
 
-    left_face[ion] = bound_face_fraction(reconstructed_left, xl, xr);
-    right_face[ion] = bound_face_fraction(reconstructed_right, xl, xr);
+    left_face[ion] = bound_face_fraction(
+        reconstructed_left, std::min(xl, xr), std::max(xl, xr));
+    right_face[ion] = bound_face_fraction(
+        reconstructed_right, std::min(xl, xr), std::max(xl, xr));
   }
 
   enforce_ionic_simplex(left_face);
@@ -199,15 +253,7 @@ inline void reconstruct_interface(
 }
 
 /**
- * @brief Reconstruct an ionic state at a physical domain boundary from the
- * three interior cells nearest that boundary.
- *
- * @param boundary Boundary cell.
- * @param inside_one First cell moving inward from the boundary, if available.
- * @param inside_two Second cell moving inward, if available.
- * @param high_side True for the positive-coordinate boundary.
- * @param courant v_n dt/dx in the positive coordinate direction.
- * @param face Output reconstructed boundary state.
+ * @brief Legacy one-sided physical-boundary reconstruction.
  */
 inline void reconstruct_boundary(
     const IonizationVariables &boundary,
@@ -240,8 +286,158 @@ inline void reconstruct_boundary(
     const double reconstructed =
         high_side ? x0 + 0.5 * (1. - courant) * slope
                   : x0 - 0.5 * (1. + courant) * slope;
-    face[ion] = bound_face_fraction(reconstructed, x0, neighbour);
+    face[ion] = bound_face_fraction(reconstructed, std::min(x0, neighbour),
+                                    std::max(x0, neighbour));
   }
+  enforce_ionic_simplex(face);
+}
+
+/**
+ * @brief Bound one element's outgoing face composition by the ion mass that is
+ * actually available in the donor cell.
+ *
+ * The implicit highest stage is included in the limiter. Candidate face
+ * fractions are projected onto the simplex subject to per-stage upper bounds
+ * q_stage/(|F_rho| dt). Therefore no explicit or implicit stage can export more
+ * ion mass than the donor contains after already accumulated conservative
+ * fluxes. Any correction is made to the face composition before the equal and
+ * opposite flux is deposited, so conservation is retained.
+ */
+inline void limit_group_outflow(
+    const IonizationVariables &donor, const double donor_mass,
+    const double donor_mass_delta_before, const double outflow_mass_rate,
+    const double dt, const int_fast32_t first, const int_fast32_t last,
+    double face[NUMBER_OF_IONNAMES]) {
+
+  if (!(outflow_mass_rate > 0.) || !(dt > 0.) || !(donor_mass > 0.)) {
+    return;
+  }
+  const double transferred_mass = outflow_mass_rate * dt;
+  if (!(transferred_mass > 0.) || !std::isfinite(transferred_mass)) {
+    return;
+  }
+
+  const int_fast32_t nexplicit = last - first + 1;
+  double candidate[NUMBER_OF_IONNAMES + 1];
+  double upper_bound[NUMBER_OF_IONNAMES + 1];
+  double limited[NUMBER_OF_IONNAMES + 1];
+
+  double cell_explicit_sum = 0.;
+  double face_explicit_sum = 0.;
+  double delta_explicit_sum = 0.;
+  for (int_fast32_t k = 0; k < nexplicit; ++k) {
+    const int_fast32_t ion = first + k;
+    const double cell_fraction =
+        std::max(0., std::min(1., donor.get_ionic_fraction(ion)));
+    candidate[k] = std::max(0., std::min(1., face[ion]));
+    cell_explicit_sum += cell_fraction;
+    face_explicit_sum += candidate[k];
+    const double delta = donor.get_delta_ionic_fraction(ion);
+    delta_explicit_sum += delta;
+    const double available =
+        std::max(0., donor_mass * cell_fraction + dt * delta);
+    upper_bound[k] = std::min(1., available / transferred_mass);
+  }
+
+  const double implicit_cell =
+      std::max(0., 1. - std::min(1., cell_explicit_sum));
+  const double implicit_face =
+      std::max(0., 1. - std::min(1., face_explicit_sum));
+  const double implicit_delta =
+      donor_mass_delta_before - delta_explicit_sum;
+  const double implicit_available =
+      std::max(0., donor_mass * implicit_cell + dt * implicit_delta);
+  candidate[nexplicit] = implicit_face;
+  upper_bound[nexplicit] =
+      std::min(1., implicit_available / transferred_mass);
+
+  double limited_sum = 0.;
+  for (int_fast32_t k = 0; k <= nexplicit; ++k) {
+    limited[k] = std::min(candidate[k], upper_bound[k]);
+    limited_sum += limited[k];
+  }
+
+  // Clipping a stage to its available budget creates a deficit in the face
+  // simplex. Redistribute that deficit only to stages with remaining physical
+  // capacity. This is a bounded projection and changes nothing when the
+  // high-order flux was already positivity preserving.
+  double deficit = std::max(0., 1. - limited_sum);
+  if (deficit > 0.) {
+    double spare_sum = 0.;
+    for (int_fast32_t k = 0; k <= nexplicit; ++k) {
+      spare_sum += std::max(0., upper_bound[k] - limited[k]);
+    }
+    if (spare_sum > 0.) {
+      const double amount = std::min(deficit, spare_sum);
+      for (int_fast32_t k = 0; k <= nexplicit; ++k) {
+        const double spare = std::max(0., upper_bound[k] - limited[k]);
+        limited[k] += amount * spare / spare_sum;
+      }
+      deficit -= amount;
+    }
+  }
+
+  // A remaining deficit would mean that this one hydro face exports more total
+  // mass than the donor provisionally owns. There is then no composition-only
+  // limiter that can make every stage positive. The hydro CFL normally makes
+  // this impossible; retain a physical simplex as a fail-safe and let the
+  // existing cell-level guard catch any pathological hydro state.
+  if (deficit > 1.e-12) {
+    double sum_available = 0.;
+    for (int_fast32_t k = 0; k <= nexplicit; ++k) {
+      sum_available += upper_bound[k];
+    }
+    if (sum_available > 0.) {
+      for (int_fast32_t k = 0; k <= nexplicit; ++k) {
+        limited[k] = upper_bound[k] / sum_available;
+      }
+    }
+  }
+
+  for (int_fast32_t k = 0; k < nexplicit; ++k) {
+    face[first + k] = std::max(0., std::min(1., limited[k]));
+  }
+}
+
+/** @brief Apply the conservative positivity limiter to every element. */
+inline void limit_outflow_face(
+    const IonizationVariables &donor, const double donor_mass,
+    const double donor_mass_delta_before, const double outflow_mass_rate,
+    const double dt, double face[NUMBER_OF_IONNAMES]) {
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_H_n, ION_H_n, face);
+#ifdef HAS_HELIUM
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_He_n, ION_He_p1, face);
+#endif
+#ifdef HAS_CARBON
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_C_p1, ION_C_p2, face);
+#endif
+#ifdef HAS_NITROGEN
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_N_n, ION_N_p2, face);
+#endif
+#ifdef HAS_OXYGEN
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_O_n, ION_O_p3, face);
+#endif
+#ifdef HAS_NEON
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_Ne_n, ION_Ne_p3, face);
+#endif
+#ifdef HAS_SULPHUR
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_S_p1, ION_S_p3, face);
+#endif
+#ifdef HAS_ARGON
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_Ar_n, ION_Ar_p3, face);
+#endif
+#ifdef HAS_MAGNESIUM
+  limit_group_outflow(donor, donor_mass, donor_mass_delta_before,
+                      outflow_mass_rate, dt, ION_Mg_p1, ION_Mg_p1, face);
+#endif
   enforce_ionic_simplex(face);
 }
 
@@ -256,6 +452,20 @@ inline void add_interface_flux(
   const double *upwind = mflux > 0. ? left_face : right_face;
   for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
     const double ion_flux = mflux * upwind[ion];
+    left.increase_delta_ionic_fraction(ion, -ion_flux);
+    right.increase_delta_ionic_fraction(ion, ion_flux);
+  }
+}
+
+/** @brief Add one already-limited donor face flux to a pair of cells. */
+inline void add_donor_interface_flux(
+    IonizationVariables &left, IonizationVariables &right, const double mflux,
+    const double donor_face[NUMBER_OF_IONNAMES]) {
+  if (mflux == 0.) {
+    return;
+  }
+  for (int_fast32_t ion = 0; ion < NUMBER_OF_IONNAMES; ++ion) {
+    const double ion_flux = mflux * donor_face[ion];
     left.increase_delta_ionic_fraction(ion, -ion_flux);
     right.increase_delta_ionic_fraction(ion, ion_flux);
   }
