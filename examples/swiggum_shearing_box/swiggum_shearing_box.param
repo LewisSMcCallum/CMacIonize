@@ -92,10 +92,23 @@ TaskBasedRadiationHydrodynamicsSimulation:
   cooling temperature floor: 100. K
   neutral gas heating: true
   neutral gas heating rate: 2.e-26 erg s^-1
-  initial turbulence: false
+  initial turbulence: true
   external gravity: true
   output folder: .
   random seed: 42
+
+# One-time inherited vertical velocity dispersion. With components: z the
+# sampled modes have k_z=0 and v=(0,0,v_z(x,y)), so they introduce no x-y
+# velocity and are exactly divergence-free at initialization. Physical
+# wavelengths keep the same smoothing scale if the box size is changed.
+InitialTurbulence:
+  components: z
+  target 3D rms velocity: 6.5 km s^-1
+  random seed: 42
+  largest wavelength: 500. pc
+  smallest wavelength: 150. pc
+  peak wavelength: 250. pc
+  number of modes: 32
 
 DensityGridWriter:
   type: Gadget
