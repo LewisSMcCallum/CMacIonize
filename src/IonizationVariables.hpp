@@ -133,6 +133,23 @@ private:
   /*! @brief (Optional) tracker for this cell. */
   Tracker *_tracker;
 
+  /**
+   * @brief Remove ionic-fraction tails that are far below any physically or
+   * numerically relevant abundance.
+   *
+   * Conservative advection and stiff chemistry can leave tiny positive or
+   * negative roundoff remnants (e.g. 1.e-300). Keeping such values in the
+   * persistent cell state is useless physically and can make derived electron
+   * densities pathological for logarithms and level-population solves. Values
+   * with magnitude >= 1.e-30 are left untouched, as are NaNs and genuinely
+   * negative values that should remain visible to existing diagnostics.
+   */
+  inline static double prune_ionic_fraction(const double ionic_fraction) {
+    return (ionic_fraction > -1.e-30 && ionic_fraction < 1.e-30)
+               ? 0.
+               : ionic_fraction;
+  }
+
 public:
   /**
    * @brief (Empty) constructor.
@@ -200,9 +217,10 @@ public:
 
     // ionic variables
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
-      _ionic_fractions[i] = other._ionic_fractions[i];
+      _ionic_fractions[i] = prune_ionic_fraction(other._ionic_fractions[i]);
       _mean_intensity[i] = other._mean_intensity[i];
-      _prev_ionic_fractions[i] = other._prev_ionic_fractions[i];
+      _prev_ionic_fractions[i] =
+          prune_ionic_fraction(other._prev_ionic_fractions[i]);
       _delta_ionic_fractions[i] = other._delta_ionic_fractions[i];
 #ifdef DO_OUTPUT_COOLING
       _cooling[i] = other._cooling[i];
@@ -228,15 +246,16 @@ public:
    */
   inline void copy_ionic_fractions(const IonizationVariables &other) {
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
-      _ionic_fractions[i] = other._ionic_fractions[i];
-      _prev_ionic_fractions[i] = other._prev_ionic_fractions[i];
+      _ionic_fractions[i] = prune_ionic_fraction(other._ionic_fractions[i]);
+      _prev_ionic_fractions[i] =
+          prune_ionic_fraction(other._prev_ionic_fractions[i]);
     }
     _temperature = other._temperature;
   }
 
   inline void copy_previous_fractions() {
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
-      _prev_ionic_fractions[i] = _ionic_fractions[i];
+      _prev_ionic_fractions[i] = prune_ionic_fraction(_ionic_fractions[i]);
     }
   }
 
@@ -328,12 +347,12 @@ public:
    * @return Ionic fraction of that ion.
    */
   inline double get_ionic_fraction(const int_fast32_t ion) const {
-    return _ionic_fractions[ion];
+    return prune_ionic_fraction(_ionic_fractions[ion]);
   }
 
 
     inline double get_prev_ionic_fraction(const int_fast32_t ion) const {
-    return _prev_ionic_fractions[ion];
+    return prune_ionic_fraction(_prev_ionic_fractions[ion]);
   }
 
   /**
@@ -344,13 +363,13 @@ public:
    */
   inline void set_ionic_fraction(const int_fast32_t ion,
                                  const double ionic_fraction) {
-    _ionic_fractions[ion] = ionic_fraction;
+    _ionic_fractions[ion] = prune_ionic_fraction(ionic_fraction);
   }
 
 
     inline void set_prev_ionic_fraction(const int_fast32_t ion,
                                  const double ionic_fraction) {
-    _prev_ionic_fractions[ion] = ionic_fraction;
+    _prev_ionic_fractions[ion] = prune_ionic_fraction(ionic_fraction);
   }
 
   inline double get_delta_ionic_fraction(const int_fast32_t ion) const {
@@ -564,8 +583,10 @@ public:
     _number_density = restart_reader.read< double >();
     _temperature = restart_reader.read< double >();
     for (int_fast32_t i = 0; i < NUMBER_OF_IONNAMES; ++i) {
-      _ionic_fractions[i] = restart_reader.read< double >();
-      _prev_ionic_fractions[i] = restart_reader.read< double >();
+      _ionic_fractions[i] =
+          prune_ionic_fraction(restart_reader.read< double >());
+      _prev_ionic_fractions[i] =
+          prune_ionic_fraction(restart_reader.read< double >());
       _mean_intensity[i] = restart_reader.read< double >();
       _delta_ionic_fractions[i] = 0.;
 #ifdef DO_OUTPUT_COOLING
