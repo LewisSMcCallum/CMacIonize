@@ -1,0 +1,177 @@
+name: One-shot low-density cooling patch
+
+on:
+  push:
+    branches:
+      - codex/swiggum-shearing-box
+    paths:
+      - .github/workflows/one-shot-low-density-cooling-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Temporary: apply low-density cooling patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/swiggum-shearing-box
+          fetch-depth: 0
+
+      - name: Apply guarded low-density cooling patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected exactly one match, found {count}")
+              path.write_text(text.replace(old, new, 1))
+
+          cpp = Path("src/LineCoolingData.cpp")
+          replace_once(
+              cpp,
+              """// The explicit RHD line-cooling branch is used only between these two
+          // temperatures. The density limits span 10^-6 to 10^10 cm^-3; unusual values
+          // are evaluated by the direct solver instead of being extrapolated.
+          """,
+              """// The explicit RHD line-cooling branch is used only between these two
+          // temperatures. The density grid spans 10^-6 to 10^10 cm^-3. Below the grid,
+          // use the low-density linear asymptote; unusual high densities are evaluated
+          // by the direct solver instead of being extrapolated.
+          """,
+              "LineCoolingData.cpp table-domain comment",
+          )
+
+          replace_once(
+              cpp,
+              """  if (!_is_valid || !(temperature >= LINE_COOLING_TABLE_MINIMUM_TEMPERATURE) ||
+              !(temperature <= LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) ||
+              !(electron_density >= LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY) ||
+              !(electron_density <= LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY)) {
+            return _line_cooling_data.get_cooling(temperature, electron_density,
+                                                  abundances);
+          }
+
+          """,
+              """  if (!_is_valid || !(temperature >= LINE_COOLING_TABLE_MINIMUM_TEMPERATURE) ||
+              !(temperature <= LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) ||
+              !(electron_density > 0.) ||
+              !(electron_density <= LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY)) {
+            return _line_cooling_data.get_cooling(temperature, electron_density,
+                                                  abundances);
+          }
+
+            // At densities below the table floor, collisional excitation is in the
+            // low-density limit, so every line-cooling coefficient is linear in n_e.
+            // Evaluate at the tabulated floor and scale down rather than sending tiny
+            // densities into the level-population solver.
+            const double table_electron_density = std::max(
+                electron_density, LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY);
+            const double low_density_scale =
+                electron_density / table_electron_density;
+
+          """,
+              "LineCoolingData.cpp low-density guard",
+          )
+
+          replace_once(
+              cpp,
+              """  const double density_coordinate =
+              (std::log(electron_density) - minimum_log_density) /
+          """,
+              """  const double density_coordinate =
+              (std::log(table_electron_density) - minimum_log_density) /
+          """,
+              "LineCoolingData.cpp density interpolation coordinate",
+          )
+
+          replace_once(
+              cpp,
+              """  return cooling;
+          }
+
+          /**
+           * @brief Calculate the strength of all emission lines for which we have data.
+          """,
+              """  return low_density_scale * cooling;
+          }
+
+          /**
+           * @brief Calculate the strength of all emission lines for which we have data.
+          """,
+              "LineCoolingData.cpp scaled return",
+          )
+
+          hpp = Path("src/LineCoolingData.hpp")
+          replace_once(
+              hpp,
+              """ * The table deliberately covers only the temperature range in which the RHD
+           * explicit heating/cooling routine uses LineCoolingData. Calls outside its
+           * finite tabulated domain fall back to LineCoolingData, retaining the exact
+           * solver as a safe path for unusual gas conditions.
+          """,
+              """ * The table deliberately covers only the temperature range in which the RHD
+           * explicit heating/cooling routine uses LineCoolingData. Temperatures outside
+           * that range and electron densities above the table ceiling fall back to the
+           * exact solver. Densities below the table floor use the physical low-density
+           * linear asymptote instead of invoking a near-singular level-population solve.
+          """,
+              "LineCoolingData.hpp table documentation",
+          )
+
+          test = Path("test/testLineCoolingData.cpp")
+          replace_once(
+              test,
+              """  // The RHD line-cooling lookup table must accurately reproduce the direct
+            // per-ion solver throughout its tabulated domain, and use that solver for
+            // conditions outside the domain.
+          """,
+              """  // The RHD line-cooling lookup table must accurately reproduce the direct
+            // per-ion solver throughout its tabulated domain, use the physical linear
+            // asymptote below its electron-density floor, and retain the direct solver
+            // for temperatures outside the table domain.
+          """,
+              "testLineCoolingData.cpp table-test comment",
+          )
+
+          replace_once(
+              test,
+              """    const double direct = data.get_cooling(2000., 1.e8, abundances);
+              const double tabulated = table.get_cooling(2000., 1.e8, abundances);
+              assert_condition(direct == tabulated);
+          """,
+              """    const double floor_cooling = table.get_cooling(10000., 1., abundances);
+              const double subfloor_cooling =
+                  table.get_cooling(10000., 0.1, abundances);
+              assert_values_equal_rel(0.1 * floor_cooling, subfloor_cooling, 1.e-13);
+
+              // This reproduces the numerical regime that motivated the guard. It may
+              // underflow harmlessly to zero, but must never enter the level solver or
+              // produce a non-finite value.
+              const double tiny_density_cooling =
+                  table.get_cooling(10000., 1.e-297, abundances);
+              assert_condition(std::isfinite(tiny_density_cooling));
+              assert_condition(tiny_density_cooling >= 0.);
+
+              const double direct = data.get_cooling(2000., 1.e8, abundances);
+              const double tabulated = table.get_cooling(2000., 1.e8, abundances);
+              assert_condition(direct == tabulated);
+          """,
+              "testLineCoolingData.cpp low-density regression test",
+          )
+
+      - name: Check patch whitespace
+        run: git diff --check
+
+      - name: Commit and push patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/LineCoolingData.cpp src/LineCoolingData.hpp test/testLineCoolingData.cpp
+          git commit -m "Use low-density asymptote below cooling table floor"
+          git push origin HEAD:codex/swiggum-shearing-box
