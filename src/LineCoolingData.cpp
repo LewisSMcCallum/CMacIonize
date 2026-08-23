@@ -1867,8 +1867,9 @@ double LineCoolingData::get_cooling(
 namespace {
 
 // The explicit RHD line-cooling branch is used only between these two
-// temperatures. The density limits span 10^-6 to 10^10 cm^-3; unusual values
-// are evaluated by the direct solver instead of being extrapolated.
+// temperatures. The density grid spans 10^-6 to 10^10 cm^-3. Below the grid,
+// use the low-density linear asymptote; unusual high densities are evaluated
+// by the direct solver instead of being extrapolated.
 constexpr double LINE_COOLING_TABLE_MINIMUM_TEMPERATURE = 3000.;
 constexpr double LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE = 50000.;
 constexpr double LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY = 1.;
@@ -1938,11 +1939,20 @@ double LineCoolingTable::get_cooling(
 
   if (!_is_valid || !(temperature >= LINE_COOLING_TABLE_MINIMUM_TEMPERATURE) ||
       !(temperature <= LINE_COOLING_TABLE_MAXIMUM_TEMPERATURE) ||
-      !(electron_density >= LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY) ||
+      !(electron_density > 0.) ||
       !(electron_density <= LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY)) {
     return _line_cooling_data.get_cooling(temperature, electron_density,
                                           abundances);
   }
+
+  // Below the table floor all of these collisionally excited lines are in
+  // the low-density limit, so their cooling coefficients are linear in n_e.
+  // Clamp only the interpolation coordinate to the table floor and scale the
+  // result back down. This avoids feeding tiny densities to the level solver.
+  const double table_electron_density = std::max(
+      electron_density, LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY);
+  const double low_density_scale =
+      electron_density / table_electron_density;
 
   const double minimum_log_temperature =
       std::log(LINE_COOLING_TABLE_MINIMUM_TEMPERATURE);
@@ -1959,7 +1969,7 @@ double LineCoolingTable::get_cooling(
   const double minimum_log_density =
       std::log(LINE_COOLING_TABLE_MINIMUM_ELECTRON_DENSITY);
   const double density_coordinate =
-      (std::log(electron_density) - minimum_log_density) /
+      (std::log(table_electron_density) - minimum_log_density) /
       (std::log(LINE_COOLING_TABLE_MAXIMUM_ELECTRON_DENSITY) -
        minimum_log_density) *
       (NUMBER_OF_ELECTRON_DENSITIES - 1);
@@ -1988,7 +1998,7 @@ double LineCoolingTable::get_cooling(
         temperature_fraction * upper_temperature);
     cooling += abundances[element] * coefficient;
   }
-  return cooling;
+  return low_density_scale * cooling;
 }
 
 /**

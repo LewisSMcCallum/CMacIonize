@@ -126,8 +126,9 @@ int main(int argc, char **argv) {
   }
 
   // The RHD line-cooling lookup table must accurately reproduce the direct
-  // per-ion solver throughout its tabulated domain, and use that solver for
-  // conditions outside the domain.
+  // per-ion solver throughout its tabulated domain, use the low-density
+  // asymptote below the density floor, and retain the direct solver outside
+  // the temperature domain.
   {
     LineCoolingTable table(data);
     assert_condition(table.is_valid());
@@ -153,6 +154,18 @@ int main(int argc, char **argv) {
         assert_values_equal_rel(direct, tabulated, 0.01);
       }
     }
+
+    const double floor_cooling = table.get_cooling(10000., 1., abundances);
+    const double subfloor_cooling =
+        table.get_cooling(10000., 0.1, abundances);
+    assert_values_equal_rel(0.1 * floor_cooling, subfloor_cooling, 1.e-13);
+
+    // Reproduce the numerical regime that motivated the guard. The result
+    // can harmlessly underflow to zero, but it must remain finite.
+    const double tiny_density_cooling =
+        table.get_cooling(10000., 1.e-297, abundances);
+    assert_condition(std::isfinite(tiny_density_cooling));
+    assert_condition(tiny_density_cooling >= 0.);
 
     const double direct = data.get_cooling(2000., 1.e8, abundances);
     const double tabulated = table.get_cooling(2000., 1.e8, abundances);
