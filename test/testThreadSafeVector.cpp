@@ -25,6 +25,8 @@
  */
 
 #include "Assert.hpp"
+#include "Task.hpp"
+#include "ThreadLock.hpp"
 #include "ThreadSafeVector.hpp"
 
 #include <omp.h>
@@ -37,6 +39,26 @@
  * @return Exit code: 0 on success.
  */
 int main(int argc, char **argv) {
+
+  // A recycled task must not retain dependencies from its previous use.
+  // This is particularly important when a source update replaces subgrids.
+  {
+    ThreadSafeVector< Task > tasks(1);
+    ThreadLock old_dependency;
+    const size_t old_index = tasks.get_free_element();
+    tasks[old_index].set_type(TASKTYPE_PHOTON_TRAVERSAL);
+    tasks[old_index].set_dependency(&old_dependency);
+    tasks.free_element(old_index);
+
+    old_dependency.lock();
+    const size_t new_index = tasks.get_free_element();
+    assert_condition(new_index == old_index);
+    tasks[new_index].set_type(TASKTYPE_SOURCE_DISCRETE_PHOTON);
+    assert_condition(tasks[new_index].lock_dependency());
+    tasks[new_index].unlock_dependency();
+    old_dependency.unlock();
+    tasks.free_element(new_index);
+  }
 
   // Temporary entries can be returned individually before clear_after(). In
   // that case clear_after() should reset the allocation cursor while leaving

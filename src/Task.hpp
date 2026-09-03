@@ -289,11 +289,24 @@ public:
   inline int_fast32_t get_type() const { return _type; }
 
   /**
-   * @brief Set the type of the task.
+   * @brief Initialize a task for a new use and set its type.
+   *
+   * Task objects are recycled by ThreadSafeVector. Reset all state that may
+   * otherwise refer to an earlier task, in particular dependency pointers to
+   * subgrids that may since have been replaced.
    *
    * @param type Type of the task.
    */
-  inline void set_type(const int_fast32_t type) { _type = type; }
+  inline void set_type(const int_fast32_t type) {
+    _type = type;
+    _number_of_unfinished_parents.set(0);
+    _number_of_children = 0;
+    _dependency[0] = nullptr;
+    _dependency[1] = nullptr;
+    _thread_id = -1;
+    _start_time = 0;
+    _end_time = 0;
+  }
 
   /**
    * @brief Get the buffer associated with this task.
