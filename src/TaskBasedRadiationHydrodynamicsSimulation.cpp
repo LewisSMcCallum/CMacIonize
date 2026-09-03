@@ -2663,8 +2663,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                       recovered = premature_launch.execute();
                       if (recovered) {
                         cmac_warning(
-                            "Recovered a stalled photon iteration %u by "
-                            "launching a partial photon buffer "
+                            "Recovered a stalled photon iteration %" PRIuFAST32
+                            " by launching a partial photon buffer "
                             "(photons=%" PRIuFAST64 "/%" PRIuFAST64
                             ", buffers=%zu).",
                             iloop, photons_done, numphoton, active_buffers);
@@ -2681,8 +2681,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                       dependency_recoveries.pre_increment();
                       recovered = true;
                       cmac_warning(
-                          "Recovered stalled photon iteration %u by releasing "
-                          "stale subgrid dependency locks once "
+                          "Recovered stalled photon iteration %" PRIuFAST32
+                          " by releasing stale subgrid dependency locks once "
                           "(photons=%" PRIuFAST64 "/%" PRIuFAST64
                           ", buffers=%zu, pending tasks=%" PRIuFAST64
                           ", queued tasks=%zu).",
@@ -2692,7 +2692,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
                     if (!recovered) {
                       cmac_error(
-                          "Photon iteration %u cannot make progress: all "
+                          "Photon iteration %" PRIuFAST32
+                          " cannot make progress: all "
                           "workers are idle, photons=%" PRIuFAST64
                           "/%" PRIuFAST64 ", buffers=%zu, pending tasks=%"
                           PRIuFAST64 ", queued tasks=%zu, dependency "
