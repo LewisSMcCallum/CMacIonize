@@ -2430,6 +2430,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           // reset the photon source information
           photon_source.reset();
 
+          // Count all photon tasks from creation until completion. This lets
+          // the scheduler distinguish real work from a stranded buffer or a
+          // permanently locked dependency at the end of an iteration.
+          AtomicValue< uint_fast64_t > pending_photon_tasks(0);
+
           // reset the diffuse field variables
           if (reemission_handler != nullptr) {
             AtomicValue< size_t > igrid(0);
@@ -2462,6 +2467,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 (*tasks)[new_task].set_type(TASKTYPE_SOURCE_DISCRETE_PHOTON);
                 (*tasks)[new_task].set_subgrid(isrc);
                 (*tasks)[new_task].set_buffer(number_of_photons_this_batch);
+                pending_photon_tasks.pre_increment();
                 shared_queue->add_task(new_task);
                 number_of_photons_done += number_of_photons_this_batch;
               }
@@ -2469,8 +2475,16 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           }
           cmac_assert(number_of_photons_done == numphoton);
 
-          bool global_run_flag = true;
+          AtomicValue< bool > global_run_flag(true);
           AtomicValue< uint_fast64_t > num_photon_done(0);
+          AtomicValue< uint_fast32_t > active_photon_tasks(0);
+          AtomicValue< uint_fast32_t > scheduler_calls(0);
+          AtomicValue< uint_fast64_t > stalled_polls(0);
+          AtomicValue< bool > recovery_requested(false);
+          AtomicValue< bool > recovery_lock(false);
+          AtomicValue< uint_fast32_t > dependency_recoveries(0);
+          const uint_fast64_t stalled_poll_limit =
+              1000000 * static_cast< uint_fast64_t >(num_thread);
 
 
           // create task contexts
@@ -2496,7 +2510,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   reemission_handler != nullptr, _max_photon_distance);
 
           PrematureLaunchTaskContext< HydroDensitySubGrid > premature_launch(
-              *buffers, *grid_creator, *tasks, queues, *shared_queue);
+              *buffers, *grid_creator, *tasks, queues, *shared_queue,
+              &pending_photon_tasks);
 
           Scheduler scheduler(*tasks, queues, *shared_queue);
 
@@ -2515,13 +2530,35 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               }
             }
 
-            // actual run flag
-            uint_fast32_t current_index = shared_queue->get_task(*tasks);
-            while (global_run_flag) {
+            // Do not enter the scheduler while a stalled iteration is being
+            // inspected. A task returned here is counted as active before the
+            // scheduler call is published as complete, closing the small gap
+            // between removing a task from a queue and executing it.
+            const auto schedule_task = [&](const bool launch_partial) {
+              if (recovery_requested.value()) {
+                return static_cast< uint_fast32_t >(NO_TASK);
+              }
+              scheduler_calls.pre_increment();
+              if (recovery_requested.value()) {
+                scheduler_calls.pre_decrement();
+                return static_cast< uint_fast32_t >(NO_TASK);
+              }
+              if (launch_partial) {
+                premature_launch.execute();
+              }
+              const uint_fast32_t task_index = scheduler.get_task(thread_id);
+              if (task_index != NO_TASK) {
+                active_photon_tasks.pre_increment();
+              }
+              scheduler_calls.pre_decrement();
+              return task_index;
+            };
+
+            uint_fast32_t current_index = schedule_task(false);
+            while (global_run_flag.value()) {
 
               if (current_index == NO_TASK) {
-                premature_launch.execute();
-                current_index = scheduler.get_task(thread_id);
+                current_index = schedule_task(true);
               }
 
               while (current_index != NO_TASK) {
@@ -2540,6 +2577,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 num_tasks_to_add = task_contexts[task.get_type()]->execute(
                     thread_id, thread_contexts[task.get_type()], tasks_to_add,
                     queues_to_add, task);
+
+                // Account for extra successors before making them visible.
+                // The current task already supplies the count for the common
+                // one-successor case.
+                if (num_tasks_to_add > 1) {
+                  pending_photon_tasks.pre_add(num_tasks_to_add - 1);
+                }
 
                 // log the end time of the task
                 task.stop();
@@ -2563,15 +2607,109 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   }
                 }
 
-                current_index = scheduler.get_task(thread_id);
+                // With no successor, retire the current pending-task count.
+                if (num_tasks_to_add == 0) {
+                  pending_photon_tasks.pre_decrement();
+                }
+                active_photon_tasks.pre_decrement();
+                stalled_polls.set(0);
+                current_index = schedule_task(false);
               }
 
-              if (buffers->is_empty() && num_photon_done.value() == numphoton) {
-                global_run_flag = false;
+              if (buffers->is_empty() &&
+                  num_photon_done.value() == numphoton &&
+                  pending_photon_tasks.value() == 0) {
+                global_run_flag.set(false);
               } else {
-                current_index = scheduler.get_task(thread_id);
+                current_index = schedule_task(false);
+                if (current_index == NO_TASK &&
+                    active_photon_tasks.value() == 0 &&
+                    !recovery_requested.value()) {
+                  const uint_fast64_t stall_count =
+                      stalled_polls.pre_increment();
+
+                  // A transient gap between scheduler calls is normal. Only
+                  // inspect the global state after sustained zero progress.
+                  if (stall_count >= stalled_poll_limit &&
+                      recovery_lock.lock()) {
+                    recovery_requested.set(true);
+                    while (scheduler_calls.value() > 0 ||
+                           active_photon_tasks.value() > 0) {
+                    }
+
+                    // A task may have completed while recovery was being
+                    // requested. In that case progress is healthy: resume
+                    // scheduling without touching any dependency.
+                    if (stalled_polls.value() < stalled_poll_limit) {
+                      recovery_requested.set(false);
+                      recovery_lock.unlock();
+                      continue;
+                    }
+
+                    size_t queued_tasks = shared_queue->size();
+                    for (size_t iqueue = 0; iqueue < queues.size(); ++iqueue) {
+                      queued_tasks += queues[iqueue]->size();
+                    }
+                    const size_t active_buffers =
+                        buffers->get_number_of_active_buffers();
+                    const uint_fast64_t pending_tasks =
+                        pending_photon_tasks.value();
+                    const uint_fast64_t photons_done = num_photon_done.value();
+
+                    bool recovered = false;
+                    if (pending_tasks == 0 && active_buffers > 0) {
+                      // Normal partial buffers are recoverable: detach the
+                      // largest one and turn it into a traversal task.
+                      recovered = premature_launch.execute();
+                      if (recovered) {
+                        cmac_warning(
+                            "Recovered a stalled photon iteration %u by "
+                            "launching a partial photon buffer "
+                            "(photons=%" PRIuFAST64 "/%" PRIuFAST64
+                            ", buffers=%zu).",
+                            iloop, photons_done, numphoton, active_buffers);
+                      }
+                    } else if (pending_tasks > 0 && queued_tasks > 0 &&
+                               dependency_recoveries.value() == 0) {
+                      // With every worker and scheduler call stopped, no grid
+                      // dependency can legitimately remain locked. Clear a
+                      // stale lock once and retry the queued work.
+                      for (auto gridit = grid_creator->begin();
+                           gridit != grid_creator->all_end(); ++gridit) {
+                        (*gridit).get_dependency()->unlock();
+                      }
+                      dependency_recoveries.pre_increment();
+                      recovered = true;
+                      cmac_warning(
+                          "Recovered stalled photon iteration %u by releasing "
+                          "stale subgrid dependency locks once "
+                          "(photons=%" PRIuFAST64 "/%" PRIuFAST64
+                          ", buffers=%zu, pending tasks=%" PRIuFAST64
+                          ", queued tasks=%zu).",
+                          iloop, photons_done, numphoton, active_buffers,
+                          pending_tasks, queued_tasks);
+                    }
+
+                    if (!recovered) {
+                      cmac_error(
+                          "Photon iteration %u cannot make progress: all "
+                          "workers are idle, photons=%" PRIuFAST64
+                          "/%" PRIuFAST64 ", buffers=%zu, pending tasks=%"
+                          PRIuFAST64 ", queued tasks=%zu, dependency "
+                          "recoveries=%" PRIuFAST32 ". No safe recovery is "
+                          "available; aborting instead of spinning forever.",
+                          iloop, photons_done, numphoton, active_buffers,
+                          pending_tasks, queued_tasks,
+                          dependency_recoveries.value());
+                    }
+
+                    stalled_polls.set(0);
+                    recovery_requested.set(false);
+                    recovery_lock.unlock();
+                  }
+                }
               }
-            } // while(global_run_flag)
+            } // while(global_run_flag.value())
 
             for (int_fast32_t itask = 0; itask < TASKTYPE_NUMBER; ++itask) {
               delete thread_contexts[itask];

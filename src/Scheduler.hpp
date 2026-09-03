@@ -67,7 +67,10 @@ public:
    */
   inline uint_fast32_t get_task(const int_fast8_t thread_id) {
 
-    uint_fast32_t task_index = _queues[thread_id]->get_task(_tasks);
+    // A worker's local queue may simultaneously be inspected by a stealing
+    // worker. Never wait behind that scan: a missed try is harmless because
+    // all queues are polled again immediately.
+    uint_fast32_t task_index = _queues[thread_id]->try_get_task(_tasks);
     if (task_index == NO_TASK) {
 
       // try to steal a task from another thread's queue
@@ -88,8 +91,10 @@ public:
         ++i;
       }
       if (task_index == NO_TASK) {
-        // get a task from the shared queue
-        task_index = _shared_queue.get_task(_tasks);
+        // Many idle workers reach the shared queue together. Do not make them
+        // all spin on its lock; a missed try is harmless because the scheduler
+        // is polled again immediately.
+        task_index = _shared_queue.try_get_task(_tasks);
       }
     }
 

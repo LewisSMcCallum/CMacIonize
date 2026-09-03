@@ -51,6 +51,9 @@ private:
   /*! @brief General shared queue. */
   TaskQueue &_shared_queue;
 
+  /*! @brief Optional count of unfinished photon tasks. */
+  AtomicValue< uint_fast64_t > *_pending_tasks;
+
 public:
   /**
    * @brief Constructor.
@@ -65,15 +68,20 @@ public:
       MemorySpace &buffers,
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
       ThreadSafeVector< Task > &tasks, std::vector< TaskQueue * > &queues,
-      TaskQueue &shared_queue)
+      TaskQueue &shared_queue,
+      AtomicValue< uint_fast64_t > *pending_tasks = nullptr)
       : _buffers(buffers), _grid_creator(grid_creator), _tasks(tasks),
-        _queues(queues), _shared_queue(shared_queue) {}
+        _queues(queues), _shared_queue(shared_queue),
+        _pending_tasks(pending_tasks) {}
 
   /**
    * @brief Execute a premature launch task.
+   *
+   * @return True if a partial photon buffer was launched.
    */
-  inline void execute() {
+  inline bool execute() {
 
+    bool launched = false;
     uint_fast32_t threshold_size = PHOTONBUFFER_SIZE;
     while (threshold_size > 0) {
       threshold_size >>= 1;
@@ -95,6 +103,9 @@ public:
             Task &new_task = _tasks[task_index];
             new_task.set_subgrid(_buffers[non_full_index].get_subgrid_index());
             new_task.set_buffer(non_full_index);
+            if (_pending_tasks != nullptr) {
+              _pending_tasks->pre_increment();
+            }
             if (largest_index > 0) {
               DensitySubGrid &subgrid = *_grid_creator.get_subgrid(
                   _buffers[non_full_index].get_subgrid_index());
@@ -132,6 +143,7 @@ public:
             this_subgrid.get_dependency()->unlock();
 
             // we managed to activate a buffer, we are done
+            launched = true;
             threshold_size = 0;
             break;
           } else {
@@ -142,6 +154,7 @@ public:
         }
       }
     }
+    return launched;
   }
 };
 

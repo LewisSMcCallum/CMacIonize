@@ -855,7 +855,7 @@ void TaskBasedIonizationSimulation::run(
     _time_log.end("photon source tasks");
 
     _time_log.start("photon propagation");
-    bool global_run_flag = true;
+    AtomicValue< bool > global_run_flag(true);
     AtomicValue< uint_fast64_t > num_photon_done(0);
 
 
@@ -923,9 +923,9 @@ void TaskBasedIonizationSimulation::run(
       }
 
       // actual run flag
-      uint_fast32_t current_index = _shared_queue->get_task(*_tasks);
+      uint_fast32_t current_index = scheduler.get_task(thread_id);
       size_t next_stall_warning = 1000000;
-      while (global_run_flag) {
+      while (global_run_flag.value()) {
 
 
         if (current_index == NO_TASK) {
@@ -978,7 +978,7 @@ void TaskBasedIonizationSimulation::run(
 
         if (_buffers->is_empty() &&
             num_photon_done.value() == _number_of_photons) {
-          global_run_flag = false;
+          global_run_flag.set(false);
         } else {
           current_index = scheduler.get_task(thread_id);
           if (current_index == NO_TASK) {
