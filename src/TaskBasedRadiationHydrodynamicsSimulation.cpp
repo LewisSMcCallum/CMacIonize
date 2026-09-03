@@ -2649,6 +2649,13 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                 task.stop();
                 cpucycle_tick(task_stop);
                 active_time[get_thread_index()] += task_stop - task_start;
+
+                // Retain completed tasks only while producing a task plot.
+                // Returning these timing-only tasks here lets the normal
+                // end-of-step task reset avoid scanning the full task pool.
+                if (task_plot_i >= task_plot_N) {
+                  tasks->free_element(itask);
+                }
               }
             }
             stop_parallel_timing_block();

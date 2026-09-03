@@ -38,6 +38,39 @@
  */
 int main(int argc, char **argv) {
 
+  // Temporary entries can be returned individually before clear_after(). In
+  // that case clear_after() should reset the allocation cursor while leaving
+  // the permanent prefix intact.
+  {
+    ThreadSafeVector< int_fast32_t > vector(16);
+    vector.get_free_elements(4);
+    for (uint_fast32_t i = 0; i < 64; ++i) {
+      const size_t index = vector.get_free_element();
+      vector[index] = i;
+      vector.free_element(index);
+    }
+    assert_condition(vector.get_number_of_active_elements() == 4);
+    vector.clear_after(4);
+    assert_condition(vector.size() == 4);
+    const size_t index = vector.get_free_element();
+    assert_condition(index == 4);
+    vector.free_element(index);
+  }
+
+  // Preserve the original clearing behaviour when temporary entries are
+  // deliberately retained, as happens while producing a task plot.
+  {
+    ThreadSafeVector< int_fast32_t > vector(16);
+    vector.get_free_elements(4);
+    vector.get_free_element();
+    vector.get_free_element();
+    vector.clear_after(4);
+    assert_condition(vector.size() == 4);
+    const size_t index = vector.get_free_element();
+    assert_condition(index == 4);
+    vector.free_element(index);
+  }
+
   // make sure we use way too many threads, to force collisions
   omp_set_num_threads(512);
 

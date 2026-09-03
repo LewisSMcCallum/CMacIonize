@@ -40,10 +40,11 @@
 #include "HydroDensitySubGrid.hpp"
 #include "SphericalDensitySubGrid.hpp"
 
-#include <cinttypes>
-#include <vector>
+#include <algorithm>
 #include <cmath>
+#include <cinttypes>
 #include <typeinfo>
+#include <vector>
 
 /**
  * @brief Class responsible for creating DensitySubGrid instances that make up
@@ -905,12 +906,36 @@ public:
   inline void update_copies(std::vector< uint_fast8_t > &copy_levels) {
 
     const uint_fast32_t original_number = number_of_original_subgrids();
+    cmac_assert_message(copy_levels.size() == original_number,
+                        "Expected %" PRIuFAST32 " copy levels, received %zu.",
+                        original_number, copy_levels.size());
+
+    // Source updates can leave the requested hierarchy unchanged. Avoid
+    // destroying and cloning every copied subgrid in that common case.
+    size_t copy_index = 0;
+    bool levels_changed = false;
+    for (uint_fast32_t i = 0; !levels_changed && i < original_number; ++i) {
+      size_t current_number_of_copies = 0;
+      while (copy_index < _originals.size() && _originals[copy_index] == i) {
+        ++current_number_of_copies;
+        ++copy_index;
+      }
+      const size_t requested_number_of_copies =
+          (static_cast< size_t >(1) << copy_levels[i]) - 1;
+      levels_changed = current_number_of_copies != requested_number_of_copies;
+    }
+    levels_changed = levels_changed || copy_index != _originals.size();
+    if (!levels_changed) {
+      return;
+    }
+
     for (uint_fast32_t igrid = original_number; igrid < _subgrids.size();
          ++igrid) {
       delete _subgrids[igrid];
     }
     _subgrids.resize(original_number);
     _originals.clear();
+    std::fill(_copies.begin(), _copies.end(), 0xffffffff);
 
     create_copies(copy_levels);
   }

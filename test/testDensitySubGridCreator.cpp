@@ -28,6 +28,7 @@
 #include "DensitySubGridCreator.hpp"
 #include "HomogeneousDensityFunction.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <vector>
 
@@ -360,6 +361,19 @@ int main(int argc, char **argv) {
   assert_condition(grid131.get_neighbour(TRAVELDIRECTION_FACE_Y_P) == 91);
   assert_condition(grid131.get_neighbour(TRAVELDIRECTION_FACE_Z_N) == 128);
   assert_condition(grid131.get_neighbour(TRAVELDIRECTION_FACE_Z_P) == 84);
+
+  // An unchanged request should preserve the existing hierarchy rather than
+  // needlessly cloning every copied subgrid again.
+  DensitySubGrid *existing_copy = &(*grid_creator.get_subgrid(128));
+  grid_creator.update_copies(copy_levels);
+  assert_condition(grid_creator.number_of_actual_subgrids() == 132);
+  assert_condition(&(*grid_creator.get_subgrid(128)) == existing_copy);
+
+  // Removing all copies must also clear the old copy lookup entries.
+  std::fill(copy_levels.begin(), copy_levels.end(), 0);
+  grid_creator.update_copies(copy_levels);
+  assert_condition(grid_creator.number_of_actual_subgrids() == 128);
+  grid_creator.update_copy_properties();
 
   return 0;
 }

@@ -169,9 +169,15 @@ public:
    * @param offset First index that should be cleared.
    */
   inline void clear_after(const size_t offset) {
-    for (size_t i = offset; i < _size; ++i) {
-      _locks[i].unlock();
-      _vector[i] = _datatype_();
+    // In the normal task-based RHD path all temporary tasks have already been
+    // returned individually. Avoid walking the entire reserved task pool in
+    // that common case; large safety margins can contain tens of millions of
+    // unused entries.
+    if (_number_taken.value() != offset) {
+      for (size_t i = offset; i < _size; ++i) {
+        _locks[i].unlock();
+        _vector[i] = _datatype_();
+      }
     }
     _number_taken.set(offset);
     _current_index.set(offset);
