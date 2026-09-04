@@ -79,6 +79,9 @@ public:
                                       double temperature = 0.) const;
 
   virtual double get_total_flux() const;
+
+  virtual double get_random_frequency_weighted(RandomGenerator &random,
+      double uniform_fraction, double &weight) const;
 };
 
 #endif // PEGASE3PHOTONSOURCESPECTRUM_HPP

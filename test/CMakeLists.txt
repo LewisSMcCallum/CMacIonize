@@ -271,6 +271,10 @@ add_unit_test(NAME testSILCCPhotonSourceDistribution
               SOURCES ${TESTSILCCPHOTONSOURCEDISTRIBUTION_SOURCES})
 
 ## Unit test for IonizationStateCalculator
+add_unit_test(NAME testSamplingHydroChemistry
+              SOURCES testSamplingHydroChemistry.cpp
+              LIBS SharedEngine)
+
 set(TESTIONIZATIONSTATECALCULATOR_SOURCES
     testIonizationStateCalculator.cpp
 )

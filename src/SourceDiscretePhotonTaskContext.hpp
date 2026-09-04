@@ -55,6 +55,7 @@ private:
 
   /*! @brief Weight of an individual discrete photon packet. */
   const double _discrete_photon_weight;
+  const double _frequency_uniform_fraction;
 
   /*! @brief Spectrum for discrete sources. */
   const PhotonSourceSpectrum &_photon_source_spectrum;
@@ -100,10 +101,12 @@ public:
       DensitySubGridCreator< _subgrid_type_ > &grid_creator,
       ThreadSafeVector< Task > &tasks,
       PhotonSourceDistribution &photon_source_distribution,
-      PhotonPacketStatistics *statistics)
+      PhotonPacketStatistics *statistics,
+      const double frequency_uniform_fraction = 0.)
       : _photon_source(photon_source), _buffers(buffers),
         _random_generators(random_generators),
         _discrete_photon_weight(discrete_photon_weight),
+        _frequency_uniform_fraction(frequency_uniform_fraction),
         _photon_source_spectrum(photon_source_spectrum),
         _abundances(abundances), _cross_sections(cross_sections),
         _grid_creator(grid_creator), _tasks(tasks),
@@ -186,15 +189,19 @@ public:
           typeid(HDF5PhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() || 
           typeid(MixedDrivingPhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ||
           typeid(SwiggumFilePhotonSourceDistribution).name() == typeid(_photon_source_distribution).name() ) {
-        frequency = _photon_source_distribution.get_photon_frequency(
-          _random_generators[thread_id], _photon_source.get_index(source_index));
+        double spectral_weight = 1.;
+        frequency = _photon_source_distribution.get_photon_frequency_weighted(
+          _random_generators[thread_id], _photon_source.get_index(source_index),
+          _frequency_uniform_fraction, spectral_weight);
         //photon.set_weight(_photon_source_distribution.get_photon_weighting(_photon_source.get_index(source_index)));
-        photon.set_weight(_discrete_photon_weight);
+        photon.set_weight(_discrete_photon_weight * spectral_weight);
       } else {
-        frequency = _photon_source_spectrum.get_random_frequency(
-            _random_generators[thread_id]);
-        // we currently assume equal weight for all photons
-        photon.set_weight(_discrete_photon_weight);
+        double spectral_weight = 1.;
+        frequency = _photon_source_spectrum.get_random_frequency_weighted(
+            _random_generators[thread_id], _frequency_uniform_fraction,
+            spectral_weight);
+        // Frequency importance sampling changes packet weights, not luminosity.
+        photon.set_weight(_discrete_photon_weight * spectral_weight);
       }
 
 

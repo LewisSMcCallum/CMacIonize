@@ -137,6 +137,8 @@ public:
   virtual double get_total_luminosity() const;
   virtual double get_photon_frequency(RandomGenerator &random_generator,
                                       photonsourcenumber_t index);
+  virtual double get_photon_frequency_weighted(RandomGenerator &random,
+      photonsourcenumber_t index, double uniform_fraction, double &weight);
 
   virtual bool update(
       DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,

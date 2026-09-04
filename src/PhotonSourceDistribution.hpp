@@ -223,6 +223,15 @@ public:
   virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index) {
     return 0.0;
   }
+
+  virtual double get_photon_frequency_weighted(RandomGenerator &random,
+      photonsourcenumber_t index, double uniform_fraction, double &weight) {
+    if (uniform_fraction != 0.) {
+      cmac_error("This source distribution does not support frequency importance sampling.");
+    }
+    weight = 1.;
+    return get_photon_frequency(random, index);
+  }
 };
 
 #endif // PHOTONSOURCEDISTRIBUTION_HPP

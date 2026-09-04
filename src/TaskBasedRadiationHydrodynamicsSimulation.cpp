@@ -29,6 +29,7 @@
 #include "AlveliusTurbulenceForcing.hpp"
 #include "BarnesHutTree.hpp"
 #include "ChargeTransferRates.hpp"
+#include "ChemistryDiagnostics.hpp"
 #include "CollisionalRates.hpp"
 #include "CommandLineParser.hpp"
 #include "ContinuousPhotonSourceFactory.hpp"
@@ -42,6 +43,7 @@
 #include "HydroBoundaryManager.hpp"
 #include "GalacticShearingBox.hpp"
 #include "HydroDensitySubGrid.hpp"
+#include "HydroStepChemistry.hpp"
 #include "HydroMaskFactory.hpp"
 #include "InitialTurbulence.hpp"
 #include "LineCoolingData.hpp"
@@ -831,7 +833,8 @@ if (neutral_gas_heating) {
     // No neutral hydrogen means no local absorption of He Ly-alpha photons.
     const double pHots = h0 > 0. ?
         1. / (1. + 77. * he0 / (sqrtT * h0)) : 0.;
-    const double ne = n * (1. - h0 + AHe * hep + 2*AHe*(1. - hep - he0));
+    const double ne = n * (std::max(0., 1. - h0) + AHe * hep +
+                           2*AHe*std::max(0., 1. - hep - he0));
     const double nenhep = ne * hep * n * AHe;
     gain += pHots * 1.21765423e-18 * alpha_e_2sP * nenhep/inverse_volume;
 #else
@@ -1569,7 +1572,20 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     "TaskBasedRadiationHydrodynamicsSimulation:time dependent ionization", false);
 
   const bool _advect_ionization = params->get_value< bool >(
-    "TaskBasedRadiationHydrodynamicsSimulation:advect ionization", false);
+      "TaskBasedRadiationHydrodynamicsSimulation:advect ionization", false);
+  const bool chemistry_every_hydro_step = params->get_value<bool>(
+      "TaskBasedRadiationHydrodynamicsSimulation:chemistry every hydro step", false);
+  const bool chemistry_diagnostics_enabled = params->get_value<bool>(
+      "TaskBasedRadiationHydrodynamicsSimulation:chemistry diagnostics", false);
+  const double frequency_uniform_fraction = params->get_value<double>(
+      "TaskBasedRadiationHydrodynamicsSimulation:frequency sampling uniform fraction", 0.);
+  if (!std::isfinite(frequency_uniform_fraction) || frequency_uniform_fraction < 0. ||
+      frequency_uniform_fraction > 1.) {
+    cmac_error("frequency sampling uniform fraction must be in [0,1].");
+  }
+  if (chemistry_diagnostics_enabled && !chemistry_every_hydro_step) {
+    cmac_error("chemistry diagnostics requires chemistry every hydro step.");
+  }
 #ifndef HAVE_GSL
  // if (_time_dependent_ionization) {
   //  cmac_error("Cant do full time dependent ionization without GSL.")
@@ -1667,6 +1683,18 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   const bool do_explicit_temp_calc = params->get_value< bool >(
           "TaskBasedRadiationHydrodynamicsSimulation:do explicit temperature calculation",
           false);
+  if (chemistry_every_hydro_step && (!_time_dependent_ionization ||
+      !do_explicit_temp_calc || params->get_value<bool>(
+          "TemperatureCalculator:do temperature calculation", false))) {
+    cmac_error("chemistry every hydro step requires time dependent ionization=true, "
+               "do explicit temperature calculation=true, and "
+               "TemperatureCalculator:do temperature calculation=false.");
+  }
+  if (log) {
+    log->write_status("Chemistry every hydro step: ", chemistry_every_hydro_step,
+                      "; GSL diagnostics: ", chemistry_diagnostics_enabled,
+                      "; frequency sampling uniform fraction: ", frequency_uniform_fraction);
+  }
 
   const bool neutral_gas_heating = params->get_value< bool >(
       "TaskBasedRadiationHydrodynamicsSimulation:neutral gas heating", false);
@@ -1783,6 +1811,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   uint_fast64_t numphoton = params->get_value< uint_fast64_t >(
       "TaskBasedRadiationHydrodynamicsSimulation:number of photons", 1e6);
+  if (chemistry_every_hydro_step && do_radiation && (!nloop || !numphoton)) {
+    cmac_error("Hydro-step chemistry with radiation requires positive photon and iteration counts.");
+  }
 
   const double _max_photon_distance = params->get_physical_value< QUANTITY_LENGTH >(
       "TaskBasedRadiationHydrodynamicsSimulation:max photon distance", "-1 kpc");
@@ -1803,6 +1834,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
   ChargeTransferRates charge_transfer_rates;
   CollisionalRates collisional_rates;
+  IonizationStateCalculator hydro_chemistry(0., abundances, *recombination_rates,
+                                           charge_transfer_rates, collisional_rates);
 
   TemperatureCalculator *temperature_calculator;
 
@@ -2253,6 +2286,21 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
   /// SIMULATION
   TimeLine *timeline = nullptr;
   int_fast32_t num_step = 0;
+  const size_t chemistry_cells_per_subgrid =
+      (*grid_creator->get_subgrid(0)).get_number_of_cells();
+  ChemistryDiagnostics chemistry_diagnostics(chemistry_diagnostics_enabled,
+      chemistry_cells_per_subgrid * grid_creator->number_of_original_subgrids(),
+      num_thread);
+  // Rebuild rates at the restored physical state before advancing chemistry.
+  // No fields are added to the binary restart layout.
+  bool refresh_chemistry_radiation = chemistry_every_hydro_step && restart_reader != nullptr;
+  if (refresh_chemistry_radiation && do_radiation && log) {
+    log->write_status("Refreshing cached radiation rates on restart for hydro-step chemistry.");
+  }
+  if (chemistry_every_hydro_step && !do_radiation) {
+    for (auto it = grid_creator->begin(); it != grid_creator->original_end(); ++it)
+      (*it).reset_intensities();
+  }
   double actual_timestep, current_time;
   requested_timestep *= CFL;
   bool has_next_step;
@@ -2318,9 +2366,10 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
 
     // decide whether or not to do the radiation step
-    if (do_radiation &&
-        (hydro_radtime < 0. ||
-         (current_time-actual_timestep) >= hydro_lastrad * hydro_radtime)) {
+    const bool radiation_due = hydro_radtime < 0. ||
+        (current_time-actual_timestep) >= hydro_lastrad * hydro_radtime;
+    if (do_radiation && (radiation_due || refresh_chemistry_radiation)) {
+      chemistry_diagnostics.flush(current_time);
 
         if (_cooling_file != nullptr) {
           *_cooling_file << current_time << "\t" << total_thermal_lost<< "\n";
@@ -2333,7 +2382,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         log->write_status("Starting radiation step...");
       }
 
-      ++hydro_lastrad;
+      if (radiation_due) ++hydro_lastrad;
+      refresh_chemistry_radiation = false;
 
     if(sourcedistribution != nullptr) {
 
@@ -2493,7 +2543,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
               new SourceDiscretePhotonTaskContext< HydroDensitySubGrid >(
                   photon_source, *buffers, random_generators, 1., *spectrum,
                   abundances, *cross_sections, *grid_creator, *tasks,
-                   *sourcedistribution,nullptr);
+                   *sourcedistribution,nullptr, frequency_uniform_fraction);
 
 
           if (reemission_handler) {
@@ -2770,7 +2820,20 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                                    abundances.get_abundance(ELEMENT_He));
 #endif
             }
-                if (_time_dependent_ionization) {
+                if (chemistry_every_hydro_step) {
+                  size_t local_cell = 0;
+                  const double luminosity_per_packet =
+                      sourcedistribution->get_total_luminosity() / numphoton;
+                  for (auto cell = (*gridit).begin(); cell != (*gridit).end(); ++cell, ++local_cell) {
+                    auto &vars = cell.get_ionization_variables();
+                    const double jfac = luminosity_per_packet / cell.get_volume();
+                    ChemistryDiagnostics::Scope diagnostic(chemistry_diagnostics,
+                        this_igrid*chemistry_cells_per_subgrid+local_cell,
+                        get_thread_index(), vars, actual_timestep, true, jfac);
+                    HydroStepChemistry::radiation_trial(vars, hydro_chemistry,
+                        jfac, actual_timestep, iloop == nloop-1);
+                  }
+                } else if (_time_dependent_ionization) {
                   if (iloop == nloop -1) {
                     temperature_calculator->calculate_temperature(
                       iloop, numphoton, *gridit, current_time - lastrad_time, true, true);
@@ -2836,7 +2899,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
               }
-              if (_time_dependent_ionization) {
+              if (chemistry_every_hydro_step) {
+                // No photons: reset_intensities() above supplies zero rates.
+              } else if (_time_dependent_ionization) {
                   
                temperature_calculator->calculate_temperature(
                       0, 0, *gridit, current_time - lastrad_time, true, true);
@@ -2878,7 +2943,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
                   cellit.get_ionization_variables().set_prev_ionic_fraction(ION_H_n,-1.);
                 }      
               } 
-              if (_time_dependent_ionization) {
+              if (chemistry_every_hydro_step) {
+                // No source distribution: chemistry remains collisional only.
+              } else if (_time_dependent_ionization) {
               
                   temperature_calculator->calculate_temperature(
                     0, 0, *gridit, current_time - lastrad_time, true, true);
@@ -2917,6 +2984,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       if (log) {
         log->write_status("Done with radiation step.");
       }
+      chemistry_diagnostics.flush(current_time);
 
       std::cout << "setting last radtime to " << current_time << std::endl;
       std::cout << "last one was " << lastrad_time << " for a difference of " << current_time - lastrad_time <<  std::endl; 
@@ -3257,8 +3325,9 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
         const size_t this_igrid = igrid.post_increment();
         if (this_igrid < grid_creator->number_of_original_subgrids()) {
           auto gridit = grid_creator->get_subgrid(this_igrid);
+          size_t local_cell = 0;
           for (auto cellit = (*gridit).hydro_begin();
-               cellit != (*gridit).hydro_end(); ++cellit) {
+               cellit != (*gridit).hydro_end(); ++cellit, ++local_cell) {
            // hydro.set_primitive_variables(cellit.get_hydro_variables(), cellit.get_ionization_variables(), cellit.get_volume())
             HydroVariables &cell_hydro = cellit.get_hydro_variables();
             IonizationVariables &cell_ionization =
@@ -3270,6 +3339,14 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
             } else if (cell_hydro.get_primitives_density() > 0.) {
               hydro.set_temperature(cell_ionization, cell_hydro,
                                     cellit.get_volume(), _cooling_temp_floor);
+            }
+            if (chemistry_every_hydro_step && cell_hydro.get_primitives_density() > 0.) {
+              ChemistryDiagnostics::Scope diagnostic(chemistry_diagnostics,
+                  this_igrid*chemistry_cells_per_subgrid+local_cell,
+                  get_thread_index(), cell_ionization, actual_timestep);
+              HydroStepChemistry::advance(cell_ionization, hydro_chemistry, actual_timestep);
+              // Chemistry changes particle number, not the hydro thermal energy.
+              hydro.align_temp_to_p(cell_hydro, cell_ionization);
             }
 
             IonizationVariables ionization_variables =
@@ -3335,6 +3412,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       if (hydro_firstsnap <= hydro_lastsnap) {
         time_logger.start("snapshot");
         writer->write(*grid_creator, hydro_lastsnap, *params, current_time);
+        chemistry_diagnostics.flush(current_time);
+        chemistry_diagnostics.write_snapshot(writer->get_snapshot_filename(hydro_lastsnap));
         if (sourcedistribution != nullptr) {
           sourcedistribution->write_snapshot_metadata(
               writer->get_snapshot_filename(hydro_lastsnap), current_time);
@@ -3621,6 +3700,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     if (write_output) {
       time_logger.start("snapshot");
       writer->write(*grid_creator, hydro_lastsnap, *params, current_time);
+      chemistry_diagnostics.flush(current_time);
+      chemistry_diagnostics.write_snapshot(writer->get_snapshot_filename(hydro_lastsnap));
       if (sourcedistribution != nullptr) {
         sourcedistribution->write_snapshot_metadata(
             writer->get_snapshot_filename(hydro_lastsnap), current_time);
@@ -3629,6 +3710,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
     }
   }
 
+  chemistry_diagnostics.flush(current_time);
   cpucycle_tick(program_end);
 
   time_logger.output("time_log.txt", true);

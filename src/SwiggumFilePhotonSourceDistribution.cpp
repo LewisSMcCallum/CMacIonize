@@ -853,6 +853,13 @@ double SwiggumFilePhotonSourceDistribution::get_photon_frequency(
       random_generator, 0.);
 }
 
+double SwiggumFilePhotonSourceDistribution::get_photon_frequency_weighted(
+    RandomGenerator &random, photonsourcenumber_t index,
+    double uniform_fraction, double &weight) {
+  return _spectra[_spectrum_indices[index]]->get_random_frequency_weighted(
+      random, uniform_fraction, weight);
+}
+
 bool SwiggumFilePhotonSourceDistribution::update(
     DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
     const double actual_timestep) {

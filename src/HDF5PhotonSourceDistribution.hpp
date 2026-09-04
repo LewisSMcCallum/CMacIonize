@@ -100,6 +100,8 @@ public:
   virtual double get_weight(photonsourcenumber_t index) const;
   virtual double get_total_luminosity() const;
   virtual double get_photon_frequency(RandomGenerator &random_generator, photonsourcenumber_t index);
+  virtual double get_photon_frequency_weighted(RandomGenerator &random,
+      photonsourcenumber_t index, double uniform_fraction, double &weight);
   virtual void write_restart_file(RestartWriter &restart_writer) const;
   virtual bool do_stellar_feedback(const double current_time) const;
   virtual void get_sne_radii(DensitySubGridCreator< HydroDensitySubGrid > &grid_creator);

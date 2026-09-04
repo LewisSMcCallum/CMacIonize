@@ -24,6 +24,7 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 #include "Pegase3PhotonSourceSpectrum.hpp"
+#include "FrequencyImportanceSampling.hpp"
 #include "Log.hpp"
 #include "ParameterFile.hpp"
 #include "Pegase3DataLocation.hpp"
@@ -287,6 +288,14 @@ double Pegase3PhotonSourceSpectrum::get_random_frequency(
           (x - _cumulative_distribution[inu]) /
           (_cumulative_distribution[inu + 1] - _cumulative_distribution[inu]);
   return frequency;
+}
+
+double Pegase3PhotonSourceSpectrum::get_random_frequency_weighted(
+    RandomGenerator &random, double uniform_fraction, double &weight) const {
+  weight = 1.;
+  if (uniform_fraction == 0.) return get_random_frequency(random);
+  return sample_frequency_importance(_frequencies, _cumulative_distribution,
+                                    random, uniform_fraction, weight);
 }
 
 /**

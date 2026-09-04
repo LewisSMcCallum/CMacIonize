@@ -53,8 +53,14 @@ struct DriverState {
   gsl_odeiv2_driver *driver;
   const gsl_odeiv2_system *system;
   std::size_t dimension;
+  int element;
+  double initial[MAXIMUM_TRACKED_DIMENSION];
+  double output[MAXIMUM_TRACKED_DIMENSION];
+  double reached_time;
+  unsigned long steps;
 
-  DriverState() : driver(nullptr), system(nullptr), dimension(0) {}
+  DriverState() : driver(nullptr), system(nullptr), dimension(0), element(0),
+                  initial{}, output{}, reached_time(0.), steps(0) {}
 };
 
 /**
@@ -70,8 +76,34 @@ inline DriverState &driver_state() {
   return state;
 }
 
+enum DiagnosticKind { RESTORED, INPUT_CLAMPED, OUTPUT_CLAMPED, SIMPLEX_CORRECTED, ATTEMPTED };
+typedef void (*DiagnosticCallback)(void *, DiagnosticKind, const char *, int,
+                                    const DriverState &);
+struct DiagnosticContext {
+  DiagnosticCallback callback = nullptr;
+  void *data = nullptr;
+};
+inline DiagnosticContext &diagnostic_context() {
+  static thread_local DiagnosticContext context;
+  return context;
+}
+inline void diagnostic(DiagnosticKind kind, const char *reason, int status = 0) {
+  DiagnosticContext &context = diagnostic_context();
+  if (context.callback) context.callback(context.data, kind, reason, status,
+                                        driver_state());
+}
+// Element bits: H/He=0, C=1, N=2, O=3, Ne=4, S=5.
+inline void set_element(int element) {
+  DriverState &state = driver_state();
+  state.element = element;
+  state.dimension = 0;
+  state.reached_time = 0.;
+  state.steps = 0;
+}
+
 /** @brief Rate-limited warning for pathological chemistry cells. */
 inline void warn_failure(const char *reason, const int status = GSL_SUCCESS) {
+  diagnostic(RESTORED, reason, status);
   static std::atomic< unsigned int > warning_count(0);
   const unsigned int count = warning_count.fetch_add(1);
   if (count < 20) {
@@ -99,6 +131,10 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
   state.driver = nullptr;
   state.system = system;
   state.dimension = system == nullptr ? 0 : system->dimension;
+  state.reached_time = 0.;
+  state.steps = 0;
+  std::fill(state.initial, state.initial + MAXIMUM_TRACKED_DIMENSION, 0.);
+  std::fill(state.output, state.output + MAXIMUM_TRACKED_DIMENSION, 0.);
 
   if (system == nullptr || system->function == nullptr ||
       state.dimension == 0 || state.dimension > MAXIMUM_TRACKED_DIMENSION) {
@@ -157,8 +193,12 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
   }
 
   double initial[MAXIMUM_TRACKED_DIMENSION];
+  diagnostic(ATTEMPTED, "ODE attempt");
+  bool input_clamped = false;
   for (std::size_t i = 0; i < dimension; ++i) {
     initial[i] = y[i];
+    state.initial[i] = y[i];
+    state.output[i] = y[i];
     if (!std::isfinite(initial[i])) {
       warn_failure("non-finite input ionic fraction");
       return GSL_SUCCESS;
@@ -166,8 +206,10 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
     // All systems currently routed through this wrapper evolve fractions.
     // Remove tiny advection/roundoff excursions before giving them to GSL.
     y[i] = std::max(0., std::min(1., y[i]));
+    input_clamped |= y[i] != initial[i];
     initial[i] = y[i];
   }
+  if (input_clamped) diagnostic(INPUT_CLAMPED, "input outside [0,1]");
 
   if (!std::isfinite(*time) || !std::isfinite(target_time)) {
     warn_failure("non-finite integration time");
@@ -211,6 +253,9 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
 
   const double initial_time = *time;
   const int status = ::gsl_odeiv2_driver_apply(driver, time, target_time, y);
+  state.reached_time = *time;
+  state.steps = driver->n;
+  for (std::size_t i = 0; i < dimension; ++i) state.output[i] = y[i];
 
   bool valid = status == GSL_SUCCESS && std::isfinite(*time);
   for (std::size_t i = 0; i < dimension && valid; ++i) {
@@ -236,7 +281,7 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
   return GSL_SUCCESS;
 }
 
-/** @brief Free a wrapped driver and clear its per-thread metadata. */
+/** @brief Free the driver, retaining its last result for output diagnostics. */
 inline void driver_free(gsl_odeiv2_driver *driver) {
   DriverState &state = driver_state();
   if (driver != nullptr) {
@@ -245,7 +290,6 @@ inline void driver_free(gsl_odeiv2_driver *driver) {
   if (state.driver == driver) {
     state.driver = nullptr;
     state.system = nullptr;
-    state.dimension = 0;
   }
 }
 

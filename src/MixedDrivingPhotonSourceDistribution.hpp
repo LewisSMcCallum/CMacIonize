@@ -844,6 +844,12 @@ public:
 
 }
 
+  double get_photon_frequency_weighted(RandomGenerator &random,
+      photonsourcenumber_t index, double uniform_fraction, double &weight) {
+    return _all_spectra[_spectrum_index[index]]->get_random_frequency_weighted(
+        random, uniform_fraction, weight);
+  }
+
 
   /**
    * @brief Update the distribution after the system moved to the given time.

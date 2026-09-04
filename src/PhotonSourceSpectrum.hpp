@@ -26,6 +26,8 @@
 #ifndef PHOTONSOURCESPECTRUM_HPP
 #define PHOTONSOURCESPECTRUM_HPP
 
+#include "Error.hpp"
+
 class RandomGenerator;
 
 /**
@@ -54,6 +56,16 @@ public:
    * @return Total ionizing flux (in m^-2 s^-1).
    */
   virtual double get_total_flux() const = 0;
+
+  /** Optional importance sampling; unsupported spectra fail explicitly. */
+  virtual double get_random_frequency_weighted(RandomGenerator &random,
+      const double uniform_fraction, double &weight) const {
+    if (uniform_fraction != 0.) {
+      cmac_error("Frequency importance sampling requires WMBasic or Pegase3 spectra.");
+    }
+    weight = 1.;
+    return get_random_frequency(random);
+  }
 };
 
 #endif // PHOTONSOURCESPECTRUM_HPP

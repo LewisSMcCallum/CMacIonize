@@ -41,6 +41,33 @@
 #include <gsl/gsl_odeiv2.h>
 #include <gsl/gsl_errno.h>
 
+// Report meaningful solver failures separately from tiny, routine output floors.
+static double bounded_chemistry_fraction(double x) {
+  return std::min(1., std::max(x, 1.e-14));
+}
+
+static void finish_element(double *y, size_t count) {
+  bool clamped = false;
+  double sum = 0.;
+  for (size_t i = 0; i < count; ++i) {
+    const double bounded = bounded_chemistry_fraction(y[i]);
+    clamped |= bounded != y[i];
+    y[i] = bounded;
+    sum += y[i];
+  }
+  const bool significant_simplex_error = sum > 1. + 1.e-8;
+  if (sum > 1.) {
+    clamped = true;
+    // Keep the implicit highest stage non-negative. The unprojected ODE result
+    // remains in the diagnostics, including any larger-than-roundoff excursion.
+    for (size_t i = 0; i < count; ++i) y[i] /= sum;
+  }
+  if (significant_simplex_error)
+    SafeGslOde::diagnostic(SafeGslOde::SIMPLEX_CORRECTED, "element fractions sum above 1+1e-8");
+  else if (clamped)
+    SafeGslOde::diagnostic(SafeGslOde::OUTPUT_CLAMPED, "trace floor/roundoff bounds");
+}
+
 /**
  * @brief Constructor.
  *
@@ -163,14 +190,17 @@ void IonizationStateCalculator::calculate_ionization_state(
     ionization_variables.set_ionic_fraction(ION_H_n, std::min(1.0, std::max(h0, 1e-14)));
 
 #ifdef HAS_HELIUM
-    ionization_variables.set_ionic_fraction(ION_He_n, std::min(1.0, std::max(he0, 1e-14)));
-    ionization_variables.set_ionic_fraction(ION_He_p1,std::min(1.0, std::max(hep, 1e-14)));
+    ionization_variables.set_ionic_fraction(ION_He_n, time_dependent ? he0 :
+        std::min(1.0, std::max(he0, 1e-14)));
+    ionization_variables.set_ionic_fraction(ION_He_p1, time_dependent ? hep :
+        std::min(1.0, std::max(hep, 1e-14)));
 #endif
 
     // do the coolants
     const double nhp = ntot * (1. - h0);
 #ifdef HAS_HELIUM
-    const double ne = ntot*(1-h0) + 2.0*AHe*ntot*(1-he0-hep) + ntot*hep*AHe;
+    const double ne = ntot * (std::max(0., 1-h0) +
+        2.0*AHe*std::max(0., 1-he0-hep) + hep*AHe);
 #else
     const double ne = nhp;
 #endif
@@ -1094,6 +1124,7 @@ int hydrogen_ode_system(double t, const double y[], double f[], void *params) {
 double IonizationStateCalculator::compute_time_dependent_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
+  SafeGslOde::set_element(0);
   double coefficients[4] = {gammaH, jH, alphaH, nH};
   // Initial conditions: n_H, n_H_plus
   double y[1] = {old_xn}; // Example initial population densities
@@ -1118,6 +1149,7 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
 
   gsl_odeiv2_driver_free(driver);
 
+  finish_element(y, 1);
   double xn = y[0];
 
   xn = std::max(xn,1e-14);
@@ -1157,11 +1189,12 @@ int hydrogen_helium_ode_system(double t, const double y[], double f[], void *par
     double he0 = y[1];
     double hep = y[2];
 
-    double hepp = 1-he0-hep;
+    double hepp = std::max(0., 1-he0-hep);
 
     double ne = (1-xh)*nH + hep*nH*AHe + 2.0*hepp*nH*AHe;
 
-    double pHots = 1. / (1. + 77. * he0 / sqrtT / xh);
+    // A valid fully ionized state has xh=he0=0. Avoid 0/0 there.
+    double pHots = xh > 0. ? xh / (xh + 77. * std::max(0., he0) / sqrtT) : 0.;
 
 
     // ODE for the neutral fraction x
@@ -1191,6 +1224,15 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
     const double gammaHe2, double ts) {
 
 
+  SafeGslOde::set_element(0);
+  // The implicit He++ fraction must be non-negative, including after advection.
+  if (he0 + hep > 1.) {
+    const double sum = he0 + hep;
+    he0 /= sum;
+    hep /= sum;
+    SafeGslOde::diagnostic(sum > 1. + 1.e-8 ? SafeGslOde::SIMPLEX_CORRECTED :
+        SafeGslOde::OUTPUT_CLAMPED, "input helium sum above one");
+  }
   double alpha_e_2sP = 4.17e-20 * std::pow(T * 1.e-4, -0.861);
   double sqrtT = std::sqrt(T);
 
@@ -1221,9 +1263,11 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
 
   gsl_odeiv2_driver_free(driver);
 
-  h0 = std::max(y[0],1e-14);
-  he0 = std::max(y[1],1e-14);
-  hep = std::max(y[2],1e-14);
+  finish_element(y, 1);
+  finish_element(y + 1, 2);
+  h0 = y[0];
+  he0 = y[1];
+  hep = y[2];
 
 
   h0 = std::min(h0,1.);
@@ -1265,6 +1309,7 @@ inline int metals_ode_system(double t, const double y[], double f[], void *param
     for (size_t i = 0; i < coefficients.size(); ++i) {
         frac_last -= y[i];
     }
+    frac_last = std::max(0., frac_last);
 
     
 //change for first level, and last level, note last level is actually second last level, with the highest level not being tracked explicity
@@ -1342,6 +1387,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 #ifdef HAS_CARBON
 {
       const size_t levels_carbon = 3;
+      SafeGslOde::set_element(1);
 
       double y[levels_carbon-1] = {ionization_variables.get_ionic_fraction(ION_C_p1), 
                               ionization_variables.get_ionic_fraction(ION_C_p2)};
@@ -1387,14 +1433,16 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_C_p1, std::min(1.0,std::max(y[0],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_C_p2, std::min(1.0,std::max(y[1],1e-14)));
+      finish_element(y, levels_carbon-1);
+      ionization_variables.set_ionic_fraction(ION_C_p1, y[0]);
+      ionization_variables.set_ionic_fraction(ION_C_p2, y[1]);
 }    
 #endif
 
 #ifdef HAS_NITROGEN
 {
       const size_t levels_nitrogen = 4;
+      SafeGslOde::set_element(2);
 
       double y[levels_nitrogen-1] = {ionization_variables.get_ionic_fraction(ION_N_n), 
                               ionization_variables.get_ionic_fraction(ION_N_p1),
@@ -1447,15 +1495,17 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_N_n, std::min(1.0,std::max(y[0],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_N_p1, std::min(1.0,std::max(y[1],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_N_p2, std::min(1.0,std::max(y[2],1e-14)));
+      finish_element(y, levels_nitrogen-1);
+      ionization_variables.set_ionic_fraction(ION_N_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_N_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_N_p2, y[2]);
 }
 #endif
 
 #ifdef HAS_OXYGEN
 {
       const size_t levels_oxygen = 5;
+      SafeGslOde::set_element(3);
 
       double y[levels_oxygen-1] = {ionization_variables.get_ionic_fraction(ION_O_n), 
                               ionization_variables.get_ionic_fraction(ION_O_p1),
@@ -1513,16 +1563,18 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_O_n, std::min(1.0,std::max(y[0],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_O_p1, std::min(1.0,std::max(y[1],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_O_p2, std::min(1.0,std::max(y[2],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_O_p3, std::min(1.0,std::max(y[3],1e-14)));
+      finish_element(y, levels_oxygen-1);
+      ionization_variables.set_ionic_fraction(ION_O_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_O_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_O_p2, y[2]);
+      ionization_variables.set_ionic_fraction(ION_O_p3, y[3]);
 }
 #endif
 
 #ifdef HAS_NEON
 {
       const size_t levels_neon = 5;
+      SafeGslOde::set_element(4);
 
       double y[levels_neon-1] = {ionization_variables.get_ionic_fraction(ION_Ne_n), 
                               ionization_variables.get_ionic_fraction(ION_Ne_p1),
@@ -1575,16 +1627,18 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_Ne_n, std::min(1.0,std::max(y[0],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_Ne_p1, std::min(1.0,std::max(y[1],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_Ne_p2, std::min(1.0,std::max(y[2],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_Ne_p3, std::min(1.0,std::max(y[3],1e-14)));
+      finish_element(y, levels_neon-1);
+      ionization_variables.set_ionic_fraction(ION_Ne_n, y[0]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p1, y[1]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p2, y[2]);
+      ionization_variables.set_ionic_fraction(ION_Ne_p3, y[3]);
 }
 #endif
 
 #ifdef HAS_SULPHUR
 {
       const size_t levels_sulphur = 4;
+      SafeGslOde::set_element(5);
 
       double y[levels_sulphur-1] = {ionization_variables.get_ionic_fraction(ION_S_p1), 
                               ionization_variables.get_ionic_fraction(ION_S_p2),
@@ -1639,9 +1693,10 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_driver_free(driver);
       //set new 
-      ionization_variables.set_ionic_fraction(ION_S_p1, std::min(1.0,std::max(y[0],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_S_p2, std::min(1.0,std::max(y[1],1e-14)));
-      ionization_variables.set_ionic_fraction(ION_S_p3, std::min(1.0,std::max(y[2],1e-14)));
+      finish_element(y, levels_sulphur-1);
+      ionization_variables.set_ionic_fraction(ION_S_p1, y[0]);
+      ionization_variables.set_ionic_fraction(ION_S_p2, y[1]);
+      ionization_variables.set_ionic_fraction(ION_S_p3, y[2]);
 
 }
 #endif
