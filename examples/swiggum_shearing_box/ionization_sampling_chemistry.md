@@ -113,6 +113,39 @@ It prints a small chemistry cost/failure comparison as well. A faster or cleaner
 full simulation is not guaranteed by passing these checks; this is a combined
 practical experiment, not a clean attribution of glitter to one mechanism.
 
+## Chemistry workspace speedup
+
+No parameter change is needed. The time-dependent solver now keeps one GSL
+workspace per active network size per thread, with a stable, owned system
+descriptor. Every cell resets the integrator and replaces its parameters;
+derivatives, adaptive step history and failed solves are never carried into
+another cell. Metal coefficients use fixed stack arrays instead of nested
+vectors. The initial trial step is the requested chemistry timestep, rather
+than timestep/100 (or /1000 for hydrogen only); RKF45 still rejects/subdivides
+trials at the same 1e-8 absolute/relative tolerances. The 10,000-step cap,
+restore-to-input fallback, diagnostic counts, cooling and chemistry cadence
+are unchanged.
+
+Only `SafeGslOde.hpp` and `IonizationStateCalculator.cpp` change runtime code.
+There is no new serialized state: existing restart dumps remain readable, and
+the small per-thread workspaces are allocated lazily after restart.
+
+The added `testChemistrySolverReuse` checks fresh-versus-reused drivers with
+changing systems on four threads, an analytic relaxation solution, invalid-RHS
+restoration, step-cap exhaustion and successful reuse afterward. It also
+prints a 96-cell actual-CHIANTI comparison and a short-step benchmark. Local
+19-ion before/after checks found identical fallback counts for every case
+(including deliberately stiff, long-step cases); among cases with no fallback,
+the maximum ion-fraction difference was 7.6e-6 over a 50-kyr step. A repeated
+5,000-cell, 95-year-step benchmark was about 1.1x, 1.2x and 1.3x faster at
+100, 8,000 and 50,000 K respectively, and approximately unchanged at 1e6 K.
+These are chemistry-only timings, not a predicted whole-run speedup.
+
+Both hydrogen-only and 19-ion builds and the focused chemistry/restart tests
+are checked. A small restart written by the previous executable was also
+continued with the new 19-ion executable: 512 physical solves per element for
+one hydro step, the expected radiation refresh, and no restored solves.
+
 ### Local validation (4 September 2026)
 
 - Hydrogen-only and 19-ion executables built with OpenMP and assertions.

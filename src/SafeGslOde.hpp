@@ -76,6 +76,25 @@ inline DriverState &driver_state() {
   return state;
 }
 
+/** @brief Thread-local workspace, shared sequentially by systems of one size.
+ *
+ * GSL retains a pointer to its system: own that small object here, not on a
+ * caller's stack. Only params is borrowed, for the duration of a solve. Reset
+ * before every cell, including after a failed solve; never reuse derivatives.
+ */
+struct DriverWorkspace {
+  gsl_odeiv2_system system{};
+  gsl_odeiv2_driver *driver = nullptr;
+  const gsl_odeiv2_step_type *step_type = nullptr;
+  ~DriverWorkspace() {
+    if (driver != nullptr) ::gsl_odeiv2_driver_free(driver);
+  }
+};
+inline DriverWorkspace &driver_workspace(std::size_t dimension) {
+  static thread_local DriverWorkspace workspaces[MAXIMUM_TRACKED_DIMENSION + 1];
+  return workspaces[dimension];
+}
+
 enum DiagnosticKind { RESTORED, INPUT_CLAMPED, OUTPUT_CLAMPED, SIMPLEX_CORRECTED, ATTEMPTED };
 typedef void (*DiagnosticCallback)(void *, DiagnosticKind, const char *, int,
                                     const DriverState &);
@@ -120,8 +139,7 @@ inline void warn_failure(const char *reason, const int status = GSL_SUCCESS) {
 }
 
 /**
- * @brief Allocate an ODE driver with chemistry-appropriate tolerances and a
- * hard step cap.
+ * @brief Reuse an ODE workspace with unchanged tolerances and a hard step cap.
  */
 inline gsl_odeiv2_driver *driver_alloc_y_new(
     const gsl_odeiv2_system *system, const gsl_odeiv2_step_type *step_type,
@@ -144,25 +162,37 @@ inline gsl_odeiv2_driver *driver_alloc_y_new(
   }
 
   if (!std::isfinite(initial_step) || initial_step <= 0.) {
-    // The caller normally supplies timestep/100 or timestep/1000.  A one
-    // second seed is only a harmless starting guess; GSL adapts it immediately.
+    // A one second seed is only a starting guess; GSL adapts it immediately.
     initial_step = 1.;
   }
 
-  gsl_odeiv2_driver *driver = ::gsl_odeiv2_driver_alloc_y_new(
-      system, step_type, initial_step, ABSOLUTE_TOLERANCE,
-      RELATIVE_TOLERANCE);
+  DriverWorkspace &workspace = driver_workspace(state.dimension);
+  if (workspace.driver != nullptr && workspace.step_type != step_type) {
+    ::gsl_odeiv2_driver_free(workspace.driver);
+    workspace.driver = nullptr;
+  }
+  workspace.system = *system;
+  state.system = &workspace.system;
+  if (workspace.driver == nullptr) {
+    workspace.driver = ::gsl_odeiv2_driver_alloc_y_new(
+        &workspace.system, step_type, initial_step, ABSOLUTE_TOLERANCE,
+        RELATIVE_TOLERANCE);
+    workspace.step_type = step_type;
+  }
+  gsl_odeiv2_driver *driver = workspace.driver;
   if (driver == nullptr) {
     warn_failure("GSL driver allocation failed");
     state.system = nullptr;
     return nullptr;
   }
 
-  const int status =
-      ::gsl_odeiv2_driver_set_nmax(driver, MAXIMUM_DRIVER_STEPS);
+  int status = ::gsl_odeiv2_driver_reset_hstart(driver, initial_step);
+  if (status == GSL_SUCCESS)
+    status = ::gsl_odeiv2_driver_set_nmax(driver, MAXIMUM_DRIVER_STEPS);
   if (status != GSL_SUCCESS) {
-    warn_failure("could not set the GSL driver step cap", status);
+    warn_failure("could not reset the GSL driver or set its step cap", status);
     ::gsl_odeiv2_driver_free(driver);
+    workspace.driver = nullptr;
     state.system = nullptr;
     return nullptr;
   }
@@ -281,13 +311,11 @@ inline int driver_apply(gsl_odeiv2_driver *driver, double *time,
   return GSL_SUCCESS;
 }
 
-/** @brief Free the driver, retaining its last result for output diagnostics. */
+/** @brief Release this solve; keep the workspace and last diagnostic result. */
 inline void driver_free(gsl_odeiv2_driver *driver) {
   DriverState &state = driver_state();
-  if (driver != nullptr) {
-    ::gsl_odeiv2_driver_free(driver);
-  }
   if (state.driver == driver) {
+    if (driver != nullptr) driver_workspace(state.dimension).system.params = nullptr;
     state.driver = nullptr;
     state.system = nullptr;
   }

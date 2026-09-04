@@ -1121,6 +1121,9 @@ int hydrogen_ode_system(double t, const double y[], double f[], void *params) {
     return GSL_SUCCESS;
 }
 
+// Seed each chemistry solve with the requested timestep, not timestep/100.
+// Easy hydro steps can finish in one trial; RKF45 still rejects and subdivides
+// harder steps using the unchanged SafeGslOde tolerances and step cap.
 double IonizationStateCalculator::compute_time_dependent_hydrogen(
     const double alphaH, const double jH, const double nH, const double gammaH, const double old_xn, double ts) {
 
@@ -1136,7 +1139,7 @@ double IonizationStateCalculator::compute_time_dependent_hydrogen(
   gsl_odeiv2_system sys = {hydrogen_ode_system, nullptr, 1, coefficients};
 
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-        &sys, gsl_odeiv2_step_rkf45, ts/1000., 1e-4, 0.0);
+        &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
 
   int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
@@ -1247,7 +1250,7 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
   gsl_odeiv2_system sys = {hydrogen_helium_ode_system, nullptr, 3, coefficients};
 
   gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-        &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+        &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
   int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1291,22 +1294,29 @@ void IonizationStateCalculator::compute_time_dependent_hydrogen_helium(
 }
 
 struct ODEParams {
-    std::vector<std::vector<double>> coefficients;
+    // At most four explicitly evolved metal stages. Avoid allocating nested
+    // vectors for each element in every cell on every hydro step.
+    double coefficients[4][5];
+    size_t levels;
     double ne;
+    ODEParams(size_t number_of_levels, double electron_density)
+        : coefficients{}, levels(number_of_levels), ne(electron_density) {
+      cmac_assert(levels >= 2 && levels <= 4);
+    }
 };
 
 
 inline int metals_ode_system(double t, const double y[], double f[], void *params) {
     (void)(t); // Avoid unused parameter warning
     ODEParams* p = static_cast<ODEParams*>(params);
-    std::vector<std::vector<double>>& coefficients = p->coefficients;
+    const auto &coefficients = p->coefficients;
     double& ne = p->ne;
     //levels here is one less than total number of states
-    size_t levels = coefficients.size();
+    size_t levels = p->levels;
     // Boundary conditions
 
     double frac_last = 1.0;
-    for (size_t i = 0; i < coefficients.size(); ++i) {
+    for (size_t i = 0; i < levels; ++i) {
         frac_last -= y[i];
     }
     frac_last = std::max(0., frac_last);
@@ -1392,9 +1402,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
       double y[levels_carbon-1] = {ionization_variables.get_ionic_fraction(ION_C_p1), 
                               ionization_variables.get_ionic_fraction(ION_C_p2)};
 
-      ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_carbon-1, std::vector<double>(5, 0.0));
-      params.ne = ne;
+      ODEParams params(levels_carbon-1, ne);
 
     //set collisional rates 
       params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_C_p1, T);
@@ -1423,7 +1431,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_carbon - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/100., 1.e-4, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts, 1.e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1448,9 +1456,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                               ionization_variables.get_ionic_fraction(ION_N_p1),
                               ionization_variables.get_ionic_fraction(ION_N_p2)};
 
-      ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_nitrogen-1, std::vector<double>(5, 0.0));
-      params.ne = ne;
+      ODEParams params(levels_nitrogen-1, ne);
 
     //set collisional rates 
       params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_N_n, T);
@@ -1485,7 +1491,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_nitrogen - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1512,9 +1518,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                               ionization_variables.get_ionic_fraction(ION_O_p2),
                               ionization_variables.get_ionic_fraction(ION_O_p3)};
 
-      ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_oxygen-1, std::vector<double>(5, 0.0));
-      params.ne = ne;
+      ODEParams params(levels_oxygen-1, ne);
 
     //set collisional rates 
       params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_O_n, T);
@@ -1553,7 +1557,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_oxygen - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1581,9 +1585,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                               ionization_variables.get_ionic_fraction(ION_Ne_p2),
                               ionization_variables.get_ionic_fraction(ION_Ne_p3)};
 
-      ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_neon-1, std::vector<double>(5, 0.0));
-      params.ne = ne;
+      ODEParams params(levels_neon-1, ne);
 
     //set collisional rates 
       params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_Ne_n, T);
@@ -1617,7 +1619,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_neon - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
@@ -1644,9 +1646,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
                               ionization_variables.get_ionic_fraction(ION_S_p2),
                               ionization_variables.get_ionic_fraction(ION_S_p3)};
 
-      ODEParams params;
-      params.coefficients = std::vector<std::vector<double>>(levels_sulphur-1, std::vector<double>(5, 0.0));
-      params.ne = ne;
+      ODEParams params(levels_sulphur-1, ne);
 
     //set collisional rates 
       params.coefficients[0][0] = collisional_rates.get_collisional_rate(ION_S_p1, T);
@@ -1683,7 +1683,7 @@ void IonizationStateCalculator::compute_time_dependent_metals(
 
       gsl_odeiv2_system sys = {metals_ode_system, nullptr, levels_sulphur - 1, &params};
       gsl_odeiv2_driver *driver = gsl_odeiv2_driver_alloc_y_new(
-          &sys, gsl_odeiv2_step_rkf45, ts/100., 1e-4, 0.0);
+          &sys, gsl_odeiv2_step_rkf45, ts, 1e-4, 0.0);
 
       int status = gsl_odeiv2_driver_apply(driver, &t, ts, y);
 
