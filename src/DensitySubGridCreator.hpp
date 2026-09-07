@@ -380,6 +380,8 @@ public:
    */
   inline bool is_spherical() const { return _spherical; }
 
+  inline double get_spherical_minimum_radius() const { return _minimum_radius; }
+
   /**
    * @brief Get the centre of the cubed-sphere grid (in m).
    */

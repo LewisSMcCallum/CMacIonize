@@ -940,8 +940,8 @@ void TaskBasedIonizationSimulation::run(
 
           // execute task
           uint_fast32_t num_tasks_to_add = 0;
-          uint_fast32_t tasks_to_add[TRAVELDIRECTION_NUMBER];
-          int_fast32_t queues_to_add[TRAVELDIRECTION_NUMBER];
+          uint_fast32_t tasks_to_add[TaskContext::MAX_CREATED_TASKS];
+          int_fast32_t queues_to_add[TaskContext::MAX_CREATED_TASKS];
 
           Task &task = (*_tasks)[current_index];
           thread_stats[thread_id].start(task.get_type());

@@ -1031,6 +1031,9 @@ add_unit_test(NAME testSphericalDensitySubGridEntry
               SOURCES ${TESTSPHERICALDENSITYSUBGRIDENTRY_SOURCES})
 
 ## Unit test for TaskBasedIonizationSimulation
+add_unit_test(NAME testTransparentSphericalCavity
+              SOURCES testTransparentSphericalCavity.cpp)
+
 set(TESTTASKBASEDIONIZATIONSIMULATION_SOURCES
     testTaskBasedIonizationSimulation.cpp
 )

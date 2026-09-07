@@ -2615,8 +2615,8 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
                 // execute task
                 uint_fast32_t num_tasks_to_add = 0;
-                uint_fast32_t tasks_to_add[TRAVELDIRECTION_NUMBER];
-                int_fast32_t queues_to_add[TRAVELDIRECTION_NUMBER];
+                uint_fast32_t tasks_to_add[TaskContext::MAX_CREATED_TASKS];
+                int_fast32_t queues_to_add[TaskContext::MAX_CREATED_TASKS];
 
                 Task &task = (*tasks)[current_index];
                 uint_fast64_t task_start, task_stop;

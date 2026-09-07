@@ -39,6 +39,7 @@
 #include "Task.hpp"
 #include "TaskContext.hpp"
 #include "TaskQueue.hpp"
+#include "TransparentSphericalCavity.hpp"
 
 #include <cinttypes>
 #include <cmath>
@@ -183,6 +184,7 @@ public:
 
     // keep track of the original number of photons
     uint_fast32_t num_photon_done_now = photon_buffer.size();
+    uint_fast32_t num_tasks_to_add = 0;
 
     // now loop over the input buffer photons and traverse them one by
     // one
@@ -204,6 +206,35 @@ public:
       // check that the photon ended up in a valid output buffer
       cmac_assert_message(result >= 0 && result < TRAVELDIRECTION_NUMBER,
                           "fail");
+
+      // The central cavity is vacuum, not an escape boundary. Its opposite
+      // intersection can belong to any inner subgrid, so use a normal task
+      // with that grid's lock rather than touching its estimators here.
+      if (_grid_creator.is_spherical() &&
+          result == TRAVELDIRECTION_FACE_Z_N &&
+          this_grid.get_neighbour(result) == NEIGHBOUR_OUTSIDE &&
+          TransparentSphericalCavity::cross(
+              photon, _grid_creator.get_spherical_centre(),
+              _grid_creator.get_spherical_minimum_radius(), _max_photon_distance)) {
+        const size_t destination =
+            _grid_creator.get_subgrid(photon.get_position()).get_index();
+        DensitySubGrid &receiving_grid = *_grid_creator.get_subgrid(destination);
+        const uint_fast32_t buffer_index = _buffers.get_free_buffer();
+        PhotonBuffer &buffer = _buffers[buffer_index];
+        buffer.set_subgrid_index(destination);
+        buffer.set_direction(TRAVELDIRECTION_INSIDE);
+        buffer[buffer.get_next_free_photon()] = photon;
+        const size_t task_index = _tasks.get_free_element();
+        Task &new_task = _tasks[task_index];
+        new_task.set_subgrid(destination);
+        new_task.set_buffer(buffer_index);
+        new_task.set_type(TASKTYPE_PHOTON_TRAVERSAL);
+        new_task.set_dependency(receiving_grid.get_dependency());
+        tasks_to_add[num_tasks_to_add] = task_index;
+        queues_to_add[num_tasks_to_add++] = receiving_grid.get_owning_thread();
+        --num_photon_done_now;
+        continue;
+      }
 
       const bool distance_limited =
           _max_photon_distance > 0. &&
@@ -227,7 +258,6 @@ public:
     // add none empty buffers to the appropriate queues
     uint_fast8_t largest_index = TRAVELDIRECTION_NUMBER;
     uint_fast32_t largest_size = 0;
-    uint_fast32_t num_tasks_to_add = 0;
     for (int_fast32_t i = 0; i < TRAVELDIRECTION_NUMBER; ++i) {
 
       // only process enabled, non-empty output buffers

@@ -28,6 +28,9 @@
 
 #include <cinttypes>
 
+#include "PhotonBuffer.hpp"
+#include "TravelDirections.hpp"
+
 class Task;
 class ThreadContext;
 
@@ -42,6 +45,9 @@ class ThreadContext;
  */
 class TaskContext {
 public:
+  // Ordinary face buffers plus at most one cavity-routing task per input photon.
+  static constexpr uint_fast32_t MAX_CREATED_TASKS =
+      TRAVELDIRECTION_NUMBER + PHOTONBUFFER_SIZE;
   /*! @brief Virtual destructor. */
   virtual ~TaskContext() {}
 
