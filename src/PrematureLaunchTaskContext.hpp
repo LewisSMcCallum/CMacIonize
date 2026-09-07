@@ -54,6 +54,9 @@ private:
   /*! @brief Optional count of unfinished photon tasks. */
   AtomicValue< uint_fast64_t > *_pending_tasks;
 
+  /*! @brief Shared rotating search: idle workers inspect different chunks. */
+  AtomicValue< size_t > _search_cursor;
+
 public:
   /**
    * @brief Constructor.
@@ -82,14 +85,20 @@ public:
   inline bool execute() {
 
     bool launched = false;
-    uint_fast32_t threshold_size = PHOTONBUFFER_SIZE;
-    while (threshold_size > 0) {
-      threshold_size >>= 1;
-      for (auto gridit = _grid_creator.begin();
-           gridit != _grid_creator.all_end(); ++gridit) {
-        DensitySubGrid &this_subgrid = *gridit;
-        if (this_subgrid.get_largest_buffer_size() > threshold_size &&
-            this_subgrid.get_dependency()->try_lock()) {
+    // Do not repeatedly scan the entire grid at decreasing size thresholds.
+    // At the photon tail most buffers contain one packet. Bound each search
+    // and share its cursor so workers return promptly to runnable tasks.
+    const size_t count = _grid_creator.all_end().get_index();
+    if (count == 0) {
+      return false;
+    }
+    const size_t chunk = std::min(size_t(64), count);
+    const size_t start = _search_cursor.post_add(chunk) % count;
+    for (size_t offset = 0; offset < chunk; ++offset) {
+        DensitySubGrid &this_subgrid =
+            *_grid_creator.get_subgrid((start + offset) % count);
+        // Read buffer metadata only while holding its owning subgrid lock.
+        if (this_subgrid.get_dependency()->try_lock()) {
 
           const uint_fast8_t largest_index =
               this_subgrid.get_largest_buffer_index();
@@ -144,7 +153,6 @@ public:
 
             // we managed to activate a buffer, we are done
             launched = true;
-            threshold_size = 0;
             break;
           } else {
             // no semi-full buffers for this subgrid: release the lock
@@ -152,7 +160,6 @@ public:
             this_subgrid.get_dependency()->unlock();
           }
         }
-      }
     }
     return launched;
   }
