@@ -247,6 +247,17 @@ TaskBasedIonizationSimulation::TaskBasedIonizationSimulation(
   _time_log.start("simulation start");
 
   _time_log.start("memory space");
+  const double frequency_uniform_fraction = _parameter_file.get_value<double>(
+      "TaskBasedIonizationSimulation:frequency sampling uniform fraction", 0.);
+  if (!std::isfinite(frequency_uniform_fraction) ||
+      frequency_uniform_fraction < 0. || frequency_uniform_fraction > 1.) {
+    cmac_error("frequency sampling uniform fraction must be in [0,1].");
+  }
+  if (_log) {
+    _log->write_status("Frequency sampling uniform fraction: ",
+                       frequency_uniform_fraction);
+  }
+
   const size_t number_of_buffers = _parameter_file.get_value< size_t >(
       "TaskBasedIonizationSimulation:number of buffers", 50000);
   _memory_log.add_entry("memory space");
@@ -869,7 +880,8 @@ void TaskBasedIonizationSimulation::run(
               *photon_source, *_buffers, _random_generators,
               discrete_photon_weight, *_photon_source_spectrum, _abundances,
               *_cross_sections, *_grid_creator, *_tasks,*_photon_source_distribution,
-              &statistics);
+              &statistics, _parameter_file.get_value<double>(
+                  "TaskBasedIonizationSimulation:frequency sampling uniform fraction", 0.));
     }
 
 
