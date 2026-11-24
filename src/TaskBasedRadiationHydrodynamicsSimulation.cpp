@@ -60,6 +60,7 @@
 #include "SourceDiscretePhotonTaskContext.hpp"
 #include "TaskQueue.hpp"
 #include "TemperatureCalculator.hpp"
+#include "HydrogenExcitationCooling.hpp"
 #include "TimeLine.hpp"
 #include "TimeLogger.hpp"
 
@@ -831,7 +832,7 @@ const double nenhp = ne*n*(1-h0);
     const double Lhep = 0.0;
 #endif
   
-  loss += (Lhp + Lhep)/inverse_volume;
+  loss += (Lhp + Lhep + hydrogen_excitation_cooling(temp, ne, n*h0))/inverse_volume;
 
   loss = std::max(loss,0.0);
 
@@ -1109,7 +1110,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     const double ne = n*(1-xh) + 2.0*AHe*n*(1.0-he0-hep) + n*hep*AHe;
     double nenhep = ne*n*AHe*ionization_variables.get_ionic_fraction(ION_He_p1);
 #else
-    const double ne = rho*(1-xh);
+    const double ne = n*(1-xh); // electron number density, not mass density
     double nenhep = 0.0;
 #endif
 
@@ -1173,7 +1174,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
     const double Lhp =
       2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(t_start));
     const double Lhep = 1.55e-39 * nenhep * std::pow(t_start, 0.3647);
-    cooling += (Lhp + Lhep)/inverse_volume;
+    cooling += (Lhp + Lhep + hydrogen_excitation_cooling(t_start, ne, n*xh))/inverse_volume;
     cooling = std::max(cooling,0.0);
   } else {
     cooling = radiative_cooling->get_cooling_rate(t_start) * nH2V;
@@ -1228,7 +1229,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         const double Lhp =
           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-        cooling += (Lhp + Lhep)/inverse_volume;
+        cooling += (Lhp + Lhep + hydrogen_excitation_cooling(temperature, ne, n*xh))/inverse_volume;
         cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;
@@ -1268,7 +1269,7 @@ inline static void do_cooling(IonizationVariables &ionization_variables,
         const double Lhp =
           2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(temperature));
         const double Lhep = 1.55e-39 * nenhep * std::pow(temperature, 0.3647);
-        cooling += (Lhp + Lhep)/inverse_volume;
+        cooling += (Lhp + Lhep + hydrogen_excitation_cooling(temperature, ne, n*xh))/inverse_volume;
         cooling = std::max(cooling,0.0);
       } else {
         cooling = radiative_cooling->get_cooling_rate(temperature) * nH2V;

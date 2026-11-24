@@ -24,6 +24,7 @@
  * @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
  */
 #include "TemperatureCalculator.hpp"
+#include "HydrogenExcitationCooling.hpp"
 #include "Abundances.hpp"
 #include "ChargeTransferRates.hpp"
 #include "CollisionalRates.hpp"
@@ -374,8 +375,9 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
       charge_transfer_rates, collisional_rates,ionization_variables);
 
   /// step 4: cooling
-  // the cooling consists of three term:
-  //  - cooling by recombination of coolants (C, N, O, Ne, S)
+  // Explicit cooling processes:
+  //  - collisionally excited metal lines
+  //  - electron-impact excitation of neutral hydrogen
   //  - cooling due to free-free radiation (bremsstrahlung)
   //  - cooling due to recombination of hydrogen and helium
 
@@ -510,13 +512,14 @@ void TemperatureCalculator::compute_cooling_and_heating_balance(
   const double Lhp =
       2.85e-40 * nenhp * sqrtT * (5.914 - 0.5 * logT + 0.01184 * std::cbrt(T));
   const double Lhep = 1.55e-39 * nenhep * std::pow(T, 0.3647);
+  const double Lh0 = hydrogen_excitation_cooling(T, ne, nh0);
 #ifdef DO_OUTPUT_COOLING
-  ionization_variables.set_cooling(ION_H_n, Lhp);
+  ionization_variables.set_cooling(ION_H_n, Lhp + Lh0);
 #ifdef HAS_HELIUM
   ionization_variables.set_cooling(ION_He_n, Lhep);
 #endif
 #endif
-  loss += Lhp + Lhep;
+  loss += Lhp + Lhep + Lh0;
   } else {
     loss = radiative_cooling->get_cooling_rate(T) * n * n;
   }

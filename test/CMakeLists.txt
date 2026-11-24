@@ -63,6 +63,9 @@ endmacro(add_unit_test)
 ### Actual unit test generation ################################################
 ### Add new unit tests below ###################################################
 
+add_unit_test(NAME testHydrogenExcitationCooling
+              SOURCES testHydrogenExcitationCooling.cpp LIBS SharedEngine)
+
 ## Unit test for LineCoolingData
 # Create the list of source files for this test
 # This list contains ALL .cpp and .hpp files necessary to make the test work.

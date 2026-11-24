@@ -24,6 +24,7 @@
  * @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
  */
 #include "EmissivityCalculator.hpp"
+#include "HydrogenExcitationCooling.hpp"
 #include "Abundances.hpp"
 #include "DensityGrid.hpp"
 #include "DensityValues.hpp"
@@ -429,7 +430,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     const double Lhep = 0.0;
 #endif
   
-  tot_cool += (Lhp + Lhep);
+  tot_cool += Lhp + Lhep + hydrogen_excitation_cooling(
+      T, ne, ntot * ionization_variables.get_ionic_fraction(ION_H_n));
   tot_cool = std::max(0.0,tot_cool);
   eval.set_emissivity(EMISSIONLINE_total_cooling,tot_cool);
     
@@ -533,7 +535,8 @@ EmissivityValues EmissivityCalculator::calculate_emissivities(
     const double Lhep = 0.0;
 #endif
   
-  tot_cool += (Lhp + Lhep);
+  tot_cool += Lhp + Lhep + hydrogen_excitation_cooling(
+      T, ne, ntot * ionization_variables.get_ionic_fraction(ION_H_n));
   tot_cool = std::max(0.0,tot_cool);
   eval.set_emissivity(EMISSIONLINE_total_cooling,tot_cool);
   }
